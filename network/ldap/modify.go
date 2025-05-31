@@ -202,7 +202,6 @@ func (ldapSession *Session) OverwriteAttributeValues(distinguishedName string, a
 			return fmt.Errorf("error flushing attribute %s of %s: %w", attrName, distinguishedName, err)
 		}
 	}
-
 	return nil
 }
 

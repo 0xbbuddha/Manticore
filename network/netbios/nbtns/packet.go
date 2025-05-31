@@ -33,6 +33,13 @@ const (
 	FlagTruncated     uint16 = 0x0200
 	FlagRecursion     uint16 = 0x0100
 	FlagBroadcast     uint16 = 0x0010
+
+	// Question Type
+	QuestionTypeNB     uint16 = 0x0020
+	QuestionTypeNBSTAT uint16 = 0x0021
+
+	// Question Class
+	QuestionClassIn uint16 = 0x0001 // Internet class
 )
 
 // NBTNSHeader represents the header of a NetBIOS name service packet
@@ -110,6 +117,7 @@ func (p *NBTNSPacket) Marshal() ([]byte, error) {
 			// Add name length and name
 			buf = append(buf, byte(len(encoded)))
 			buf = append(buf, []byte(encoded)...)
+			buf = append(buf, byte(0x00))
 
 			// Add type, class, TTL, and RDATA length
 			buf = binary.BigEndian.AppendUint16(buf, rr.Type)
@@ -158,7 +166,7 @@ func (p *NBTNSPacket) Unmarshal(data []byte) (int, error) {
 		if err != nil {
 			return 0, fmt.Errorf("failed to decode name: %v", err)
 		}
-		offset += nameLen
+		offset += nameLen + 1 // null terminator
 
 		if offset+4 > len(data) {
 			return 0, fmt.Errorf("truncated question")
