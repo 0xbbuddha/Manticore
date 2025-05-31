@@ -18,11 +18,16 @@ import (
 //
 // Returns:
 //   - bool: True if the baseDN exists, false if it does not exist or if an error occurs.
+//   - error: An error if the search fails.
 //
 // Example usage:
 //
 //	ldapSession := &Session{}
-//	exists := ldapSession.DistinguishedNameExists("DC=example,DC=com")
+//	exists, err := ldapSession.DistinguishedNameExists("DC=example,DC=com")
+//	if err != nil {
+//		fmt.Println("Error checking if baseDN exists:", err)
+//		return
+//	}
 //	if exists {
 //	    fmt.Println("The baseDN exists in the LDAP directory.")
 //	} else {

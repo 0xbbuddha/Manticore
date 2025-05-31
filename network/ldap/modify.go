@@ -199,7 +199,7 @@ func (ldapSession *Session) OverwriteAttributeValues(distinguishedName string, a
 		// Execute the modify request
 		err := ldapSession.connection.Modify(m)
 		if err != nil {
-			return fmt.Errorf("error overwriting attribute %s of %s: %s", attrName, distinguishedName, err)
+			return fmt.Errorf("error flushing attribute %s of %s: %w", attrName, distinguishedName, err)
 		}
 	}
 
