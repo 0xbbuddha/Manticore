@@ -202,7 +202,6 @@ func (ldapSession *Session) OverwriteAttributeValues(distinguishedName string, a
 			return fmt.Errorf("error overwriting attribute %s of %s: %s", attrName, distinguishedName, err)
 		}
 	}
-
 	return nil
 }
 
