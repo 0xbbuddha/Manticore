@@ -6,7 +6,7 @@ import (
 	goldapv3 "github.com/go-ldap/ldap/v3"
 )
 
-// BaseDNExists checks if a given base distinguished name (baseDN) exists in the LDAP directory.
+// DistinguishedNameExists checks if a given base distinguished name (baseDN) exists in the LDAP directory.
 //
 // This function performs an LDAP search with a base scope to determine if the specified baseDN exists.
 // It constructs an LDAP search request with the provided baseDN and a search filter of "(objectClass=*)",
@@ -18,11 +18,16 @@ import (
 //
 // Returns:
 //   - bool: True if the baseDN exists, false if it does not exist or if an error occurs.
+//   - error: An error if the search fails.
 //
 // Example usage:
 //
 //	ldapSession := &Session{}
-//	exists := ldapSession.BaseDNExists("DC=example,DC=com")
+//	exists, err := ldapSession.DistinguishedNameExists("DC=example,DC=com")
+//	if err != nil {
+//		fmt.Println("Error checking if baseDN exists:", err)
+//		return
+//	}
 //	if exists {
 //	    fmt.Println("The baseDN exists in the LDAP directory.")
 //	} else {
@@ -32,12 +37,12 @@ import (
 // Note:
 //   - This function assumes that the Session struct has a valid connection object and that the ldap package
 //     is correctly imported and used.
-func (ldapSession *Session) BaseDNExists(baseDN string) bool {
+func (ldapSession *Session) DistinguishedNameExists(distinguishedName string) (bool, error) {
 	// Specify LDAP search parameters
 	// https://pkg.go.dev/gopkg.in/ldap.v3#NewSearchRequest
 	searchRequest := goldapv3.NewSearchRequest(
 		// Base DN
-		baseDN,
+		distinguishedName,
 		// Scope
 		goldapv3.ScopeBaseObject,
 		// DerefAliases
@@ -58,11 +63,15 @@ func (ldapSession *Session) BaseDNExists(baseDN string) bool {
 
 	// Perform LDAP search
 	_, err := ldapSession.connection.Search(searchRequest)
-	if goldapv3.IsErrorWithCode(err, goldapv3.LDAPResultNoSuchObject) {
-		return false
-	} else {
-		return true
+	if err != nil {
+		if goldapv3.IsErrorWithCode(err, goldapv3.LDAPResultNoSuchObject) {
+			return false, nil
+		} else {
+			return false, err
+		}
 	}
+
+	return true, nil
 }
 
 // GetAllNamingContexts retrieves all naming contexts from the LDAP server.
