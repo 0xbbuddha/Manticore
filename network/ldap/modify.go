@@ -184,16 +184,23 @@ func (req *ModifyRequest) Replace(attrType string, attrVals []string) {
 //   - attrName: A string representing the name of the attribute to be overwritten.
 //   - attrVals: A slice of strings representing the new values for the attribute.
 func (ldapSession *Session) OverwriteAttributeValues(distinguishedName string, attrName string, attrVals []string) error {
-	controls := NewControlsWithOIDs([]string{LDAP_SERVER_PERMISSIVE_MODIFY_OID}, false)
+	if len(attrVals) == 0 {
+		err := ldapSession.FlushAttributeValues(distinguishedName, attrName)
+		if err != nil {
+			return fmt.Errorf("error flushing attribute %s of %s: %s", attrName, distinguishedName, err)
+		}
+	} else {
+		controls := NewControlsWithOIDs([]string{LDAP_SERVER_PERMISSIVE_MODIFY_OID}, false)
 
-	m := goldapv3.NewModifyRequest(distinguishedName, controls)
-	m.Delete(attrName, []string{})
-	m.Add(attrName, attrVals)
+		m := goldapv3.NewModifyRequest(distinguishedName, controls)
+		m.Delete(attrName, []string{})
+		m.Add(attrName, attrVals)
 
-	// Execute the modify request
-	err := ldapSession.connection.Modify(m)
-	if err != nil {
-		return fmt.Errorf("error overwriting attribute %s of %s: %s", attrName, distinguishedName, err)
+		// Execute the modify request
+		err := ldapSession.connection.Modify(m)
+		if err != nil {
+			return fmt.Errorf("error overwriting attribute %s of %s: %s", attrName, distinguishedName, err)
+		}
 	}
 
 	return nil
@@ -322,7 +329,7 @@ func (ldapSession *Session) AddStringToAttributeList(distinguishedName string, a
 	return nil
 }
 
-// FlushAttribute flushes the attribute by deleting it
+// FlushAttributeValues flushes the attribute by deleting it
 //
 // Parameters:
 //   - dn: A string representing the distinguished name (DN) of the LDAP entry to be modified.
@@ -330,7 +337,7 @@ func (ldapSession *Session) AddStringToAttributeList(distinguishedName string, a
 //
 // Returns:
 //   - An error object if the flush operation fails, otherwise nil.
-func (ldapSession *Session) FlushAttribute(distinguishedName string, attributeName string) error {
+func (ldapSession *Session) FlushAttributeValues(distinguishedName string, attributeName string) error {
 	// Create a modify request
 	m := goldapv3.NewModifyRequest(distinguishedName, nil)
 	m.Replace(attributeName, []string{})
