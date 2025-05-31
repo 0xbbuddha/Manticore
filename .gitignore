@@ -25,5 +25,5 @@ go.work.sum
 .env
 
 # Builds dir
-./bin/*
+./bin/
 ./main.go
