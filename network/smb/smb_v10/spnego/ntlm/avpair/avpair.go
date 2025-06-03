@@ -36,14 +36,17 @@ func (a *AvPair) String() string {
 func (a *AvPair) Marshal() ([]byte, error) {
 	marshaledData := []byte{}
 
+	// AvId
 	buf2 := make([]byte, 2)
 	binary.LittleEndian.PutUint16(buf2, a.AvID)
 	marshaledData = append(marshaledData, buf2...)
 
+	// AvLen
 	buf2 = make([]byte, 2)
 	binary.LittleEndian.PutUint16(buf2, a.AvLen)
 	marshaledData = append(marshaledData, buf2...)
 
+	// AvData
 	marshaledData = append(marshaledData, a.AvData...)
 
 	return marshaledData, nil
@@ -53,10 +56,13 @@ func (a *AvPair) Marshal() ([]byte, error) {
 func (a *AvPair) Unmarshal(marshaledData []byte) (int, error) {
 	buf := []byte{}
 
+	// AvId
 	a.AvID = binary.LittleEndian.Uint16(marshaledData[0:2])
 
+	// AvLen
 	a.AvLen = binary.LittleEndian.Uint16(marshaledData[2:4])
 
+	// AvData
 	a.AvData = marshaledData[4:]
 
 	return len(buf), nil
