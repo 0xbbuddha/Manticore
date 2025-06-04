@@ -99,7 +99,6 @@ func CreateNegotiateMessage(domain, workstation string, useUnicode bool) (*Negot
 
 // Marshal serializes the NegotiateMessage into a byte slice
 func (msg *NegotiateMessage) Marshal() ([]byte, error) {
-
 	// A 32-bit unsigned integer that defines the offset, in bytes, from
 	// the beginning of the NEGOTIATE_MESSAGE to the entry in Payload
 	// Starting at 40 for the header section + 4 for negotiate flags + 8 for domain name fields + 8 for workstation fields + 8 for version
@@ -122,9 +121,11 @@ func (msg *NegotiateMessage) Marshal() ([]byte, error) {
 	offset += len(msg.Workstation)
 	payload = append(payload, msg.Workstation...)
 
-	// Create header section
+	// Data section
+
 	marshalledData := []byte{}
 
+	// Create header section
 	msg.Header.MessageType = types.NEGOTIATE_MESSAGE_TYPE
 	msg.Header.Signature = header.NTLM_SIGNATURE
 	marshalledHeader, err := msg.Header.Marshal()
@@ -152,8 +153,8 @@ func (msg *NegotiateMessage) Marshal() ([]byte, error) {
 	}
 	marshalledData = append(marshalledData, workstationFieldsBytes...)
 
-	// Write version
-	if msg.Version != nil {
+	// Write version if needed
+	if msg.Version != nil && msg.NegotiateFlags.HasFlag(flags.NTLMSSP_NEGOTIATE_VERSION) {
 		byteStream, err := msg.Version.Marshal()
 		if err != nil {
 			return nil, err
