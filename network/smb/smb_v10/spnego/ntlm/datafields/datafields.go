@@ -50,3 +50,10 @@ func (df *DataFields) Unmarshal(data []byte) (int, error) {
 
 	return 8, nil
 }
+
+// Equal compares two DataFields structs for equality
+func (df *DataFields) Equal(other *DataFields) bool {
+	return df.Len == other.Len &&
+		df.MaxLen == other.MaxLen &&
+		df.BufferOffset == other.BufferOffset
+}
