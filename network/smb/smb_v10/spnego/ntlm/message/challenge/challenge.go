@@ -213,3 +213,8 @@ func (msg *ChallengeMessage) Unmarshal(data []byte) (int, error) {
 
 	return totalBytesRead, nil
 }
+
+// GetMessageType returns the message type of the ChallengeMessage
+func (msg *ChallengeMessage) GetMessageType() uint32 {
+	return uint32(msg.Header.MessageType)
+}

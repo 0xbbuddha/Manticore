@@ -430,3 +430,8 @@ func (msg *AuthenticateMessage) Unmarshal(data []byte) (int, error) {
 
 	return totalBytesRead, nil
 }
+
+// GetMessageType returns the message type of the AuthenticateMessage
+func (msg *AuthenticateMessage) GetMessageType() uint32 {
+	return uint32(msg.Header.MessageType)
+}
