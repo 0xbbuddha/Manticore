@@ -72,7 +72,7 @@ func (msg *ChallengeMessage) Marshal() ([]byte, error) {
 	marshalledData := []byte{}
 
 	// Create header section
-	msg.Header.MessageType = types.CHALLENGE_MESSAGE_TYPE
+	msg.Header.MessageType = types.MESSAGE_TYPE_CHALLENGE
 	msg.Header.Signature = header.NTLM_SIGNATURE
 	marshalledHeader, err := msg.Header.Marshal()
 	if err != nil {

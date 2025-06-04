@@ -12,15 +12,15 @@ func TestMessageTypeString(t *testing.T) {
 		expected    string
 	}{
 		{
-			messageType: types.NEGOTIATE_MESSAGE_TYPE,
+			messageType: types.MESSAGE_TYPE_NEGOTIATE,
 			expected:    "NEGOTIATE",
 		},
 		{
-			messageType: types.CHALLENGE_MESSAGE_TYPE,
+			messageType: types.MESSAGE_TYPE_CHALLENGE,
 			expected:    "CHALLENGE",
 		},
 		{
-			messageType: types.AUTHENTICATE_MESSAGE_TYPE,
+			messageType: types.MESSAGE_TYPE_AUTHENTICATE,
 			expected:    "AUTHENTICATE",
 		},
 		{

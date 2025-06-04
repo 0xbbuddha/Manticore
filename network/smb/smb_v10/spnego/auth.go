@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/authenticate"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/challenge"
+	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/authenticate"
+	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/challenge"
 	"github.com/TheManticoreProject/Manticore/utils/encoding/utf16"
 )
 
@@ -64,7 +64,8 @@ func (ctx *AuthContext) ProcessChallengeToken(token []byte) ([]byte, error) {
 	switch ctx.Type {
 	case AuthTypeNTLM:
 		// Parse the NTLM CHALLENGE message
-		challenge, err := challenge.ParseChallengeMessage(innerToken)
+		challenge := &challenge.ChallengeMessage{}
+		_, err = challenge.Unmarshal(innerToken)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse NTLM CHALLENGE message: %v", err)
 		}

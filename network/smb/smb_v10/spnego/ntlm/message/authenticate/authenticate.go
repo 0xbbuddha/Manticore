@@ -207,7 +207,7 @@ func (msg *AuthenticateMessage) Marshal() ([]byte, error) {
 	marshalledData := []byte{}
 
 	// Write header
-	msg.Header.MessageType = types.AUTHENTICATE_MESSAGE_TYPE
+	msg.Header.MessageType = types.MESSAGE_TYPE_AUTHENTICATE
 	msg.Header.Signature = header.NTLM_SIGNATURE
 	marshalledHeader, err := msg.Header.Marshal()
 	if err != nil {

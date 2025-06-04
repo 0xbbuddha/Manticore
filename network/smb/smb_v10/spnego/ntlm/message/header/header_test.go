@@ -17,13 +17,13 @@ func TestHeaderMarshalUnmarshal(t *testing.T) {
 		{
 			name:      "Standard NTLM Header",
 			signature: header.NTLM_SIGNATURE,
-			msgType:   types.NEGOTIATE_MESSAGE_TYPE,
+			msgType:   types.MESSAGE_TYPE_NEGOTIATE,
 			wantError: false,
 		},
 		{
 			name:      "Custom Signature",
 			signature: [8]byte{'T', 'E', 'S', 'T', 'S', 'I', 'G', 0},
-			msgType:   types.CHALLENGE_MESSAGE_TYPE,
+			msgType:   types.MESSAGE_TYPE_CHALLENGE,
 			wantError: false,
 		},
 	}

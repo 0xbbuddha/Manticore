@@ -44,7 +44,7 @@ func CreateNegotiateMessage(domain, workstation string, useUnicode bool) (*Negot
 	msg := NegotiateMessage{
 		Header: header.Header{
 			Signature:   header.NTLM_SIGNATURE,
-			MessageType: types.NEGOTIATE_MESSAGE_TYPE,
+			MessageType: types.MESSAGE_TYPE_NEGOTIATE,
 		},
 	}
 
@@ -126,7 +126,7 @@ func (msg *NegotiateMessage) Marshal() ([]byte, error) {
 	marshalledData := []byte{}
 
 	// Create header section
-	msg.Header.MessageType = types.NEGOTIATE_MESSAGE_TYPE
+	msg.Header.MessageType = types.MESSAGE_TYPE_NEGOTIATE
 	msg.Header.Signature = header.NTLM_SIGNATURE
 	marshalledHeader, err := msg.Header.Marshal()
 	if err != nil {

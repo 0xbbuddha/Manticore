@@ -5,7 +5,8 @@ import (
 	"testing"
 
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/negotiate"
+	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/negotiate"
+	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/types"
 )
 
 func TestCreateNegTokenInit(t *testing.T) {
@@ -82,7 +83,7 @@ func TestAuthContext(t *testing.T) {
 
 	// Verify message type is NEGOTIATE (1)
 	messageType := ntlmToken[8]
-	if messageType != 1 {
+	if types.MessageType(messageType) != types.MESSAGE_TYPE_NEGOTIATE {
 		t.Errorf("Expected message type 1 (NEGOTIATE), got %d", messageType)
 	}
 }
