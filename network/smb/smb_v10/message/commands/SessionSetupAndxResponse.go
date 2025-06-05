@@ -146,7 +146,7 @@ func (c *SessionSetupAndxResponse) Marshal() ([]byte, error) {
 
 	// Marshalling parameter Action
 	buf2 := make([]byte, 2)
-	binary.BigEndian.PutUint16(buf2, uint16(c.Action))
+	binary.LittleEndian.PutUint16(buf2, uint16(c.Action))
 	rawParametersContent = append(rawParametersContent, buf2...)
 
 	// Marshalling parameters
@@ -209,7 +209,7 @@ func (c *SessionSetupAndxResponse) Unmarshal(data []byte) (int, error) {
 	if len(rawParametersContent) < offset+2 {
 		return offset, fmt.Errorf("rawParametersContent too short for Action")
 	}
-	c.Action = types.USHORT(binary.BigEndian.Uint16(rawParametersContent[offset : offset+2]))
+	c.Action = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
 	offset += 2
 
 	// Then unmarshal the data
