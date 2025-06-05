@@ -242,42 +242,42 @@ func (c *SessionSetupAndxRequest) Marshal() ([]byte, error) {
 
 	// Marshalling parameter MaxBufferSize
 	buf2 := make([]byte, 2)
-	binary.BigEndian.PutUint16(buf2, uint16(c.MaxBufferSize))
+	binary.LittleEndian.PutUint16(buf2, uint16(c.MaxBufferSize))
 	rawParametersContent = append(rawParametersContent, buf2...)
 
 	// Marshalling parameter MaxMpxCount
 	buf2 = make([]byte, 2)
-	binary.BigEndian.PutUint16(buf2, uint16(c.MaxMpxCount))
+	binary.LittleEndian.PutUint16(buf2, uint16(c.MaxMpxCount))
 	rawParametersContent = append(rawParametersContent, buf2...)
 
 	// Marshalling parameter VcNumber
 	buf2 = make([]byte, 2)
-	binary.BigEndian.PutUint16(buf2, uint16(c.VcNumber))
+	binary.LittleEndian.PutUint16(buf2, uint16(c.VcNumber))
 	rawParametersContent = append(rawParametersContent, buf2...)
 
 	// Marshalling parameter SessionKey
 	buf4 := make([]byte, 4)
-	binary.BigEndian.PutUint32(buf4, uint32(c.SessionKey))
+	binary.LittleEndian.PutUint32(buf4, uint32(c.SessionKey))
 	rawParametersContent = append(rawParametersContent, buf4...)
 
 	// Marshalling parameter OEMPasswordLen
 	buf2 = make([]byte, 2)
-	binary.BigEndian.PutUint16(buf2, uint16(c.OEMPasswordLen))
+	binary.LittleEndian.PutUint16(buf2, uint16(c.OEMPasswordLen))
 	rawParametersContent = append(rawParametersContent, buf2...)
 
 	// Marshalling parameter UnicodePasswordLen
 	buf2 = make([]byte, 2)
-	binary.BigEndian.PutUint16(buf2, uint16(c.UnicodePasswordLen))
+	binary.LittleEndian.PutUint16(buf2, uint16(c.UnicodePasswordLen))
 	rawParametersContent = append(rawParametersContent, buf2...)
 
 	// Marshalling parameter Reserved
 	buf4 = make([]byte, 4)
-	binary.BigEndian.PutUint32(buf4, uint32(c.Reserved))
+	binary.LittleEndian.PutUint32(buf4, uint32(c.Reserved))
 	rawParametersContent = append(rawParametersContent, buf4...)
 
 	// Marshalling parameter Capabilities
 	buf4 = make([]byte, 4)
-	binary.BigEndian.PutUint32(buf4, uint32(c.Capabilities))
+	binary.LittleEndian.PutUint32(buf4, uint32(c.Capabilities))
 	rawParametersContent = append(rawParametersContent, buf4...)
 
 	// Marshalling parameters
@@ -334,56 +334,56 @@ func (c *SessionSetupAndxRequest) Unmarshal(data []byte) (int, error) {
 	if len(rawParametersContent) < offset+2 {
 		return offset, fmt.Errorf("rawParametersContent too short for MaxBufferSize")
 	}
-	c.MaxBufferSize = types.USHORT(binary.BigEndian.Uint16(rawParametersContent[offset : offset+2]))
+	c.MaxBufferSize = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
 	offset += 2
 
 	// Unmarshalling parameter MaxMpxCount
 	if len(rawParametersContent) < offset+2 {
 		return offset, fmt.Errorf("rawParametersContent too short for MaxMpxCount")
 	}
-	c.MaxMpxCount = types.USHORT(binary.BigEndian.Uint16(rawParametersContent[offset : offset+2]))
+	c.MaxMpxCount = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
 	offset += 2
 
 	// Unmarshalling parameter VcNumber
 	if len(rawParametersContent) < offset+2 {
 		return offset, fmt.Errorf("rawParametersContent too short for VcNumber")
 	}
-	c.VcNumber = types.USHORT(binary.BigEndian.Uint16(rawParametersContent[offset : offset+2]))
+	c.VcNumber = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
 	offset += 2
 
 	// Unmarshalling parameter SessionKey
 	if len(rawParametersContent) < offset+4 {
 		return offset, fmt.Errorf("rawParametersContent too short for SessionKey")
 	}
-	c.SessionKey = types.ULONG(binary.BigEndian.Uint32(rawParametersContent[offset : offset+4]))
+	c.SessionKey = types.ULONG(binary.LittleEndian.Uint32(rawParametersContent[offset : offset+4]))
 	offset += 4
 
 	// Unmarshalling parameter OEMPasswordLen
 	if len(rawParametersContent) < offset+2 {
 		return offset, fmt.Errorf("rawParametersContent too short for OEMPasswordLen")
 	}
-	c.OEMPasswordLen = types.USHORT(binary.BigEndian.Uint16(rawParametersContent[offset : offset+2]))
+	c.OEMPasswordLen = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
 	offset += 2
 
 	// Unmarshalling parameter UnicodePasswordLen
 	if len(rawParametersContent) < offset+2 {
 		return offset, fmt.Errorf("rawParametersContent too short for UnicodePasswordLen")
 	}
-	c.UnicodePasswordLen = types.USHORT(binary.BigEndian.Uint16(rawParametersContent[offset : offset+2]))
+	c.UnicodePasswordLen = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
 	offset += 2
 
 	// Unmarshalling parameter Reserved
 	if len(rawParametersContent) < offset+4 {
 		return offset, fmt.Errorf("rawParametersContent too short for Reserved")
 	}
-	c.Reserved = types.ULONG(binary.BigEndian.Uint32(rawParametersContent[offset : offset+4]))
+	c.Reserved = types.ULONG(binary.LittleEndian.Uint32(rawParametersContent[offset : offset+4]))
 	offset += 4
 
 	// Unmarshalling parameter Capabilities
 	if len(rawParametersContent) < offset+4 {
 		return offset, fmt.Errorf("rawParametersContent too short for Capabilities")
 	}
-	c.Capabilities = capabilities.Capabilities(binary.BigEndian.Uint32(rawParametersContent[offset : offset+4]))
+	c.Capabilities = capabilities.Capabilities(binary.LittleEndian.Uint32(rawParametersContent[offset : offset+4]))
 	offset += 4
 
 	// Then unmarshal the data
