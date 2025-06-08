@@ -4,6 +4,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/TheManticoreProject/Manticore/network/netbios/nbt"
 	"github.com/TheManticoreProject/Manticore/network/tcp"
 )
 
@@ -23,6 +24,8 @@ func NewTransport(transportType string) Transport {
 	switch strings.ToLower(transportType) {
 	case "tcp":
 		return tcp.NewTCPTransport()
+	case "nbt":
+		return nbt.NewNBTTransport()
 	}
 	return nil
 }

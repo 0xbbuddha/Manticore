@@ -1,4 +1,4 @@
-package ntlm
+package targetinfo
 
 import (
 	"encoding/binary"

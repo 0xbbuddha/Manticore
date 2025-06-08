@@ -1,5 +1,7 @@
 package securitymode
 
+import "strings"
+
 type SecurityMode uint8
 
 const (
@@ -75,4 +77,31 @@ func (sm SecurityMode) IsSecuritySignatureEnabled() bool {
 //   - bool: True if the server requires security signatures, false otherwise
 func (sm SecurityMode) IsSecuritySignatureRequired() bool {
 	return (sm & NEGOTIATE_SECURITY_SIGNATURES_REQUIRED) != 0
+}
+
+// String returns a string representation of the enabled security mode flags
+//
+// Returns:
+//   - string: A string containing all enabled security mode flags separated by |
+func (sm SecurityMode) String() string {
+	var flags []string
+
+	if sm&NEGOTIATE_USER_SECURITY == NEGOTIATE_USER_SECURITY {
+		flags = append(flags, "NEGOTIATE_USER_SECURITY")
+	}
+	if sm&NEGOTIATE_ENCRYPT_PASSWORDS == NEGOTIATE_ENCRYPT_PASSWORDS {
+		flags = append(flags, "NEGOTIATE_ENCRYPT_PASSWORDS")
+	}
+	if sm&NEGOTIATE_SECURITY_SIGNATURES_ENABLED == NEGOTIATE_SECURITY_SIGNATURES_ENABLED {
+		flags = append(flags, "NEGOTIATE_SECURITY_SIGNATURES_ENABLED")
+	}
+	if sm&NEGOTIATE_SECURITY_SIGNATURES_REQUIRED == NEGOTIATE_SECURITY_SIGNATURES_REQUIRED {
+		flags = append(flags, "NEGOTIATE_SECURITY_SIGNATURES_REQUIRED")
+	}
+
+	if len(flags) == 0 {
+		return "NONE"
+	}
+
+	return strings.Join(flags, "|")
 }

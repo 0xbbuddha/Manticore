@@ -41,7 +41,7 @@ func (c *Client) SessionSetup() error {
 	request_msg.Header.Flags2 = flags2.Flags2(flags2.FLAGS2_NT_STATUS_ERROR_CODES | flags2.FLAGS2_LONG_NAMES_ALLOWED | flags2.FLAGS2_EXTENDED_SECURITY)
 
 	// Add Unicode support if server supports it
-	if c.Connection.Server.Capabilities&capabilities.CAP_UNICODE != 0 {
+	if c.Connection.Server.Capabilities&capabilities.CAP_UNICODE == capabilities.CAP_UNICODE {
 		request_msg.Header.Flags2 |= flags2.Flags2(flags2.FLAGS2_UNICODE)
 	}
 
@@ -60,6 +60,11 @@ func (c *Client) SessionSetup() error {
 	session_setup_cmd.MaxMpxCount = c.Connection.MaxMpxCount
 	session_setup_cmd.Capabilities = c.Connection.Server.Capabilities
 
+	session_setup_cmd.AccountName.SetString("user")
+	session_setup_cmd.PrimaryDomain.SetString("domain")
+	session_setup_cmd.NativeOS.SetString("Unix")
+	session_setup_cmd.NativeLanMan.SetString("Samba")
+
 	// Check if we're using share level access control
 	if c.Connection.Server.SecurityMode.SupportsShareLevelAccessControl() {
 		// Share level access control is required by the server
@@ -74,17 +79,30 @@ func (c *Client) SessionSetup() error {
 		// Data section - for null session, use empty strings
 		session_setup_cmd.OEMPassword = []types.UCHAR{}
 		session_setup_cmd.UnicodePassword = []types.UCHAR{}
-		session_setup_cmd.AccountName.SetString("")
-		session_setup_cmd.PrimaryDomain.SetString("")
-		session_setup_cmd.NativeOS.SetString("")
-		session_setup_cmd.NativeLanMan.SetString("")
 	} else {
 		// User level access control is required by the server
 		// TODO: Look up Session from Client.Connection.SessionTable where Session.UserCredentials matches
 		// the application-supplied UserCredentials and reuse if found
 
 		// Handle authentication based on server capabilities
-		if !c.Connection.Server.SecurityMode.SupportsChallengeResponseAuth() {
+		if c.Connection.Server.SecurityMode.SupportsChallengeResponseAuth() {
+			// Server supports challenge/response authentication
+			// Determine authentication type based on policies
+
+			session_setup_cmd.VcNumber = types.USHORT(0x0000)
+			session_setup_cmd.SessionKey = c.Connection.Server.SessionKey
+
+			// TODO: Implement proper LM/NTLM/LMv2/NTLMv2 response selection based on policies
+			// For now, we'll use placeholder values
+
+			// LM or LMv2 response in OEMPassword field
+			session_setup_cmd.OEMPassword = []types.UCHAR("LMResponse")
+			session_setup_cmd.OEMPasswordLen = types.USHORT(len(session_setup_cmd.OEMPassword))
+
+			// NTLM or NTLMv2 response in UnicodePassword field
+			session_setup_cmd.UnicodePassword = []types.UCHAR("NTLMResponse")
+			session_setup_cmd.UnicodePasswordLen = types.USHORT(len(session_setup_cmd.UnicodePassword))
+		} else {
 			// Server doesn't support challenge/response authentication
 
 			// Use plaintext authentication
@@ -105,33 +123,6 @@ func (c *Client) SessionSetup() error {
 				session_setup_cmd.UnicodePasswordLen = types.USHORT(0x0000)
 				session_setup_cmd.UnicodePassword = []types.UCHAR{}
 			}
-
-			session_setup_cmd.AccountName.SetString("AccountName")
-			session_setup_cmd.PrimaryDomain.SetString("DomainName")
-			session_setup_cmd.NativeOS.SetString("")
-			session_setup_cmd.NativeLanMan.SetString("")
-		} else {
-			// Server supports challenge/response authentication
-			// Determine authentication type based on policies
-
-			session_setup_cmd.VcNumber = types.USHORT(0x0000)
-			session_setup_cmd.SessionKey = c.Connection.Server.SessionKey
-
-			// TODO: Implement proper LM/NTLM/LMv2/NTLMv2 response selection based on policies
-			// For now, we'll use placeholder values
-
-			// LM or LMv2 response in OEMPassword field
-			session_setup_cmd.OEMPassword = []types.UCHAR("LMResponse")
-			session_setup_cmd.OEMPasswordLen = types.USHORT(len(session_setup_cmd.OEMPassword))
-
-			// NTLM or NTLMv2 response in UnicodePassword field
-			session_setup_cmd.UnicodePassword = []types.UCHAR("NTLMResponse")
-			session_setup_cmd.UnicodePasswordLen = types.USHORT(len(session_setup_cmd.UnicodePassword))
-
-			session_setup_cmd.AccountName.SetString("AccountName")
-			session_setup_cmd.PrimaryDomain.SetString("DomainName")
-			session_setup_cmd.NativeOS.SetString("")
-			session_setup_cmd.NativeLanMan.SetString("")
 		}
 	}
 

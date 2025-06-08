@@ -35,7 +35,7 @@ func (c *Client) Negotiate() error {
 	request_msg := message.NewMessage()
 
 	request_msg.Header.SetFlags(flags.FLAGS_CANONICALIZED_PATHS | flags.FLAGS_CASE_INSENSITIVE)
-	request_msg.Header.SetFlags2(flags2.FLAGS2_UNICODE | flags2.FLAGS2_LONG_NAMES_ALLOWED | flags2.FLAGS2_NT_STATUS_ERROR_CODES | flags2.FLAGS2_SECURITY_SIGNATURE)
+	request_msg.Header.SetFlags2(flags2.FLAGS2_UNICODE | flags2.FLAGS2_NT_STATUS_ERROR_CODES | flags2.FLAGS2_EXTENDED_SECURITY | flags2.FLAGS2_LONG_NAMES_ALLOWED)
 
 	negotiate_cmd := commands.NewNegotiateRequest()
 	negotiate_cmd.Dialects.AddDialect(dialects.DIALECT_NT_LM_0_12)
@@ -89,6 +89,7 @@ func (c *Client) Negotiate() error {
 	c.Connection.Server.DomainName = string(negotiate_response.DomainName)
 	c.Connection.Server.Name = string(negotiate_response.ServerName)
 	c.Connection.Server.SecurityMode = negotiate_response.SecurityMode
+	c.Connection.Server.ServerGUID = negotiate_response.ServerGUID
 
 	return nil
 }

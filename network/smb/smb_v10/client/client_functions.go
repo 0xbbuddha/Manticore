@@ -26,10 +26,29 @@ func NewClientUsingNBTTransport(host net.IP, port int) *Client {
 	}
 }
 
+// NewClientUsingTCPTransport creates a new SMB v1.0 client using TCP transport
+//
+// Returns:
+//   - A pointer to the initialized SMB client
+//   - An error if the client initialization fails
+func NewClientUsingTCPTransport(host net.IP, port int) *Client {
+	return &Client{
+		Transport: transport.NewTransport("tcp"),
+
+		Connection: &Connection{
+			Server: &Server{
+				Host: host,
+				Port: port,
+			},
+		},
+		TreeConnect: nil,
+		Session:     nil,
+	}
+}
+
 // Connect establishes a connection to an SMB server
 //
 // Returns:
-//   - An error if the connection fails
 func (c *Client) Connect(ipaddr net.IP, port int) error {
 	err := c.Transport.Connect(ipaddr, port)
 	if err != nil {

@@ -14,7 +14,8 @@ import (
 )
 
 // SessionSetupAndxRequest
-// Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/81e15dee-8fb6-4102-8644-7eaa7ded63f7
+// Source for CIFS base: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/81e15dee-8fb6-4102-8644-7eaa7ded63f7
+// SMBv1.0 extension: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb/a00d0361-3544-4845-96ab-309b4bb7705d
 type SessionSetupAndxRequest struct {
 	command_interface.Command
 
@@ -42,6 +43,9 @@ type SessionSetupAndxRequest struct {
 	// SessionKey field in the SMB_COM_NEGOTIATE Response for this SMB connection.
 	SessionKey types.ULONG
 
+	// When extended security is not being used, the following fields (OEMPasswordLen,
+	// UnicodePasswordLen) are used to authenticate the user:
+
 	// If SMB_FLAGS2_UNICODE is set (1), the value of OEMPasswordLen MUST be 0x0000 and
 	// the password MUST be encoded using UTF-16LE Unicode. Padding MUST NOT be added
 	// to align this plaintext Unicode string to a word boundary.
@@ -51,6 +55,13 @@ type SessionSetupAndxRequest struct {
 	// 0x0000, and the password MUST be encoded using the 8-bit OEM character set
 	// (extended ASCII).
 	UnicodePasswordLen types.USHORT
+
+	// When extended security is being used, the following field (SecurityBlobLength)
+	// is used to authenticate the user:
+
+	// SecurityBlobLength (2 bytes): This value MUST specify the length in bytes
+	// of the variable-length SecurityBlob field that is contained within the request.
+	SecurityBlobLength types.USHORT
 
 	// Reserved (4 bytes): Reserved. This field MUST be 0x00000000. The server MUST
 	// ignore the contents of this field.
@@ -62,6 +73,10 @@ type SessionSetupAndxRequest struct {
 	Capabilities capabilities.Capabilities
 
 	// Data
+
+	// When extended security is not being used, the following fields (OEMPassword,
+	// UnicodePassword, Pad, AccountName, PrimaryDomain) are used to authenticate the
+	// user:
 
 	// The OEMPassword value is an array of bytes, not a null-terminated string.
 	OEMPassword []types.UCHAR
@@ -109,6 +124,13 @@ type SessionSetupAndxRequest struct {
 	// MUST be aligned to start on a 2-byte boundary from the start of the SMB header.
 	PrimaryDomain types.SMB_STRING
 
+	// When extended security is being used, the following field (SecurityBlobLength)
+	// is used to authenticate the user:
+
+	// SecurityBlob (variable): This field MUST be the authentication token sent to the
+	// server, as specified in section 3.2.4.2.4 and in [RFC2743].
+	SecurityBlob []types.UCHAR
+
 	// NativeOS (variable): A string representing the native operating system of the
 	// CIFS client. If SMB_FLAGS2_UNICODE is set in the Flags2 field of the SMB header
 	// of the request, this string MUST be a null-terminated array of 16-bit Unicode
@@ -124,6 +146,11 @@ type SessionSetupAndxRequest struct {
 	// characters. If this string consists of Unicode characters, this field MUST be
 	// aligned to start on a 2-byte boundary from the start of the SMB header.
 	NativeLanMan types.SMB_STRING
+
+	// Internal fields
+
+	// useExtendedSecurity (bool): Whether to use the extended security to authenticate the user.
+	useExtendedSecurity bool
 }
 
 // NewSessionSetupAndxRequest creates a new SessionSetupAndxRequest structure
@@ -170,6 +197,9 @@ func (c *SessionSetupAndxRequest) IsAndX() bool {
 func (c *SessionSetupAndxRequest) Marshal() ([]byte, error) {
 	marshalledCommand := []byte{}
 
+	var bytesStream []byte
+	var err error
+
 	// Create the Parameters structure if it is nil
 	if c.GetParameters() == nil {
 		c.SetParameters(parameters.NewParameters())
@@ -196,30 +226,35 @@ func (c *SessionSetupAndxRequest) Marshal() ([]byte, error) {
 	// the data will be stored in the parameters
 	rawDataContent := []byte{}
 
-	// Marshalling data OEMPassword
-	rawDataContent = append(rawDataContent, c.OEMPassword...)
+	if c.GetUseExtendedSecurity() {
+		// Marshalling data SecurityBlob
+		rawDataContent = append(rawDataContent, c.SecurityBlob...)
+	} else {
+		// Marshalling data OEMPassword
+		rawDataContent = append(rawDataContent, c.OEMPassword...)
 
-	// Marshalling data UnicodePassword
-	rawDataContent = append(rawDataContent, c.UnicodePassword...)
+		// Marshalling data UnicodePassword
+		rawDataContent = append(rawDataContent, c.UnicodePassword...)
 
-	// Marshalling data Pad
-	rawDataContent = append(rawDataContent, c.Pad...)
+		// Marshalling data Pad
+		rawDataContent = append(rawDataContent, c.Pad...)
 
-	// Marshalling data AccountName
-	c.AccountName.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_NULL_TERMINATED_ASCII_STRING)
-	bytesStream, err := c.AccountName.Marshal()
-	if err != nil {
-		return nil, err
+		// Marshalling data AccountName
+		c.AccountName.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_NULL_TERMINATED_ASCII_STRING)
+		bytesStream, err := c.AccountName.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		rawDataContent = append(rawDataContent, bytesStream...)
+
+		// Marshalling data PrimaryDomain
+		c.PrimaryDomain.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_VARIABLE_BLOCK_16BIT)
+		bytesStream, err = c.PrimaryDomain.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		rawDataContent = append(rawDataContent, bytesStream...)
 	}
-	rawDataContent = append(rawDataContent, bytesStream...)
-
-	// Marshalling data PrimaryDomain
-	c.PrimaryDomain.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_VARIABLE_BLOCK_16BIT)
-	bytesStream, err = c.PrimaryDomain.Marshal()
-	if err != nil {
-		return nil, err
-	}
-	rawDataContent = append(rawDataContent, bytesStream...)
 
 	// Marshalling data NativeOS
 	c.NativeOS.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_VARIABLE_BLOCK_16BIT)
@@ -260,15 +295,22 @@ func (c *SessionSetupAndxRequest) Marshal() ([]byte, error) {
 	binary.LittleEndian.PutUint32(buf4, uint32(c.SessionKey))
 	rawParametersContent = append(rawParametersContent, buf4...)
 
-	// Marshalling parameter OEMPasswordLen
-	buf2 = make([]byte, 2)
-	binary.LittleEndian.PutUint16(buf2, uint16(c.OEMPasswordLen))
-	rawParametersContent = append(rawParametersContent, buf2...)
+	if c.GetUseExtendedSecurity() {
+		// Marshalling parameter SecurityBlobLength
+		buf2 = make([]byte, 2)
+		binary.LittleEndian.PutUint16(buf2, uint16(c.SecurityBlobLength))
+		rawParametersContent = append(rawParametersContent, buf2...)
+	} else {
+		// Marshalling parameter OEMPasswordLen
+		buf2 = make([]byte, 2)
+		binary.LittleEndian.PutUint16(buf2, uint16(c.OEMPasswordLen))
+		rawParametersContent = append(rawParametersContent, buf2...)
 
-	// Marshalling parameter UnicodePasswordLen
-	buf2 = make([]byte, 2)
-	binary.LittleEndian.PutUint16(buf2, uint16(c.UnicodePasswordLen))
-	rawParametersContent = append(rawParametersContent, buf2...)
+		// Marshalling parameter UnicodePasswordLen
+		buf2 = make([]byte, 2)
+		binary.LittleEndian.PutUint16(buf2, uint16(c.UnicodePasswordLen))
+		rawParametersContent = append(rawParametersContent, buf2...)
+	}
 
 	// Marshalling parameter Reserved
 	buf4 = make([]byte, 4)
@@ -389,44 +431,52 @@ func (c *SessionSetupAndxRequest) Unmarshal(data []byte) (int, error) {
 	// Then unmarshal the data
 	offset = 0
 
-	// Unmarshalling data OEMPassword
-	if len(rawDataContent) < offset+1 {
-		return offset, fmt.Errorf("rawParametersContent too short for OEMPassword")
-	}
-	c.OEMPassword = rawDataContent[offset : offset+int(c.OEMPasswordLen)]
-	offset += int(c.OEMPasswordLen)
+	if c.Capabilities.HasCapability(capabilities.CAP_EXTENDED_SECURITY) {
+		// Unmarshalling data SecurityBlob
+		if len(rawDataContent) < offset+2 {
+			return offset, fmt.Errorf("rawDataContent too short for SecurityBlobLength")
+		}
+		c.SecurityBlobLength = types.USHORT(binary.LittleEndian.Uint16(rawDataContent[offset : offset+2]))
+	} else {
+		// Unmarshalling data OEMPassword
+		if len(rawDataContent) < offset+1 {
+			return offset, fmt.Errorf("rawParametersContent too short for OEMPassword")
+		}
+		c.OEMPassword = rawDataContent[offset : offset+int(c.OEMPasswordLen)]
+		offset += int(c.OEMPasswordLen)
 
-	// Unmarshalling data UnicodePassword
-	if len(rawDataContent) < offset+1 {
-		return offset, fmt.Errorf("rawParametersContent too short for UnicodePassword")
-	}
-	c.UnicodePassword = rawDataContent[offset : offset+int(c.UnicodePasswordLen)]
-	offset += int(c.UnicodePasswordLen)
+		// Unmarshalling data UnicodePassword
+		if len(rawDataContent) < offset+1 {
+			return offset, fmt.Errorf("rawParametersContent too short for UnicodePassword")
+		}
+		c.UnicodePassword = rawDataContent[offset : offset+int(c.UnicodePasswordLen)]
+		offset += int(c.UnicodePasswordLen)
 
-	// Unmarshalling data Pad
-	padLen := int(c.UnicodePasswordLen)
-	if padLen%2 == 1 {
-		padLen++
-	}
-	if len(rawDataContent) < offset+padLen {
-		return offset, fmt.Errorf("rawParametersContent too short for Pad")
-	}
-	c.Pad = rawDataContent[offset : offset+padLen]
-	offset += padLen
+		// Unmarshalling data Pad
+		padLen := int(c.UnicodePasswordLen)
+		if padLen%2 == 1 {
+			padLen++
+		}
+		if len(rawDataContent) < offset+padLen {
+			return offset, fmt.Errorf("rawParametersContent too short for Pad")
+		}
+		c.Pad = rawDataContent[offset : offset+padLen]
+		offset += padLen
 
-	// Unmarshalling data AccountName
-	bytesRead, err = c.AccountName.Unmarshal(rawDataContent[offset:])
-	if err != nil {
-		return offset, err
-	}
-	offset += bytesRead
+		// Unmarshalling data AccountName
+		bytesRead, err = c.AccountName.Unmarshal(rawDataContent[offset:])
+		if err != nil {
+			return offset, err
+		}
+		offset += bytesRead
 
-	// Unmarshalling data PrimaryDomain
-	bytesRead, err = c.PrimaryDomain.Unmarshal(rawDataContent[offset:])
-	if err != nil {
-		return offset, err
+		// Unmarshalling data PrimaryDomain
+		bytesRead, err = c.PrimaryDomain.Unmarshal(rawDataContent[offset:])
+		if err != nil {
+			return offset, err
+		}
+		offset += bytesRead
 	}
-	offset += bytesRead
 
 	// Unmarshalling data NativeOS
 	bytesRead, err = c.NativeOS.Unmarshal(rawDataContent[offset:])
@@ -443,4 +493,20 @@ func (c *SessionSetupAndxRequest) Unmarshal(data []byte) (int, error) {
 	offset += bytesRead
 
 	return offset, nil
+}
+
+// SetUseExtendedSecurity sets whether to use extended security for authentication
+//
+// Parameters:
+// - useExtendedSecurity: Whether to use extended security
+func (c *SessionSetupAndxRequest) SetUseExtendedSecurity(useExtendedSecurity bool) {
+	c.useExtendedSecurity = useExtendedSecurity
+}
+
+// GetUseExtendedSecurity returns whether extended security is being used for authentication
+//
+// Returns:
+// - bool: Whether extended security is being used
+func (c *SessionSetupAndxRequest) GetUseExtendedSecurity() bool {
+	return c.useExtendedSecurity
 }

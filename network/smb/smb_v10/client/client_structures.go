@@ -7,6 +7,7 @@ import (
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/securitymode"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/transport"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/types"
+	"github.com/TheManticoreProject/Manticore/windows/guid"
 )
 
 // Client represents an SMB v1.0 client
@@ -114,4 +115,7 @@ type Server struct {
 
 	// DomainName is the domain name of the server
 	DomainName string
+
+	// ServerGUID is the GUID of the server
+	ServerGUID guid.GUID
 }
