@@ -57,13 +57,13 @@ func TestNewTransport(t *testing.T) {
 		wantNil       bool
 	}{
 		{
-			name:          "NBT transport",
-			transportType: "nbt",
+			name:          "TCP transport",
+			transportType: "tcp",
 			wantNil:       false,
 		},
 		{
-			name:          "NBT transport uppercase",
-			transportType: "NBT",
+			name:          "TCP transport uppercase",
+			transportType: "TCP",
 			wantNil:       false,
 		},
 		{
