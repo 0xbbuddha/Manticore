@@ -1,6 +1,9 @@
 package capabilities
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 // Capabilities (4 bytes): A 32-bit field providing a set of server capability indicators.
 // This bit field is used to indicate to the client which features are supported by the server.
@@ -44,24 +47,67 @@ const (
 	// CAP_NT_FIND indicates the server supports the TRANS2_FIND_FIRST2, TRANS2_FIND_NEXT2, and FIND_CLOSE2 command requests.
 	CAP_NT_FIND Capabilities = 1 << 9
 
-	// CAP_BULK_TRANSFER indicates a reserved capability that was not implemented and MUST be zero.
-	CAP_BULK_TRANSFER Capabilities = 1 << 10
+	// CAP_R10
+	CAP_R10 Capabilities = 1 << 10
 
-	// CAP_COMPRESSED_DATA indicates a reserved capability that was not implemented and MUST be zero.
-	CAP_COMPRESSED_DATA Capabilities = 1 << 11
+	// CAP_R11
+	CAP_R11 Capabilities = 1 << 11
 
 	// CAP_DFS indicates the server is aware of the DFS Referral Protocol and can respond to Microsoft DFS referral requests.
 	CAP_DFS Capabilities = 1 << 12
 
 	// CAP_QUADWORD_ALIGNED indicates a reserved capability that was not implemented and MUST be zero.
-	CAP_QUADWORD_ALIGNED Capabilities = 0x00002000
+	CAP_QUADWORD_ALIGNED Capabilities = 1 << 13
 
 	// CAP_INFOLEVEL_PASSTHROUGH indicates the server supports the INFOLEVEL_PASSTHROUGH capability.
-	CAP_INFOLEVEL_PASSTHROUGH Capabilities = 0x00004000
+	CAP_INFOLEVEL_PASSTHROUGH Capabilities = 1 << 13
 
 	// CAP_LARGE_READX indicates the server supports large read operations.
 	// This capability affects the maximum size, in bytes, of the server buffer for sending an SMB_COM_READ_ANDX response to the client.
-	CAP_LARGE_READX Capabilities = 0x00004000
+	CAP_LARGE_READX Capabilities = 1 << 14
+
+	// CAP_LARGE_WRITEX indicates the server supports large write operations.
+	// This capability affects the maximum size, in bytes, of the server buffer for sending an SMB_COM_WRITE_ANDX response to the client.
+	CAP_LARGE_WRITEX Capabilities = 1 << 15
+
+	// CAP_LWIO indicates the server supports the LWIO capability.
+	CAP_LWIO Capabilities = 1 << 16
+
+	// CAP_R17
+	CAP_R17 Capabilities = 1 << 17
+
+	// CAP_R18
+	CAP_R18 Capabilities = 1 << 18
+
+	// CAP_R19
+	CAP_R19 Capabilities = 1 << 19
+
+	// CAP_R20
+	CAP_R20 Capabilities = 1 << 20
+
+	// CAP_R21
+	CAP_R21 Capabilities = 1 << 21
+
+	// CAP_R22
+	CAP_R22 Capabilities = 1 << 22
+
+	// CAP_UNIX indicates the server supports the UNIX capability.
+	CAP_UNIX Capabilities = 1 << 23
+
+	// CAP_R24
+	CAP_R24 Capabilities = 1 << 24
+
+	// CAP_COMPRESSED_DATA indicates the server supports compressed data.
+	CAP_COMPRESSED_DATA Capabilities = 1 << 25
+
+	// CAP_R26
+	CAP_R26 Capabilities = 1 << 26
+
+	// CAP_R27
+	CAP_R27 Capabilities = 1 << 27
+
+	// CAP_R28
+	CAP_R28 Capabilities = 1 << 28
 
 	// CAP_DYNAMIC_REAUTH indicates the server supports dynamic reauthentication.
 	CAP_DYNAMIC_REAUTH Capabilities = 1 << 29
@@ -73,58 +119,60 @@ const (
 	CAP_EXTENDED_SECURITY Capabilities = 1 << 31
 )
 
+// CapabilityMap maps capability values to their string representations
+var CapabilityMap = map[Capabilities]string{
+	CAP_RAW_MODE:              "CAP_RAW_MODE",
+	CAP_MPX_MODE:              "CAP_MPX_MODE",
+	CAP_UNICODE:               "CAP_UNICODE",
+	CAP_LARGE_FILES:           "CAP_LARGE_FILES",
+	CAP_NT_SMBS:               "CAP_NT_SMBS",
+	CAP_RPC_REMOTE_APIS:       "CAP_RPC_REMOTE_APIS",
+	CAP_NT_STATUS:             "CAP_NT_STATUS",
+	CAP_LEVEL_II_OPLOCKS:      "CAP_LEVEL_II_OPLOCKS",
+	CAP_LOCK_AND_READ:         "CAP_LOCK_AND_READ",
+	CAP_NT_FIND:               "CAP_NT_FIND",
+	CAP_R10:                   "CAP_R10",
+	CAP_R11:                   "CAP_R11",
+	CAP_DFS:                   "CAP_DFS",
+	CAP_INFOLEVEL_PASSTHROUGH: "CAP_INFOLEVEL_PASSTHROUGH",
+	CAP_LARGE_READX:           "CAP_LARGE_READX",
+	CAP_LARGE_WRITEX:          "CAP_LARGE_WRITEX",
+	CAP_LWIO:                  "CAP_LWIO",
+	CAP_R17:                   "CAP_R17",
+	CAP_R18:                   "CAP_R18",
+	CAP_R19:                   "CAP_R19",
+	CAP_R20:                   "CAP_R20",
+	CAP_R21:                   "CAP_R21",
+	CAP_R22:                   "CAP_R22",
+	CAP_UNIX:                  "CAP_UNIX",
+	CAP_R24:                   "CAP_R24",
+	CAP_COMPRESSED_DATA:       "CAP_COMPRESSED_DATA",
+	CAP_R26:                   "CAP_R26",
+	CAP_R27:                   "CAP_R27",
+	CAP_R28:                   "CAP_R28",
+	CAP_DYNAMIC_REAUTH:        "CAP_DYNAMIC_REAUTH",
+	CAP_R30:                   "CAP_R30",
+	CAP_EXTENDED_SECURITY:     "CAP_EXTENDED_SECURITY",
+}
+
 // String returns a string representation of the capabilities.
 // The string is a bitmask of the capabilities that are set.
 // The capabilities are listed in alphabetical order.
 func (c Capabilities) String() string {
 	var flagList []string
 
-	if c&CAP_DFS == CAP_DFS {
-		flagList = append(flagList, "CAP_DFS")
+	// Get all keys from the map and sort them
+	var keys []Capabilities
+	for k := range CapabilityMap {
+		keys = append(keys, k)
 	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 
-	if c&CAP_LARGE_FILES == CAP_LARGE_FILES {
-		flagList = append(flagList, "CAP_LARGE_FILES")
-	}
-
-	if c&CAP_LARGE_READX == CAP_LARGE_READX {
-		flagList = append(flagList, "CAP_LARGE_READX")
-	}
-
-	if c&CAP_LEVEL_II_OPLOCKS == CAP_LEVEL_II_OPLOCKS {
-		flagList = append(flagList, "CAP_LEVEL_II_OPLOCKS")
-	}
-
-	if c&CAP_LOCK_AND_READ == CAP_LOCK_AND_READ {
-		flagList = append(flagList, "CAP_LOCK_AND_READ")
-	}
-
-	if c&CAP_MPX_MODE == CAP_MPX_MODE {
-		flagList = append(flagList, "CAP_MPX_MODE")
-	}
-
-	if c&CAP_NT_FIND == CAP_NT_FIND {
-		flagList = append(flagList, "CAP_NT_FIND")
-	}
-
-	if c&CAP_NT_SMBS == CAP_NT_SMBS {
-		flagList = append(flagList, "CAP_NT_SMBS")
-	}
-
-	if c&CAP_RAW_MODE == CAP_RAW_MODE {
-		flagList = append(flagList, "CAP_RAW_MODE")
-	}
-
-	if c&CAP_RPC_REMOTE_APIS == CAP_RPC_REMOTE_APIS {
-		flagList = append(flagList, "CAP_RPC_REMOTE_APIS")
-	}
-
-	if c&CAP_STATUS32 == CAP_STATUS32 {
-		flagList = append(flagList, "CAP_STATUS32")
-	}
-
-	if c&CAP_UNICODE == CAP_UNICODE {
-		flagList = append(flagList, "CAP_UNICODE")
+	// Check each capability flag in sorted order
+	for _, capability := range keys {
+		if c.HasCapability(capability) {
+			flagList = append(flagList, CapabilityMap[capability])
+		}
 	}
 
 	if len(flagList) == 0 {
