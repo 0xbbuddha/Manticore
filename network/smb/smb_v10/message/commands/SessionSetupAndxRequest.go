@@ -124,11 +124,12 @@ type SessionSetupAndxRequest struct {
 	// MUST be aligned to start on a 2-byte boundary from the start of the SMB header.
 	PrimaryDomain types.SMB_STRING
 
-	// When extended security is being used, the following field (SecurityBlobLength)
+	// When extended security is being used, the following field (SecurityBlob)
 	// is used to authenticate the user:
 
 	// SecurityBlob (variable): This field MUST be the authentication token sent to the
-	// server, as specified in section 3.2.4.2.4 and in [RFC2743].
+	// server, as specified in section 3.2.4.2.4 and in [RFC2743]. This field MUST be
+	// aligned to start on a 2-byte boundary from the start of the SMB header.
 	SecurityBlob []types.UCHAR
 
 	// NativeOS (variable): A string representing the native operating system of the
@@ -146,11 +147,6 @@ type SessionSetupAndxRequest struct {
 	// characters. If this string consists of Unicode characters, this field MUST be
 	// aligned to start on a 2-byte boundary from the start of the SMB header.
 	NativeLanMan types.SMB_STRING
-
-	// Internal fields
-
-	// useExtendedSecurity (bool): Whether to use the extended security to authenticate the user.
-	useExtendedSecurity bool
 }
 
 // NewSessionSetupAndxRequest creates a new SessionSetupAndxRequest structure
@@ -170,13 +166,20 @@ func NewSessionSetupAndxRequest() *SessionSetupAndxRequest {
 		Capabilities:       capabilities.Capabilities(0),
 
 		// Data
+		// When extended security is not being used, the following fields (OEMPassword,
+		// UnicodePassword, Pad, AccountName, PrimaryDomain) are used to authenticate the
+		// user:
 		OEMPassword:     []types.UCHAR{},
 		UnicodePassword: []types.UCHAR{},
 		Pad:             []types.UCHAR{},
 		AccountName:     types.SMB_STRING{},
 		PrimaryDomain:   types.SMB_STRING{},
-		NativeOS:        types.SMB_STRING{},
-		NativeLanMan:    types.SMB_STRING{},
+		// When extended security is being used, the following field (SecurityBlob)
+		// is used to authenticate the user:
+		SecurityBlob: []types.UCHAR{},
+		// Other data fields
+		NativeOS:     types.SMB_STRING{},
+		NativeLanMan: types.SMB_STRING{},
 	}
 
 	c.Command.SetCommandCode(codes.SMB_COM_SESSION_SETUP_ANDX)
@@ -226,15 +229,18 @@ func (c *SessionSetupAndxRequest) Marshal() ([]byte, error) {
 	// the data will be stored in the parameters
 	rawDataContent := []byte{}
 
-	if c.GetUseExtendedSecurity() {
+	if c.Capabilities.HasCapability(capabilities.CAP_EXTENDED_SECURITY) {
 		// Marshalling data SecurityBlob
 		rawDataContent = append(rawDataContent, c.SecurityBlob...)
+		c.SecurityBlobLength = types.USHORT(len(c.SecurityBlob))
 	} else {
 		// Marshalling data OEMPassword
 		rawDataContent = append(rawDataContent, c.OEMPassword...)
+		c.OEMPasswordLen = types.USHORT(len(c.OEMPassword))
 
 		// Marshalling data UnicodePassword
 		rawDataContent = append(rawDataContent, c.UnicodePassword...)
+		c.UnicodePasswordLen = types.USHORT(len(c.UnicodePassword))
 
 		// Marshalling data Pad
 		rawDataContent = append(rawDataContent, c.Pad...)
@@ -295,7 +301,7 @@ func (c *SessionSetupAndxRequest) Marshal() ([]byte, error) {
 	binary.LittleEndian.PutUint32(buf4, uint32(c.SessionKey))
 	rawParametersContent = append(rawParametersContent, buf4...)
 
-	if c.GetUseExtendedSecurity() {
+	if c.Capabilities.HasCapability(capabilities.CAP_EXTENDED_SECURITY) {
 		// Marshalling parameter SecurityBlobLength
 		buf2 = make([]byte, 2)
 		binary.LittleEndian.PutUint16(buf2, uint16(c.SecurityBlobLength))
@@ -400,19 +406,28 @@ func (c *SessionSetupAndxRequest) Unmarshal(data []byte) (int, error) {
 	c.SessionKey = types.ULONG(binary.LittleEndian.Uint32(rawParametersContent[offset : offset+4]))
 	offset += 4
 
-	// Unmarshalling parameter OEMPasswordLen
-	if len(rawParametersContent) < offset+2 {
-		return offset, fmt.Errorf("rawParametersContent too short for OEMPasswordLen")
-	}
-	c.OEMPasswordLen = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
-	offset += 2
+	if c.Capabilities.HasCapability(capabilities.CAP_EXTENDED_SECURITY) {
+		// Unmarshalling parameter SecurityBlobLength
+		if len(rawParametersContent) < offset+2 {
+			return offset, fmt.Errorf("rawParametersContent too short for SecurityBlobLength")
+		}
+		c.SecurityBlobLength = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
+		offset += 2
+	} else {
+		// Unmarshalling parameter OEMPasswordLen
+		if len(rawParametersContent) < offset+2 {
+			return offset, fmt.Errorf("rawParametersContent too short for OEMPasswordLen")
+		}
+		c.OEMPasswordLen = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
+		offset += 2
 
-	// Unmarshalling parameter UnicodePasswordLen
-	if len(rawParametersContent) < offset+2 {
-		return offset, fmt.Errorf("rawParametersContent too short for UnicodePasswordLen")
+		// Unmarshalling parameter UnicodePasswordLen
+		if len(rawParametersContent) < offset+2 {
+			return offset, fmt.Errorf("rawParametersContent too short for UnicodePasswordLen")
+		}
+		c.UnicodePasswordLen = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
+		offset += 2
 	}
-	c.UnicodePasswordLen = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
-	offset += 2
 
 	// Unmarshalling parameter Reserved
 	if len(rawParametersContent) < offset+4 {
@@ -437,6 +452,7 @@ func (c *SessionSetupAndxRequest) Unmarshal(data []byte) (int, error) {
 			return offset, fmt.Errorf("rawDataContent too short for SecurityBlobLength")
 		}
 		c.SecurityBlobLength = types.USHORT(binary.LittleEndian.Uint16(rawDataContent[offset : offset+2]))
+		offset += 2
 	} else {
 		// Unmarshalling data OEMPassword
 		if len(rawDataContent) < offset+1 {
@@ -493,20 +509,4 @@ func (c *SessionSetupAndxRequest) Unmarshal(data []byte) (int, error) {
 	offset += bytesRead
 
 	return offset, nil
-}
-
-// SetUseExtendedSecurity sets whether to use extended security for authentication
-//
-// Parameters:
-// - useExtendedSecurity: Whether to use extended security
-func (c *SessionSetupAndxRequest) SetUseExtendedSecurity(useExtendedSecurity bool) {
-	c.useExtendedSecurity = useExtendedSecurity
-}
-
-// GetUseExtendedSecurity returns whether extended security is being used for authentication
-//
-// Returns:
-// - bool: Whether extended security is being used
-func (c *SessionSetupAndxRequest) GetUseExtendedSecurity() bool {
-	return c.useExtendedSecurity
 }

@@ -23,6 +23,12 @@ type Client struct {
 
 	// Connection is the connection for the client
 	Connection *Connection
+
+	// NativeOS is the native operating system of the client
+	NativeOS string
+
+	// NativeLanMan is the native LAN Manager of the client
+	NativeLanMan string
 }
 
 // Connection represents an established SMB connection between the client and server

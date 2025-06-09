@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/capabilities"
@@ -60,10 +61,8 @@ func (c *Client) SessionSetup() error {
 	session_setup_cmd.MaxMpxCount = c.Connection.MaxMpxCount
 	session_setup_cmd.Capabilities = c.Connection.Server.Capabilities
 
-	session_setup_cmd.AccountName.SetString("user")
-	session_setup_cmd.PrimaryDomain.SetString("domain")
-	session_setup_cmd.NativeOS.SetString("Unix")
-	session_setup_cmd.NativeLanMan.SetString("Samba")
+	session_setup_cmd.NativeOS.SetString(c.NativeOS)
+	session_setup_cmd.NativeLanMan.SetString(c.NativeLanMan)
 
 	// Check if we're using share level access control
 	if c.Connection.Server.SecurityMode.SupportsShareLevelAccessControl() {
@@ -79,6 +78,7 @@ func (c *Client) SessionSetup() error {
 		// Data section - for null session, use empty strings
 		session_setup_cmd.OEMPassword = []types.UCHAR{}
 		session_setup_cmd.UnicodePassword = []types.UCHAR{}
+
 	} else {
 		// User level access control is required by the server
 		// TODO: Look up Session from Client.Connection.SessionTable where Session.UserCredentials matches
@@ -92,16 +92,14 @@ func (c *Client) SessionSetup() error {
 			session_setup_cmd.VcNumber = types.USHORT(0x0000)
 			session_setup_cmd.SessionKey = c.Connection.Server.SessionKey
 
-			// TODO: Implement proper LM/NTLM/LMv2/NTLMv2 response selection based on policies
-			// For now, we'll use placeholder values
+			bytesBlob, err := hex.DecodeString("604006062b0601050502a0363034a00e300c060a2b06010401823702020aa22204204e544c4d5353500001000000050288a000000000000000000000000000000000")
+			if err != nil {
+				return fmt.Errorf("failed to decode security blob: %v", err)
+			}
+			session_setup_cmd.SecurityBlob = bytesBlob
 
-			// LM or LMv2 response in OEMPassword field
-			session_setup_cmd.OEMPassword = []types.UCHAR("LMResponse")
-			session_setup_cmd.OEMPasswordLen = types.USHORT(len(session_setup_cmd.OEMPassword))
-
-			// NTLM or NTLMv2 response in UnicodePassword field
-			session_setup_cmd.UnicodePassword = []types.UCHAR("NTLMResponse")
-			session_setup_cmd.UnicodePasswordLen = types.USHORT(len(session_setup_cmd.UnicodePassword))
+			// session_setup_cmd.NativeOS.SetBufferFormat()
+			// session_setup_cmd.NativeLanMan.SetBufferFormat()
 		} else {
 			// Server doesn't support challenge/response authentication
 
