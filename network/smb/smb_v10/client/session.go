@@ -1,7 +1,6 @@
 package client
 
 import (
-	"encoding/hex"
 	"fmt"
 
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/capabilities"
@@ -10,14 +9,16 @@ import (
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message/commands/codes"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message/header/flags"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message/header/flags2"
+	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/types"
 	"github.com/TheManticoreProject/Manticore/utils/encoding/utf16"
+	"github.com/TheManticoreProject/Manticore/windows/credentials"
 )
 
 // Session represents an established session between the client and server
 type Session struct {
 	// The SMB connection associated with this session
-	Connection *Client
+	Client *Client
 
 	// The cryptographic session key associated with this session
 	SessionKey []byte
@@ -25,12 +26,12 @@ type Session struct {
 	// The 2-byte UID for this session
 	SessionUID uint16
 
-	// Opaque implementation-specific entity that identifies the credentials
-	UserCredentials interface{}
+	// The credentials for this session
+	Credentials *credentials.Credentials
 }
 
-func (c *Client) SessionSetup() error {
-	if !c.Transport.IsConnected() {
+func (s *Session) SessionSetup() error {
+	if !s.Client.Transport.IsConnected() {
 		return fmt.Errorf("transport is not connected")
 	}
 	request_msg := message.NewMessage()
@@ -42,12 +43,12 @@ func (c *Client) SessionSetup() error {
 	request_msg.Header.Flags2 = flags2.Flags2(flags2.FLAGS2_NT_STATUS_ERROR_CODES | flags2.FLAGS2_LONG_NAMES_ALLOWED | flags2.FLAGS2_EXTENDED_SECURITY)
 
 	// Add Unicode support if server supports it
-	if c.Connection.Server.Capabilities&capabilities.CAP_UNICODE == capabilities.CAP_UNICODE {
+	if s.Client.Connection.Server.Capabilities&capabilities.CAP_UNICODE == capabilities.CAP_UNICODE {
 		request_msg.Header.Flags2 |= flags2.Flags2(flags2.FLAGS2_UNICODE)
 	}
 
 	// Set message signing flags based on server security mode
-	if c.Connection.Server.SecurityMode.IsSecuritySignatureEnabled() {
+	if s.Client.Connection.Server.SecurityMode.IsSecuritySignatureEnabled() {
 		request_msg.Header.Flags2 |= flags2.Flags2(flags2.FLAGS2_SECURITY_SIGNATURE)
 	}
 
@@ -57,21 +58,21 @@ func (c *Client) SessionSetup() error {
 	request_msg.Header.TID = 65535
 	request_msg.Header.UID = 0
 
-	session_setup_cmd.MaxBufferSize = types.USHORT(c.Connection.Server.MaxBufferSize)
-	session_setup_cmd.MaxMpxCount = c.Connection.MaxMpxCount
-	session_setup_cmd.Capabilities = c.Connection.Server.Capabilities
+	session_setup_cmd.MaxBufferSize = types.USHORT(s.Client.Connection.Server.MaxBufferSize)
+	session_setup_cmd.MaxMpxCount = s.Client.Connection.MaxMpxCount
+	session_setup_cmd.Capabilities = s.Client.Connection.Server.Capabilities
 
-	session_setup_cmd.NativeOS.SetString(c.NativeOS)
-	session_setup_cmd.NativeLanMan.SetString(c.NativeLanMan)
+	session_setup_cmd.NativeOS = s.Client.NativeOS
+	session_setup_cmd.NativeLanMan = s.Client.NativeLanMan
 
 	// Check if we're using share level access control
-	if c.Connection.Server.SecurityMode.SupportsShareLevelAccessControl() {
+	if s.Client.Connection.Server.SecurityMode.SupportsShareLevelAccessControl() {
 		// Share level access control is required by the server
 		// If no authentication has been performed on the SMB connection, use anonymous authentication
 
 		// Parameters
 		session_setup_cmd.VcNumber = types.USHORT(0x0000)
-		session_setup_cmd.SessionKey = c.Connection.Server.SessionKey
+		session_setup_cmd.SessionKey = s.Client.Connection.Server.SessionKey
 		session_setup_cmd.OEMPasswordLen = types.USHORT(0x0000)
 		session_setup_cmd.UnicodePasswordLen = types.USHORT(0x0000)
 
@@ -85,18 +86,35 @@ func (c *Client) SessionSetup() error {
 		// the application-supplied UserCredentials and reuse if found
 
 		// Handle authentication based on server capabilities
-		if c.Connection.Server.SecurityMode.SupportsChallengeResponseAuth() {
+		if s.Client.Connection.Server.SecurityMode.SupportsChallengeResponseAuth() {
 			// Server supports challenge/response authentication
 			// Determine authentication type based on policies
 
 			session_setup_cmd.VcNumber = types.USHORT(0x0000)
-			session_setup_cmd.SessionKey = c.Connection.Server.SessionKey
+			session_setup_cmd.SessionKey = s.Client.Connection.Server.SessionKey
 
-			bytesBlob, err := hex.DecodeString("604006062b0601050502a0363034a00e300c060a2b06010401823702020aa22204204e544c4d5353500001000000050288a000000000000000000000000000000000")
+			useUnicode := s.Client.Connection.Server.Capabilities&capabilities.CAP_UNICODE == capabilities.CAP_UNICODE
+
+			authCtx := spnego.NewAuthContext(
+				spnego.AuthTypeNTLM,
+				s.Credentials.Domain,
+				s.Credentials.Username,
+				s.Credentials.Password,
+				s.Client.Workstation,
+				useUnicode,
+			)
+
+			negotiateToken, err := authCtx.CreateNegotiateToken()
 			if err != nil {
-				return fmt.Errorf("failed to decode security blob: %v", err)
+				return fmt.Errorf("failed to create negotiate token: %v", err)
 			}
-			session_setup_cmd.SecurityBlob = bytesBlob
+			session_setup_cmd.SecurityBlob = negotiateToken
+
+			// bytesBlob, err := hex.DecodeString("604006062b0601050502a0363034a00e300c060a2b06010401823702020aa22204204e544c4d5353500001000000050288a000000000000000000000000000000000")
+			// if err != nil {
+			// 	return fmt.Errorf("failed to decode security blob: %v", err)
+			// }
+			// session_setup_cmd.SecurityBlob = bytesBlob
 
 			// session_setup_cmd.NativeOS.SetBufferFormat()
 			// session_setup_cmd.NativeLanMan.SetBufferFormat()
@@ -105,10 +123,10 @@ func (c *Client) SessionSetup() error {
 
 			// Use plaintext authentication
 			session_setup_cmd.VcNumber = types.USHORT(0x0000)
-			session_setup_cmd.SessionKey = c.Connection.Server.SessionKey
+			session_setup_cmd.SessionKey = s.Client.Connection.Server.SessionKey
 
 			// Check if Unicode is supported
-			if c.Connection.Server.Capabilities&0x00000004 != 0 { // CAP_UNICODE
+			if s.Client.Connection.Server.Capabilities&0x00000004 != 0 { // CAP_UNICODE
 				// Send password in Unicode
 				session_setup_cmd.UnicodePassword = []types.UCHAR(utf16.EncodeUTF16LE("UnicodePassword"))
 				session_setup_cmd.UnicodePasswordLen = types.USHORT(len(session_setup_cmd.UnicodePassword))
@@ -132,13 +150,13 @@ func (c *Client) SessionSetup() error {
 	}
 
 	// Send the message
-	_, err = c.Transport.Send(marshalled_message)
+	_, err = s.Client.Transport.Send(marshalled_message)
 	if err != nil {
 		return fmt.Errorf("failed to send negotiate message: %v", err)
 	}
 
 	// Receive the response
-	raw_response_message, err := c.Transport.Receive()
+	raw_response_message, err := s.Client.Transport.Receive()
 	if err != nil {
 		return fmt.Errorf("failed to receive response message: %v", err)
 	}

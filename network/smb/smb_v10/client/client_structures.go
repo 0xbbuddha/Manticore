@@ -29,6 +29,9 @@ type Client struct {
 
 	// NativeLanMan is the native LAN Manager of the client
 	NativeLanMan string
+
+	// Workstation is the workstation name of the client
+	Workstation string
 }
 
 // Connection represents an established SMB connection between the client and server

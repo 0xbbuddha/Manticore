@@ -11,6 +11,9 @@ import (
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message/data"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message/parameters"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/types"
+	"github.com/TheManticoreProject/Manticore/utils"
+
+	"github.com/TheManticoreProject/Manticore/utils/encoding/utf16"
 )
 
 // SessionSetupAndxRequest
@@ -138,7 +141,7 @@ type SessionSetupAndxRequest struct {
 	// characters. Otherwise, this string MUST be a null-terminated array of OEM
 	// characters. If this string consists of Unicode characters, this field MUST be
 	// aligned to start on a 2-byte boundary from the start of the SMB header.
-	NativeOS types.SMB_STRING
+	NativeOS string
 
 	// NativeLanMan (variable): A string that represents the native LAN manager type
 	// of the client. If SMB_FLAGS2_UNICODE is set in the Flags2 field of the SMB header
@@ -146,7 +149,7 @@ type SessionSetupAndxRequest struct {
 	// characters. Otherwise, this string MUST be a null-terminated array of OEM
 	// characters. If this string consists of Unicode characters, this field MUST be
 	// aligned to start on a 2-byte boundary from the start of the SMB header.
-	NativeLanMan types.SMB_STRING
+	NativeLanMan string
 }
 
 // NewSessionSetupAndxRequest creates a new SessionSetupAndxRequest structure
@@ -178,8 +181,8 @@ func NewSessionSetupAndxRequest() *SessionSetupAndxRequest {
 		// is used to authenticate the user:
 		SecurityBlob: []types.UCHAR{},
 		// Other data fields
-		NativeOS:     types.SMB_STRING{},
-		NativeLanMan: types.SMB_STRING{},
+		NativeOS:     "",
+		NativeLanMan: "",
 	}
 
 	c.Command.SetCommandCode(codes.SMB_COM_SESSION_SETUP_ANDX)
@@ -200,7 +203,6 @@ func (c *SessionSetupAndxRequest) IsAndX() bool {
 func (c *SessionSetupAndxRequest) Marshal() ([]byte, error) {
 	marshalledCommand := []byte{}
 
-	var bytesStream []byte
 	var err error
 
 	// Create the Parameters structure if it is nil
@@ -233,6 +235,24 @@ func (c *SessionSetupAndxRequest) Marshal() ([]byte, error) {
 		// Marshalling data SecurityBlob
 		rawDataContent = append(rawDataContent, c.SecurityBlob...)
 		c.SecurityBlobLength = types.USHORT(len(c.SecurityBlob))
+
+		// Marshalling data NativeOS
+		if c.Capabilities.HasCapability(capabilities.CAP_UNICODE) {
+			rawDataContent = append(rawDataContent, utf16.EncodeUTF16LE(c.NativeOS)...)
+			rawDataContent = append(rawDataContent, []byte{0, 0}...)
+		} else {
+			rawDataContent = append(rawDataContent, c.NativeOS...)
+			rawDataContent = append(rawDataContent, []byte{0}...)
+		}
+
+		// Marshalling data NativeLanMan
+		if c.Capabilities.HasCapability(capabilities.CAP_UNICODE) {
+			rawDataContent = append(rawDataContent, utf16.EncodeUTF16LE(c.NativeLanMan)...)
+			rawDataContent = append(rawDataContent, []byte{0, 0}...)
+		} else {
+			rawDataContent = append(rawDataContent, c.NativeLanMan...)
+			rawDataContent = append(rawDataContent, []byte{0}...)
+		}
 	} else {
 		// Marshalling data OEMPassword
 		rawDataContent = append(rawDataContent, c.OEMPassword...)
@@ -260,23 +280,37 @@ func (c *SessionSetupAndxRequest) Marshal() ([]byte, error) {
 			return nil, err
 		}
 		rawDataContent = append(rawDataContent, bytesStream...)
-	}
 
-	// Marshalling data NativeOS
-	c.NativeOS.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_VARIABLE_BLOCK_16BIT)
-	bytesStream, err = c.NativeOS.Marshal()
-	if err != nil {
-		return nil, err
-	}
-	rawDataContent = append(rawDataContent, bytesStream...)
+		// Marshalling data NativeOS
+		nativeOSSmbString := types.SMB_STRING{}
+		if c.Capabilities.HasCapability(capabilities.CAP_UNICODE) {
+			nativeOSSmbString.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_NULL_TERMINATED_OEM_STRING_16BIT)
+			nativeOSSmbString.SetString(string(utf16.EncodeUTF16LE(c.NativeOS)))
+		} else {
+			nativeOSSmbString.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_NULL_TERMINATED_OEM_STRING)
+			nativeOSSmbString.SetString(c.NativeOS)
+		}
+		bytesStream, err = nativeOSSmbString.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		rawDataContent = append(rawDataContent, bytesStream...)
 
-	// Marshalling data NativeLanMan
-	c.NativeLanMan.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_VARIABLE_BLOCK_16BIT)
-	bytesStream, err = c.NativeLanMan.Marshal()
-	if err != nil {
-		return nil, err
+		// Marshalling data NativeLanMan
+		nativeLanManSmbString := types.SMB_STRING{}
+		if c.Capabilities.HasCapability(capabilities.CAP_UNICODE) {
+			nativeLanManSmbString.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_NULL_TERMINATED_OEM_STRING_16BIT)
+			nativeLanManSmbString.SetString(string(utf16.EncodeUTF16LE(c.NativeLanMan)))
+		} else {
+			nativeLanManSmbString.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_NULL_TERMINATED_OEM_STRING)
+			nativeLanManSmbString.SetString(c.NativeLanMan)
+		}
+		bytesStream, err = nativeLanManSmbString.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		rawDataContent = append(rawDataContent, bytesStream...)
 	}
-	rawDataContent = append(rawDataContent, bytesStream...)
 
 	// Then marshal the parameters
 	rawParametersContent := []byte{}
@@ -453,6 +487,16 @@ func (c *SessionSetupAndxRequest) Unmarshal(data []byte) (int, error) {
 		}
 		c.SecurityBlobLength = types.USHORT(binary.LittleEndian.Uint16(rawDataContent[offset : offset+2]))
 		offset += 2
+
+		// Unmarshalling data NativeOS
+		nativeOSdata, bytesRead := utils.ReadUntilNullTerminator(rawDataContent[offset:])
+		offset += bytesRead
+		c.NativeOS = string(nativeOSdata)
+
+		// Unmarshalling data NativeLanMan
+		nativeLanMandata, bytesRead := utils.ReadUntilNullTerminator(rawDataContent[offset:])
+		offset += bytesRead
+		c.NativeLanMan = string(nativeLanMandata)
 	} else {
 		// Unmarshalling data OEMPassword
 		if len(rawDataContent) < offset+1 {
@@ -492,21 +536,27 @@ func (c *SessionSetupAndxRequest) Unmarshal(data []byte) (int, error) {
 			return offset, err
 		}
 		offset += bytesRead
-	}
 
-	// Unmarshalling data NativeOS
-	bytesRead, err = c.NativeOS.Unmarshal(rawDataContent[offset:])
-	if err != nil {
-		return offset, err
-	}
-	offset += bytesRead
+		// Unmarshalling NativeOS
+		nativeOSSmbString := types.SMB_STRING{}
+		nativeOSSmbString.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_NULL_TERMINATED_OEM_STRING)
+		nativeOSSmbString.SetString(c.NativeOS)
+		bytesRead, err = nativeOSSmbString.Unmarshal(rawDataContent[offset:])
+		if err != nil {
+			return offset, err
+		}
+		offset += bytesRead
 
-	// Unmarshalling data NativeLanMan
-	bytesRead, err = c.NativeLanMan.Unmarshal(rawDataContent[offset:])
-	if err != nil {
-		return offset, err
+		// Unmarshalling NativeLanMan
+		nativeLanManSmbString := types.SMB_STRING{}
+		nativeLanManSmbString.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_NULL_TERMINATED_OEM_STRING)
+		nativeLanManSmbString.SetString(c.NativeLanMan)
+		bytesRead, err = nativeLanManSmbString.Unmarshal(rawDataContent[offset:])
+		if err != nil {
+			return offset, err
+		}
+		offset += bytesRead
 	}
-	offset += bytesRead
 
 	return offset, nil
 }
