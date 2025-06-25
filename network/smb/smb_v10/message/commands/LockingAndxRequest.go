@@ -231,6 +231,9 @@ func (c *LockingAndxRequest) Unmarshal(data []byte) (int, error) {
 
 	// First unmarshal the parameters
 	offset = 0
+	if c.IsAndX() {
+		offset += 4
+	}
 
 	// Unmarshalling parameter FID
 	if len(rawParametersContent) < offset+2 {

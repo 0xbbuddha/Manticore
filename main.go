@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/TheManticoreProject/Manticore/logger"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/client"
 	"github.com/TheManticoreProject/Manticore/windows/credentials"
 	"github.com/TheManticoreProject/goopts/parser"
 )
 
 var (
-	mode string
-
 	// Configuration
 	debug bool
 
@@ -66,15 +65,27 @@ func parseArgs() {
 func main() {
 	parseArgs()
 
+	creds, err := credentials.NewCredentials(authDomain, authUsername, authPassword, authHashes)
+	if err != nil {
+		logger.Warn(fmt.Sprintf("Error creating credentials: %s", err))
+		return
+	}
+
+	// Create a new SMB client
 	c := client.NewClientUsingTCPTransport(net.ParseIP(target), 445)
 
-	err := c.Connect(net.ParseIP(target), 445)
+	// Connect to the SMB server
+	err = c.Connect(net.ParseIP(target), 445)
 	if err != nil {
 		fmt.Printf("[error] Error connecting to SMB server: %s\n", err)
 		return
 	} else {
 		fmt.Printf("[info] Connected to SMB server\n")
 	}
+
+	// Set the native OS and LAN Manager
+	c.NativeOS = "Unix"
+	c.NativeLanMan = "Samba"
 
 	fmt.Printf("[info] Dialect         : [%s]\n", c.Connection.SelectedDialect)
 	fmt.Printf("[info] Capabilities    : [0x%08x] (%s)\n", uint32(c.Connection.Server.Capabilities), c.Connection.Server.Capabilities.String())
@@ -92,15 +103,7 @@ func main() {
 		fmt.Printf("[info] Server name     : [%s]\n", c.Connection.Server.Name)
 	}
 
-	c.Session = &client.Session{
-		Client: c,
-		Credentials: &credentials.Credentials{
-			Domain:   authDomain,
-			Username: authUsername,
-			Password: authPassword,
-		},
-	}
-	err = c.Session.SessionSetup()
+	err = c.SessionSetup(creds)
 	if err != nil {
 		fmt.Printf("[error] Error setting up session: %s\n", err)
 		return

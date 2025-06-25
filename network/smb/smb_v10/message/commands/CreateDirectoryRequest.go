@@ -129,7 +129,6 @@ func (c *CreateDirectoryRequest) Unmarshal(data []byte) (int, error) {
 
 	// First unmarshal the parameters
 	offset = 0
-
 	// No parameters to unmarshal
 
 	// Then unmarshal the data

@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/transport"
+	"github.com/TheManticoreProject/Manticore/windows/credentials"
 )
 
 // NewClientUsingNBTTransport creates a new SMB v1.0 client using NBT transport
@@ -61,6 +62,22 @@ func (c *Client) Connect(ipaddr net.IP, port int) error {
 	}
 
 	return nil
+}
+
+// SessionSetup sets up a session with the SMB server
+//
+// Returns:
+//   - An error if the session setup fails
+func (c *Client) SessionSetup(credentials *credentials.Credentials) error {
+	if c.Session == nil {
+		c.Session = &Session{
+			Client:      c,
+			Credentials: credentials,
+		}
+	}
+	c.Session.Client = c
+
+	return c.Session.SessionSetup()
 }
 
 // SetHost sets the host IP address for the SMB client

@@ -40,38 +40,30 @@ type NegotiateMessage struct {
 }
 
 // CreateNegotiateMessage initializes a NegotiateMessage with the given parameters
-func CreateNegotiateMessage(domain, workstation string, useUnicode bool) (*NegotiateMessage, error) {
+func CreateNegotiateMessage(domain, workstation string, negotiateFlags flags.NegotiateFlags, version *version.Version) (*NegotiateMessage, error) {
 	msg := NegotiateMessage{
 		Header: header.Header{
 			Signature:   header.NTLM_SIGNATURE,
 			MessageType: types.MESSAGE_TYPE_NEGOTIATE,
 		},
+		NegotiateFlags: negotiateFlags,
+		Version:        version,
 	}
 
-	msg.NegotiateFlags = flags.NTLMSSP_NEGOTIATE_NTLM |
-		flags.NTLMSSP_NEGOTIATE_ALWAYS_SIGN |
-		flags.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY |
-		flags.NTLMSSP_NEGOTIATE_128 |
-		flags.NTLMSSP_NEGOTIATE_56 |
-		flags.NTLMSSP_REQUEST_TARGET |
-		flags.NTLMSSP_NEGOTIATE_TARGET_INFO |
-		flags.NTLMSSP_NEGOTIATE_VERSION
-
-	// Set Unicode flag
-	if useUnicode {
-		msg.NegotiateFlags |= flags.NTLMSSP_NEGOTIATE_UNICODE
-	} else {
-		msg.NegotiateFlags |= flags.NTLMSSP_NEGOTIATE_OEM
+	if version != nil && !msg.NegotiateFlags.HasFlag(flags.NTLMSSP_NEGOTIATE_VERSION) {
+		msg.NegotiateFlags |= flags.NTLMSSP_NEGOTIATE_VERSION
 	}
 
 	// DomainNameFields
 	msg.DomainNameFields.Len = 0
 	msg.DomainNameFields.MaxLen = 0
 	msg.DomainNameFields.BufferOffset = 0
-	if domain != "" {
-		msg.NegotiateFlags |= flags.NTLMSSP_NEGOTIATE_OEM_DOMAIN_SUPPLIED
-		if useUnicode {
-			msg.DomainName = utf16.EncodeUTF16LE(domain)
+	if len(domain) > 0 {
+		if !msg.NegotiateFlags.HasFlag(flags.NTLMSSP_NEGOTIATE_OEM_DOMAIN_SUPPLIED) {
+			msg.NegotiateFlags |= flags.NTLMSSP_NEGOTIATE_OEM_DOMAIN_SUPPLIED
+		}
+		if msg.NegotiateFlags.HasFlag(flags.NTLMSSP_NEGOTIATE_UNICODE) {
+			msg.DomainName = utf16.EncodeUTF16LE(strings.ToUpper(domain))
 		} else {
 			msg.DomainName = []byte(strings.ToUpper(domain))
 		}
@@ -83,10 +75,12 @@ func CreateNegotiateMessage(domain, workstation string, useUnicode bool) (*Negot
 	msg.WorkstationFields.Len = 0
 	msg.WorkstationFields.MaxLen = 0
 	msg.WorkstationFields.BufferOffset = 0
-	if workstation != "" {
-		msg.NegotiateFlags |= flags.NTLMSSP_NEGOTIATE_OEM_WORKSTATION_SUPPLIED
-		if useUnicode {
-			msg.Workstation = utf16.EncodeUTF16LE(workstation)
+	if len(workstation) > 0 {
+		if !msg.NegotiateFlags.HasFlag(flags.NTLMSSP_NEGOTIATE_OEM_WORKSTATION_SUPPLIED) {
+			msg.NegotiateFlags |= flags.NTLMSSP_NEGOTIATE_OEM_WORKSTATION_SUPPLIED
+		}
+		if msg.NegotiateFlags.HasFlag(flags.NTLMSSP_NEGOTIATE_UNICODE) {
+			msg.Workstation = utf16.EncodeUTF16LE(strings.ToUpper(workstation))
 		} else {
 			msg.Workstation = []byte(strings.ToUpper(workstation))
 		}
@@ -101,25 +95,41 @@ func CreateNegotiateMessage(domain, workstation string, useUnicode bool) (*Negot
 func (msg *NegotiateMessage) Marshal() ([]byte, error) {
 	// A 32-bit unsigned integer that defines the offset, in bytes, from
 	// the beginning of the NEGOTIATE_MESSAGE to the entry in Payload
-	// Starting at 40 for the header section + 4 for negotiate flags + 8 for domain name fields + 8 for workstation fields + 8 for version
-	offset := 40
+	// Compute the start‐of‐payload offset:
+	//   8 bytes  NTLMSSP Signature
+	// + 4 bytes  MessageType
+	// + 4 bytes  NegotiateFlags
+	// + 8 bytes  DomainNameFields
+	// + 8 bytes  WorkstationFields
+	// + 8 bytes  Version (real or zero placeholder)
+	offset := 8 + 4 + 4 + 8 + 8 + 8 // = 40
 
 	// Write payload data first to compute offsets
 	payload := []byte{}
 
 	// Domain name
-	msg.DomainNameFields.Len = uint16(len(msg.DomainName))
-	msg.DomainNameFields.MaxLen = uint16(len(msg.DomainName))
 	msg.DomainNameFields.BufferOffset = uint32(offset)
-	offset += len(msg.DomainName)
-	payload = append(payload, msg.DomainName...)
+	if msg.NegotiateFlags.HasFlag(flags.NTLMSSP_NEGOTIATE_OEM_DOMAIN_SUPPLIED) {
+		payload = append(payload, msg.DomainName...)
+		offset += len(msg.DomainName)
+		msg.DomainNameFields.Len = uint16(len(msg.DomainName))
+		msg.DomainNameFields.MaxLen = uint16(len(msg.DomainName))
+	} else {
+		msg.DomainNameFields.Len = 0
+		msg.DomainNameFields.MaxLen = 0
+	}
 
 	// Workstation
-	msg.WorkstationFields.Len = uint16(len(msg.Workstation))
-	msg.WorkstationFields.MaxLen = uint16(len(msg.Workstation))
 	msg.WorkstationFields.BufferOffset = uint32(offset)
-	offset += len(msg.Workstation)
-	payload = append(payload, msg.Workstation...)
+	if msg.NegotiateFlags.HasFlag(flags.NTLMSSP_NEGOTIATE_OEM_WORKSTATION_SUPPLIED) {
+		payload = append(payload, msg.Workstation...)
+		offset += len(msg.Workstation)
+		msg.WorkstationFields.Len = uint16(len(msg.Workstation))
+		msg.WorkstationFields.MaxLen = uint16(len(msg.Workstation))
+	} else {
+		msg.WorkstationFields.Len = 0
+		msg.WorkstationFields.MaxLen = 0
+	}
 
 	// Data section
 
@@ -154,7 +164,10 @@ func (msg *NegotiateMessage) Marshal() ([]byte, error) {
 	marshalledData = append(marshalledData, workstationFieldsBytes...)
 
 	// Write version if needed
-	if msg.Version != nil && msg.NegotiateFlags.HasFlag(flags.NTLMSSP_NEGOTIATE_VERSION) {
+	if msg.NegotiateFlags.HasFlag(flags.NTLMSSP_NEGOTIATE_VERSION) {
+		if msg.Version == nil {
+			return nil, fmt.Errorf("NTLMSSP_NEGOTIATE_VERSION flag is set but Version is nil")
+		}
 		byteStream, err := msg.Version.Marshal()
 		if err != nil {
 			return nil, err
@@ -174,7 +187,7 @@ func (msg *NegotiateMessage) Marshal() ([]byte, error) {
 func (msg *NegotiateMessage) Unmarshal(data []byte) (int, error) {
 	totalBytesRead := 0
 
-	if len(data) < 40 {
+	if len(data) < 32 {
 		return 0, fmt.Errorf("data too short to be a valid NegotiateMessage")
 	}
 
@@ -189,14 +202,14 @@ func (msg *NegotiateMessage) Unmarshal(data []byte) (int, error) {
 	if totalBytesRead+4 > len(data) {
 		return 0, fmt.Errorf("data too short to read NegotiateFlags in NegotiateMessage")
 	}
-	msg.NegotiateFlags = flags.NegotiateFlags(binary.LittleEndian.Uint32(data[12:16]))
+	msg.NegotiateFlags = flags.NegotiateFlags(binary.LittleEndian.Uint32(data[totalBytesRead : totalBytesRead+4]))
 	totalBytesRead += 4
 
 	// Read domain fields
 	if totalBytesRead+8 > len(data) {
 		return 0, fmt.Errorf("data too short to read DomainNameFields in NegotiateMessage")
 	}
-	bytesRead, err = msg.DomainNameFields.Unmarshal(data[16:24])
+	bytesRead, err = msg.DomainNameFields.Unmarshal(data[totalBytesRead : totalBytesRead+8])
 	if err != nil {
 		return 0, err
 	}
@@ -206,7 +219,7 @@ func (msg *NegotiateMessage) Unmarshal(data []byte) (int, error) {
 	if totalBytesRead+8 > len(data) {
 		return 0, fmt.Errorf("data too short to read WorkstationFields in NegotiateMessage")
 	}
-	bytesRead, err = msg.WorkstationFields.Unmarshal(data[24:32])
+	bytesRead, err = msg.WorkstationFields.Unmarshal(data[totalBytesRead : totalBytesRead+8])
 	if err != nil {
 		return 0, err
 	}
@@ -233,17 +246,31 @@ func (msg *NegotiateMessage) Unmarshal(data []byte) (int, error) {
 
 	// Read payload section
 
+	fmt.Printf("len(data): %d\n", len(data))
+
+	fmt.Printf("msg.DomainNameFields.BufferOffset: %d\n", msg.DomainNameFields.BufferOffset)
+	fmt.Printf("msg.DomainNameFields.Len: %d\n", msg.DomainNameFields.Len)
+	fmt.Printf("DomainName = data [%d:%d]\n", msg.DomainNameFields.BufferOffset, msg.DomainNameFields.BufferOffset+uint32(msg.DomainNameFields.Len))
+
+	fmt.Printf("msg.WorkstationFields.BufferOffset: %d\n", msg.WorkstationFields.BufferOffset)
+	fmt.Printf("msg.WorkstationFields.Len: %d\n", msg.WorkstationFields.Len)
+	fmt.Printf("Workstation = data [%d:%d]\n", msg.WorkstationFields.BufferOffset, msg.WorkstationFields.BufferOffset+uint32(msg.WorkstationFields.Len))
+
 	// Domain name
-	if msg.DomainNameFields.BufferOffset+uint32(msg.DomainNameFields.Len) > uint32(len(data)) {
-		return 0, fmt.Errorf("data too short to read DomainName in payload section in NegotiateMessage")
+	if msg.DomainNameFields.Len != 0 {
+		if msg.DomainNameFields.BufferOffset+uint32(msg.DomainNameFields.Len) > uint32(len(data)) {
+			return 0, fmt.Errorf("data too short to read DomainName in payload section in NegotiateMessage")
+		}
+		msg.DomainName = data[msg.DomainNameFields.BufferOffset : msg.DomainNameFields.BufferOffset+uint32(msg.DomainNameFields.Len)]
 	}
-	msg.DomainName = data[msg.DomainNameFields.BufferOffset : msg.DomainNameFields.BufferOffset+uint32(msg.DomainNameFields.Len)]
 
 	// Workstation
-	if msg.WorkstationFields.BufferOffset+uint32(msg.WorkstationFields.Len) > uint32(len(data)) {
-		return 0, fmt.Errorf("data too short to read Workstation in payload section in NegotiateMessage")
+	if msg.WorkstationFields.Len != 0 {
+		if msg.WorkstationFields.BufferOffset+uint32(msg.WorkstationFields.Len) > uint32(len(data)) {
+			return 0, fmt.Errorf("data too short to read Workstation in payload section in NegotiateMessage")
+		}
+		msg.Workstation = data[msg.WorkstationFields.BufferOffset : msg.WorkstationFields.BufferOffset+uint32(msg.WorkstationFields.Len)]
 	}
-	msg.Workstation = data[msg.WorkstationFields.BufferOffset : msg.WorkstationFields.BufferOffset+uint32(msg.WorkstationFields.Len)]
 
 	return totalBytesRead, nil
 }

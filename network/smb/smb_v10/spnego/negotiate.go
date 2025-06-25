@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/negotiate"
+	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/negotiate/flags"
+	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/version"
 )
 
 // CreateNegotiateToken creates the initial SPNEGO token with NTLM negotiate message
@@ -14,11 +16,11 @@ import (
 // Returns:
 //   - []byte: The SPNEGO token containing the NTLM negotiate message
 //   - error: An error if token creation fails
-func (ctx *AuthContext) CreateNegotiateToken() ([]byte, error) {
+func (ctx *AuthContext) CreateNegotiateToken(negotiateFlags flags.NegotiateFlags, version *version.Version) ([]byte, error) {
 	switch ctx.Type {
 	case AuthTypeNTLM:
 		// Create NTLM NEGOTIATE message
-		ntlmNegotiate, err := negotiate.CreateNegotiateMessage(ctx.Domain, ctx.Workstation, ctx.UseUnicode)
+		ntlmNegotiate, err := negotiate.CreateNegotiateMessage(ctx.Domain, ctx.Workstation, negotiateFlags, version)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create NTLM NEGOTIATE message: %v", err)
 		}

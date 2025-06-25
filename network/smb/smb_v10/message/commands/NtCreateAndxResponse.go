@@ -256,6 +256,9 @@ func (c *NtCreateAndxResponse) Unmarshal(data []byte) (int, error) {
 
 	// First unmarshal the parameters
 	offset = 0
+	if c.IsAndX() {
+		offset += 4
+	}
 
 	// Unmarshalling parameter OpLockLevel
 	if len(rawParametersContent) < offset+1 {

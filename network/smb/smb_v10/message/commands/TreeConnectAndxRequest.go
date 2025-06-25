@@ -215,6 +215,9 @@ func (c *TreeConnectAndxRequest) Unmarshal(data []byte) (int, error) {
 
 	// First unmarshal the parameters
 	offset = 0
+	if c.IsAndX() {
+		offset += 4
+	}
 
 	// Unmarshalling parameter Flags
 	if len(rawParametersContent) < offset+2 {

@@ -1,6 +1,7 @@
 package spnego
 
 import (
+	"encoding/asn1"
 	"errors"
 	"fmt"
 
@@ -51,7 +52,7 @@ func (ctx *AuthContext) ProcessChallengeToken(token []byte) ([]byte, error) {
 	}
 
 	// Check if the server accepted our mechanism
-	if resp.NegState == Reject {
+	if resp.NegState == asn1.Enumerated(1) {
 		return nil, errors.New("server rejected authentication")
 	}
 

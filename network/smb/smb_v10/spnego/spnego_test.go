@@ -6,12 +6,24 @@ import (
 
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/negotiate"
+	negotiate_flags "github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/negotiate/flags"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/types"
+	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/version"
 )
 
 func TestCreateNegTokenInit(t *testing.T) {
 	// Create a simple NTLM NEGOTIATE message
-	ntlmNegotiate, err := negotiate.CreateNegotiateMessage("DOMAIN", "WORKSTATION", true)
+	negotiateFlags := negotiate_flags.NegotiateFlags(
+		negotiate_flags.NTLMSSP_NEGOTIATE_NTLM |
+			negotiate_flags.NTLMSSP_NEGOTIATE_ALWAYS_SIGN |
+			negotiate_flags.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY |
+			negotiate_flags.NTLMSSP_NEGOTIATE_128 |
+			negotiate_flags.NTLMSSP_NEGOTIATE_56 |
+			negotiate_flags.NTLMSSP_REQUEST_TARGET |
+			negotiate_flags.NTLMSSP_NEGOTIATE_TARGET_INFO,
+	)
+
+	ntlmNegotiate, err := negotiate.CreateNegotiateMessage("DOMAIN", "WORKSTATION", negotiateFlags, nil)
 	if err != nil {
 		t.Fatalf("Failed to create NTLM NEGOTIATE message: %v", err)
 	}
@@ -61,7 +73,24 @@ func TestAuthContext(t *testing.T) {
 	)
 
 	// Create negotiate token
-	token, err := ctx.CreateNegotiateToken()
+	negotiateFlags := negotiate_flags.NegotiateFlags(
+		negotiate_flags.NTLMSSP_NEGOTIATE_NTLM |
+			negotiate_flags.NTLMSSP_NEGOTIATE_ALWAYS_SIGN |
+			negotiate_flags.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY |
+			negotiate_flags.NTLMSSP_NEGOTIATE_128 |
+			negotiate_flags.NTLMSSP_NEGOTIATE_56 |
+			negotiate_flags.NTLMSSP_REQUEST_TARGET |
+			negotiate_flags.NTLMSSP_NEGOTIATE_TARGET_INFO |
+			negotiate_flags.NTLMSSP_NEGOTIATE_VERSION,
+	)
+	v := &version.Version{
+		ProductMajorVersion: 5,
+		ProductMinorVersion: 1,
+		ProductBuild:        0,
+		Reserved:            [3]byte{0, 0, 0},
+		NTLMRevision:        version.NTLMSSP_REVISION_W2K3,
+	}
+	token, err := ctx.CreateNegotiateToken(negotiateFlags, v)
 	if err != nil {
 		t.Fatalf("Failed to create negotiate token: %v", err)
 	}

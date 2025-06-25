@@ -3,7 +3,6 @@ package negotiate_test
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"testing"
 
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/negotiate"
@@ -11,7 +10,6 @@ import (
 )
 
 func TestMarshalUnmarshal(t *testing.T) {
-
 	tests := []struct {
 		name        string
 		domain      string
@@ -52,20 +50,16 @@ func TestMarshalUnmarshal(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create message
-			msg, err := negotiate.CreateNegotiateMessage(tt.domain, tt.workstation, tt.useUnicode)
+			msg, err := negotiate.CreateNegotiateMessage(tt.domain, tt.workstation, tt.flags, nil)
 			if err != nil {
 				t.Fatalf("Failed to create negotiate message: %v", err)
 			}
-
-			msg.NegotiateFlags = tt.flags
 
 			// Marshal
 			data, err := msg.Marshal()
 			if err != nil {
 				t.Fatalf("Failed to marshal: %v", err)
 			}
-
-			fmt.Printf("Marshaled NegotiateMessage: %s\n", hex.EncodeToString(data))
 
 			// Unmarshal
 			unmarshaledMsg := &negotiate.NegotiateMessage{}
@@ -75,15 +69,29 @@ func TestMarshalUnmarshal(t *testing.T) {
 			}
 
 			// Compare fields
-			if !bytes.Equal(msg.DomainName, unmarshaledMsg.DomainName) {
+			if !bytes.Equal(msg.DomainName, unmarshaledMsg.DomainName) && msg.NegotiateFlags.HasFlag(flags.NTLMSSP_NEGOTIATE_OEM_DOMAIN_SUPPLIED) {
 				t.Error("DomainName mismatch")
-				t.Errorf("msg.DomainName: %s", string(msg.DomainName))
-				t.Errorf("unmarshaledMsg.DomainName: %s", string(unmarshaledMsg.DomainName))
+				t.Errorf("  | msg.DomainName: \"%s\"", string(msg.DomainName))
+				t.Errorf("  | msg.DomainNameFields.BufferOffset: %d", msg.DomainNameFields.BufferOffset)
+				t.Errorf("  | msg.DomainNameFields.Len: %d", msg.DomainNameFields.Len)
+				t.Errorf("  | msg.DomainNameFields.MaxLen: %d", msg.DomainNameFields.MaxLen)
+				t.Errorf("  | ")
+				t.Errorf("  | unmarshaledMsg.DomainName: \"%s\"", string(unmarshaledMsg.DomainName))
+				t.Errorf("  | unmarshaledMsg.DomainNameFields.BufferOffset: %d", unmarshaledMsg.DomainNameFields.BufferOffset)
+				t.Errorf("  | unmarshaledMsg.DomainNameFields.Len: %d", unmarshaledMsg.DomainNameFields.Len)
+				t.Errorf("  | unmarshaledMsg.DomainNameFields.MaxLen: %d", unmarshaledMsg.DomainNameFields.MaxLen)
 			}
-			if !bytes.Equal(msg.Workstation, unmarshaledMsg.Workstation) {
+			if !bytes.Equal(msg.Workstation, unmarshaledMsg.Workstation) && msg.NegotiateFlags.HasFlag(flags.NTLMSSP_NEGOTIATE_OEM_WORKSTATION_SUPPLIED) {
 				t.Error("Workstation mismatch")
-				t.Errorf("msg.Workstation: %s", string(msg.Workstation))
-				t.Errorf("unmarshaledMsg.Workstation: %s", string(unmarshaledMsg.Workstation))
+				t.Errorf("  | msg.Workstation: \"%s\"", string(msg.Workstation))
+				t.Errorf("  | msg.WorkstationFields.BufferOffset: %d", msg.WorkstationFields.BufferOffset)
+				t.Errorf("  | msg.WorkstationFields.Len: %d", msg.WorkstationFields.Len)
+				t.Errorf("  | msg.WorkstationFields.MaxLen: %d", msg.WorkstationFields.MaxLen)
+				t.Errorf("  | ")
+				t.Errorf("  | unmarshaledMsg.Workstation: \"%s\"", string(unmarshaledMsg.Workstation))
+				t.Errorf("  | unmarshaledMsg.WorkstationFields.BufferOffset: %d", unmarshaledMsg.WorkstationFields.BufferOffset)
+				t.Errorf("  | unmarshaledMsg.WorkstationFields.Len: %d", unmarshaledMsg.WorkstationFields.Len)
+				t.Errorf("  | unmarshaledMsg.WorkstationFields.MaxLen: %d", unmarshaledMsg.WorkstationFields.MaxLen)
 			}
 			if msg.NegotiateFlags != unmarshaledMsg.NegotiateFlags {
 				t.Error("NegotiateFlags mismatch")
@@ -97,5 +105,18 @@ func TestMarshalUnmarshal(t *testing.T) {
 				t.Error("WorkstationFields mismatch")
 			}
 		})
+	}
+}
+
+func TestUnmarshallRealData(t *testing.T) {
+	bytesBlob, err := hex.DecodeString("4e544c4d5353500001000000050288a000000000000000000000000000000000")
+	if err != nil {
+		t.Fatalf("failed to decode hex string: %v", err)
+	}
+
+	msg := &negotiate.NegotiateMessage{}
+	_, err = msg.Unmarshal(bytesBlob)
+	if err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
 	}
 }

@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/capabilities"
@@ -10,6 +11,8 @@ import (
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message/header/flags"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message/header/flags2"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego"
+	negotiate_flags "github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/negotiate/flags"
+	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/version"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/types"
 	"github.com/TheManticoreProject/Manticore/utils/encoding/utf16"
 	"github.com/TheManticoreProject/Manticore/windows/credentials"
@@ -34,6 +37,9 @@ func (s *Session) SessionSetup() error {
 	if !s.Client.Transport.IsConnected() {
 		return fmt.Errorf("transport is not connected")
 	}
+
+	// Prepare and send a NTLMSSP NEGOTIATE message =============================================================================================
+
 	request_msg := message.NewMessage()
 	session_setup_cmd := commands.NewSessionSetupAndxRequest()
 
@@ -62,8 +68,13 @@ func (s *Session) SessionSetup() error {
 	session_setup_cmd.MaxMpxCount = s.Client.Connection.MaxMpxCount
 	session_setup_cmd.Capabilities = s.Client.Connection.Server.Capabilities
 
+	// if s.Client.Connection.Server.Capabilities&0x00000004 != 0 { // CAP_UNICODE
+	// 	session_setup_cmd.NativeOS = string(utf16.EncodeUTF16LE(s.Client.NativeOS))
+	// 	session_setup_cmd.NativeLanMan = string(utf16.EncodeUTF16LE(s.Client.NativeLanMan))
+	// } else {
 	session_setup_cmd.NativeOS = s.Client.NativeOS
 	session_setup_cmd.NativeLanMan = s.Client.NativeLanMan
+	// }
 
 	// Check if we're using share level access control
 	if s.Client.Connection.Server.SecurityMode.SupportsShareLevelAccessControl() {
@@ -104,20 +115,32 @@ func (s *Session) SessionSetup() error {
 				useUnicode,
 			)
 
-			negotiateToken, err := authCtx.CreateNegotiateToken()
+			negotiateFlags := negotiate_flags.NegotiateFlags(
+				negotiate_flags.NTLMSSP_NEGOTIATE_NTLM |
+					negotiate_flags.NTLMSSP_NEGOTIATE_ALWAYS_SIGN |
+					negotiate_flags.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY |
+					negotiate_flags.NTLMSSP_NEGOTIATE_128 |
+					negotiate_flags.NTLMSSP_NEGOTIATE_56 |
+					negotiate_flags.NTLMSSP_REQUEST_TARGET |
+					negotiate_flags.NTLMSSP_NEGOTIATE_TARGET_INFO |
+					negotiate_flags.NTLMSSP_NEGOTIATE_VERSION,
+			)
+			if useUnicode && !negotiateFlags.HasFlag(negotiate_flags.NTLMSSP_NEGOTIATE_UNICODE) {
+				negotiateFlags |= negotiate_flags.NTLMSSP_NEGOTIATE_UNICODE
+			}
+
+			v := &version.Version{
+				ProductMajorVersion: 5,
+				ProductMinorVersion: 1,
+				ProductBuild:        0,
+				Reserved:            [3]byte{0, 0, 0},
+				NTLMRevision:        version.NTLMSSP_REVISION_W2K3,
+			}
+			negotiateToken, err := authCtx.CreateNegotiateToken(negotiateFlags, v)
 			if err != nil {
 				return fmt.Errorf("failed to create negotiate token: %v", err)
 			}
 			session_setup_cmd.SecurityBlob = negotiateToken
-
-			// bytesBlob, err := hex.DecodeString("604006062b0601050502a0363034a00e300c060a2b06010401823702020aa22204204e544c4d5353500001000000050288a000000000000000000000000000000000")
-			// if err != nil {
-			// 	return fmt.Errorf("failed to decode security blob: %v", err)
-			// }
-			// session_setup_cmd.SecurityBlob = bytesBlob
-
-			// session_setup_cmd.NativeOS.SetBufferFormat()
-			// session_setup_cmd.NativeLanMan.SetBufferFormat()
 		} else {
 			// Server doesn't support challenge/response authentication
 
@@ -141,7 +164,6 @@ func (s *Session) SessionSetup() error {
 			}
 		}
 	}
-
 	request_msg.AddCommand(session_setup_cmd)
 
 	marshalled_message, err := request_msg.Marshal()
@@ -155,7 +177,8 @@ func (s *Session) SessionSetup() error {
 		return fmt.Errorf("failed to send negotiate message: %v", err)
 	}
 
-	// Receive the response
+	// Wait for a NTLMSSP CHALLENGE response message =============================================================================================
+
 	raw_response_message, err := s.Client.Transport.Receive()
 	if err != nil {
 		return fmt.Errorf("failed to receive response message: %v", err)
@@ -171,9 +194,32 @@ func (s *Session) SessionSetup() error {
 		return fmt.Errorf("unexpected response command: %d", response_msg.Header.Command)
 	}
 
-	_ = response_msg.Command.(*commands.SessionSetupAndxResponse)
+	session_setup_response_challenge := response_msg.Command.(*commands.SessionSetupAndxResponse)
 
-	// TODO
+	fmt.Printf("session_setup_response_challenge->NativeOS: %s\n", string(session_setup_response_challenge.NativeOS))
+	fmt.Printf("session_setup_response_challenge->NativeLanMan: %s\n", string(session_setup_response_challenge.NativeLanMan))
+
+	// Prepare and send a NTLMSSP AUTH message ==================================================================================================
+
+	useUnicode := s.Client.Connection.Server.Capabilities&capabilities.CAP_UNICODE == capabilities.CAP_UNICODE
+
+	authCtx := spnego.NewAuthContext(
+		spnego.AuthTypeNTLM,
+		s.Credentials.Domain,
+		s.Credentials.Username,
+		s.Credentials.Password,
+		s.Client.Workstation,
+		useUnicode,
+	)
+
+	fmt.Printf("session_setup_response_challenge.SecurityBlob: %s\n", hex.EncodeToString(session_setup_response_challenge.SecurityBlob))
+
+	authenticateToken, err := authCtx.ProcessChallengeToken(session_setup_response_challenge.SecurityBlob)
+	if err != nil {
+		return fmt.Errorf("failed to process challenge token: %v", err)
+	}
+
+	fmt.Printf("authenticateToken: %s\n", hex.EncodeToString(authenticateToken))
 
 	return nil
 }
