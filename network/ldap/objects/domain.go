@@ -10,65 +10,89 @@ import (
 type Domain struct {
 	// LdapSession is the LDAP session object
 	LdapSession LdapSessionInterface
+
 	// DistinguishedName is the distinguished name of the domain
 	DistinguishedName string
+
 	// NetBIOSName is the NetBIOS name of the domain
 	NetBIOSName string
+
 	// DNSName is the DNS name of the domain
 	DNSName string
+
 	// SID is the SID of the domain
 	SID string
 }
 
-// IsDomainFunctionalityAtLeast checks if the domain's functionality level is at least the specified level.
-//
-// This function retrieves the domain object for the given domain name and queries the LDAP server
-// to get the "msDS-Behavior-Version" attribute, which represents the domain's functionality level.
-// It then compares this value with the provided functionality level.
-//
-// Parameters:
-//   - domain (string): The name of the domain to check.
-//   - functionalityLevel (int): The minimum functionality level to check against.
-//
-// Returns:
-//   - bool: True if the domain's functionality level is at least the specified level, false otherwise.
-//
-// Example:
-//
-//	domain := &Domain{}
-//	isAtLeast := domain.IsDomainAtLeast(ldap_attributes.DomainFunctionalityLevel(3))
-//	if isAtLeast {
-//	    fmt.Println("The domain's functionality level is at least 3")
-//	} else {
-//	    fmt.Println("The domain's functionality level is less than 3")
-//	}
-//
-// Note:
-//   - This function assumes that the Session struct has a valid connection object and that the GetDomain and QueryBaseObject methods
-//     are implemented correctly.
-//   - The function logs a warning if the "msDS-Behavior-Version" attribute cannot be parsed to an integer.
-func (domain *Domain) IsDomainFunctionalityAtLeast(functionalityLevel ldap_attributes.DomainFunctionalityLevel) (bool, error) {
+// IsDomainFunctionalityLevelGreaterThan checks if the domain's functionality level is greater than the specified level.
+func (domain *Domain) IsDomainFunctionalityLevelGreaterThan(functionalityLevel ldap_attributes.DomainFunctionalityLevel) (bool, error) {
+	domainFunctionalityLevel, err := domain.GetDomainFunctionalityLevel()
+	if err != nil {
+		return false, err
+	}
+
+	return domainFunctionalityLevel > functionalityLevel, nil
+}
+
+// IsDomainFunctionalityLevelGreaterThanOrEqualTo checks if the domain's functionality level is greater than or equal to the specified level.
+func (domain *Domain) IsDomainFunctionalityLevelGreaterThanOrEqualTo(functionalityLevel ldap_attributes.DomainFunctionalityLevel) (bool, error) {
+	domainFunctionalityLevel, err := domain.GetDomainFunctionalityLevel()
+	if err != nil {
+		return false, err
+	}
+
+	return domainFunctionalityLevel >= functionalityLevel, nil
+}
+
+// IsDomainFunctionalityLevelLowerThan checks if the domain's functionality level is lower than the specified level.
+func (domain *Domain) IsDomainFunctionalityLevelLowerThan(functionalityLevel ldap_attributes.DomainFunctionalityLevel) (bool, error) {
+	domainFunctionalityLevel, err := domain.GetDomainFunctionalityLevel()
+	if err != nil {
+		return false, err
+	}
+
+	return domainFunctionalityLevel < functionalityLevel, nil
+}
+
+// IsDomainFunctionalityLevelLowerThanOrEqualTo checks if the domain's functionality level is lower than or equal to the specified level.
+func (domain *Domain) IsDomainFunctionalityLevelLowerThanOrEqualTo(functionalityLevel ldap_attributes.DomainFunctionalityLevel) (bool, error) {
+	domainFunctionalityLevel, err := domain.GetDomainFunctionalityLevel()
+	if err != nil {
+		return false, err
+	}
+
+	return domainFunctionalityLevel <= functionalityLevel, nil
+}
+
+// IsDomainFunctionalityLevelEqualTo checks if the domain's functionality level is equal to the specified level.
+func (domain *Domain) IsDomainFunctionalityLevelEqualTo(functionalityLevel ldap_attributes.DomainFunctionalityLevel) (bool, error) {
+	domainFunctionalityLevel, err := domain.GetDomainFunctionalityLevel()
+	if err != nil {
+		return false, err
+	}
+
+	return domainFunctionalityLevel == functionalityLevel, nil
+}
+
+// GetDomainFunctionalityLevel gets the domain's functionality level.
+func (domain *Domain) GetDomainFunctionalityLevel() (ldap_attributes.DomainFunctionalityLevel, error) {
 	var err error
 
 	query := fmt.Sprintf("(distinguishedName=%s)", domain.DistinguishedName)
 	attributes := []string{"msDS-Behavior-Version"}
 	results, err := domain.LdapSession.QueryBaseObject(domain.DistinguishedName, query, attributes)
 	if err != nil {
-		return false, fmt.Errorf("error querying LDAP: %w", err)
+		return 0, fmt.Errorf("error querying LDAP: %w", err)
 	}
 
 	if len(results) != 0 {
 		domainFunctionalityLevel, err := strconv.Atoi(results[0].GetAttributeValue("msDS-Behavior-Version"))
 		if err != nil {
-			return false, err
+			return 0, err
 		} else {
-			if domainFunctionalityLevel >= int(functionalityLevel) {
-				return true, nil
-			} else {
-				return false, nil
-			}
+			return ldap_attributes.DomainFunctionalityLevel(domainFunctionalityLevel), nil
 		}
 	} else {
-		return false, nil
+		return 0, fmt.Errorf("domain functionality level not found for domain %s", domain.DistinguishedName)
 	}
 }
