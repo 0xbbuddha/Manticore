@@ -3,6 +3,8 @@ package objects
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/TheManticoreProject/Manticore/network/ldap/ldap_attributes"
 )
 
 type Domain struct {
@@ -18,7 +20,7 @@ type Domain struct {
 	SID string
 }
 
-// IsDomainAtLeast checks if the domain's functionality level is at least the specified level.
+// IsDomainFunctionalityAtLeast checks if the domain's functionality level is at least the specified level.
 //
 // This function retrieves the domain object for the given domain name and queries the LDAP server
 // to get the "msDS-Behavior-Version" attribute, which represents the domain's functionality level.
@@ -33,51 +35,40 @@ type Domain struct {
 //
 // Example:
 //
-//	ldapSession := &Session{}
-//	domain := "example.com"
-//	functionalityLevel := 3
-//	isAtLeast := ldapSession.IsDomainAtLeast(domain, functionalityLevel)
+//	domain := &Domain{}
+//	isAtLeast := domain.IsDomainAtLeast(ldap_attributes.DomainFunctionalityLevel(3))
 //	if isAtLeast {
-//	    fmt.Println("The domain's functionality level is at least", functionalityLevel)
+//	    fmt.Println("The domain's functionality level is at least 3")
 //	} else {
-//	    fmt.Println("The domain's functionality level is less than", functionalityLevel)
+//	    fmt.Println("The domain's functionality level is less than 3")
 //	}
 //
 // Note:
 //   - This function assumes that the Session struct has a valid connection object and that the GetDomain and QueryBaseObject methods
 //     are implemented correctly.
 //   - The function logs a warning if the "msDS-Behavior-Version" attribute cannot be parsed to an integer.
-func (domain *Domain) IsDomainAtLeast(functionalityLevel int) (bool, error) {
+func (domain *Domain) IsDomainFunctionalityAtLeast(functionalityLevel ldap_attributes.DomainFunctionalityLevel) (bool, error) {
 	var err error
 
-	domainObject, err := domain.LdapSession.GetDomain(domain.DistinguishedName)
+	query := fmt.Sprintf("(distinguishedName=%s)", domain.DistinguishedName)
+	attributes := []string{"msDS-Behavior-Version"}
+	results, err := domain.LdapSession.QueryBaseObject(domain.DistinguishedName, query, attributes)
 	if err != nil {
-		return false, fmt.Errorf("error fetching domain: %w", err)
+		return false, fmt.Errorf("error querying LDAP: %w", err)
 	}
 
-	if domainObject != nil {
-		query := fmt.Sprintf("(distinguishedName=%s)", domainObject.DistinguishedName)
-		attributes := []string{"msDS-Behavior-Version"}
-		results, err := domain.LdapSession.QueryBaseObject(domainObject.DistinguishedName, query, attributes)
+	if len(results) != 0 {
+		domainFunctionalityLevel, err := strconv.Atoi(results[0].GetAttributeValue("msDS-Behavior-Version"))
 		if err != nil {
-			return false, fmt.Errorf("error querying LDAP: %w", err)
-		}
-
-		if len(results) != 0 {
-			domainFunctionalityLevel, err := strconv.Atoi(results[0].GetAttributeValue("msDS-Behavior-Version"))
-			if err != nil {
-				return false, err
-			} else {
-				if domainFunctionalityLevel >= functionalityLevel {
-					return true, nil
-				} else {
-					return false, nil
-				}
-			}
+			return false, err
 		} else {
-			return false, nil
+			if domainFunctionalityLevel >= int(functionalityLevel) {
+				return true, nil
+			} else {
+				return false, nil
+			}
 		}
+	} else {
+		return false, nil
 	}
-
-	return false, err
 }
