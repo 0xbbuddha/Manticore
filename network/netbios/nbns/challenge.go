@@ -1,4 +1,4 @@
-package nbtns
+package nbns
 
 import (
 	"encoding/binary"
@@ -15,14 +15,14 @@ const (
 
 // NameChallenger handles name conflict detection and resolution
 type NameChallenger struct {
-	nbtns    *NetBIOSNameServer
+	nbns     *NetBIOSNameServer
 	handlers *PacketHandler
 }
 
 // NewNameChallenger creates a new name challenger instance
-func NewNameChallenger(nbtns *NetBIOSNameServer, handlers *PacketHandler) *NameChallenger {
+func NewNameChallenger(nbns *NetBIOSNameServer, handlers *PacketHandler) *NameChallenger {
 	return &NameChallenger{
-		nbtns:    nbtns,
+		nbns:     nbns,
 		handlers: handlers,
 	}
 }
@@ -30,13 +30,13 @@ func NewNameChallenger(nbtns *NetBIOSNameServer, handlers *PacketHandler) *NameC
 // ChallengeOwnership verifies if a node still owns a name
 func (c *NameChallenger) ChallengeOwnership(name string, owner net.IP) (bool, error) {
 	// Create challenge packet
-	request := &NBTNSPacket{
-		Header: NBTNSHeader{
+	request := &NBNSPacket{
+		Header: NBNSHeader{
 			TransactionID: generateTransactionID(),
 			Flags:         OpNameQuery,
 			Questions:     1,
 		},
-		Questions: []NBTNSQuestion{
+		Questions: []NBNSQuestion{
 			{
 				Name: &NetBIOSName{Name: name},
 				Type: 0x20, // NB record
@@ -45,7 +45,7 @@ func (c *NameChallenger) ChallengeOwnership(name string, owner net.IP) (bool, er
 	}
 
 	// Create UDP connection for challenge
-	conn, err := net.DialUDP("udp", nil, &net.UDPAddr{IP: owner, Port: DefaultNBTNSUDPPort})
+	conn, err := net.DialUDP("udp", nil, &net.UDPAddr{IP: owner, Port: DefaultNBNSUDPPort})
 	if err != nil {
 		return false, fmt.Errorf("failed to create UDP connection: %v", err)
 	}
@@ -75,7 +75,7 @@ func (c *NameChallenger) ChallengeOwnership(name string, owner net.IP) (bool, er
 		}
 
 		// Parse response
-		var response NBTNSPacket
+		var response NBNSPacket
 		bytesRead, err := response.Unmarshal(buf[:n])
 		if err != nil {
 			continue
@@ -107,7 +107,7 @@ func (c *NameChallenger) ChallengeOwnership(name string, owner net.IP) (bool, er
 }
 
 // DefendName actively defends a name against challenges
-func (c *NameChallenger) DefendName(packet *NBTNSPacket, response *NBTNSPacket) {
+func (c *NameChallenger) DefendName(packet *NBNSPacket, response *NBNSPacket) {
 	// Only defend against queries
 	if packet.Header.Flags&0xF000 != OpNameQuery {
 		return
@@ -115,7 +115,7 @@ func (c *NameChallenger) DefendName(packet *NBTNSPacket, response *NBTNSPacket) 
 
 	for _, q := range packet.Questions {
 		// Check if we own this name
-		owners, nameType, err := c.nbtns.QueryName(q.Name.Name)
+		owners, nameType, err := c.nbns.QueryName(q.Name.Name)
 		if err != nil {
 			continue
 		}
@@ -132,7 +132,7 @@ func (c *NameChallenger) DefendName(packet *NBTNSPacket, response *NBTNSPacket) 
 				Address: binary.BigEndian.Uint32(ip.To4()),
 				Flags:   0x0000,
 			}
-			rr := NBTNSResourceRecord{
+			rr := NBNSResourceRecord{
 				Name:     q.Name,
 				Type:     q.Type,
 				Class:    q.Class,

@@ -1,4 +1,4 @@
-package nbtns
+package nbns
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 
 const (
 	// Default UDP port for NetBIOS name service
-	DefaultNBTNSUDPPort = 137
+	DefaultNBNSUDPPort = 137
 
 	// UDP timeouts and buffer sizes
 	UDPReadTimeout  = 5 * time.Second
@@ -20,7 +20,7 @@ const (
 
 // UDPServer represents a NetBIOS Name Server UDP component
 type UDPServer struct {
-	nbtns    *NetBIOSNameServer
+	nbns    *NetBIOSNameServer
 	conn     *net.UDPConn
 	addr     *net.UDPAddr
 	wg       sync.WaitGroup
@@ -28,18 +28,18 @@ type UDPServer struct {
 	handlers *PacketHandler
 }
 
-// NewUDPServer creates a new NBTNS UDP server instance
-func NewUDPServer(addr string, nbtns *NetBIOSNameServer) (*UDPServer, error) {
+// NewUDPServer creates a new NBNS UDP server instance
+func NewUDPServer(addr string, nbns *NetBIOSNameServer) (*UDPServer, error) {
 	udpAddr, err := net.ResolveUDPAddr("udp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve address: %v", err)
 	}
 
 	return &UDPServer{
-		nbtns:    nbtns,
+		nbns:    nbns,
 		addr:     udpAddr,
 		quit:     make(chan struct{}),
-		handlers: NewPacketHandler(nbtns),
+		handlers: NewPacketHandler(nbns),
 	}, nil
 }
 
@@ -54,7 +54,7 @@ func (s *UDPServer) Start() error {
 	s.wg.Add(1)
 	go s.serve()
 
-	log.Printf("NBTNS UDP server listening on %s", s.addr)
+	log.Printf("NBNS UDP server listening on %s", s.addr)
 	return nil
 }
 
@@ -99,7 +99,7 @@ func (s *UDPServer) serve() {
 
 // handlePacket processes a single UDP packet
 func (s *UDPServer) handlePacket(data []byte, remoteAddr *net.UDPAddr) {
-	var packet NBTNSPacket
+	var packet NBNSPacket
 	bytesRead, err := packet.Unmarshal(data)
 	if err != nil {
 		log.Printf("Failed to unmarshal packet: %v", err)
@@ -112,8 +112,8 @@ func (s *UDPServer) handlePacket(data []byte, remoteAddr *net.UDPAddr) {
 	}
 
 	// Create response packet
-	response := &NBTNSPacket{
-		Header: NBTNSHeader{
+	response := &NBNSPacket{
+		Header: NBNSHeader{
 			TransactionID: packet.Header.TransactionID,
 			Flags:         FlagResponse | FlagAuthoritative,
 			Questions:     0,

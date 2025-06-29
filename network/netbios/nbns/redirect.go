@@ -1,4 +1,4 @@
-package nbtns
+package nbns
 
 import (
 	"net"
@@ -42,7 +42,7 @@ func (r *RedirectManager) GetRedirect(scope string) (RedirectInfo, bool) {
 }
 
 // HandleRedirect modifies a response packet for redirection if needed
-func (r *RedirectManager) HandleRedirect(request *NBTNSPacket, response *NBTNSPacket) bool {
+func (r *RedirectManager) HandleRedirect(request *NBNSPacket, response *NBNSPacket) bool {
 	// Only redirect name queries
 	if request.Header.Flags&0xF000 != OpNameQuery {
 		return false
@@ -64,7 +64,7 @@ func (r *RedirectManager) HandleRedirect(request *NBTNSPacket, response *NBTNSPa
 
 	// Modify response for redirection
 	response.Header.Flags = FlagResponse | OpRedirect
-	response.Additional = []NBTNSResourceRecord{
+	response.Additional = []NBNSResourceRecord{
 		{
 			Name:     request.Questions[0].Name,
 			Type:     0x20,                           // NB record
