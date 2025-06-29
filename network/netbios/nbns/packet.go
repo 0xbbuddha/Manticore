@@ -1,4 +1,4 @@
-package nbtns
+package nbns
 
 import (
 	"encoding/binary"
@@ -42,8 +42,8 @@ const (
 	QuestionClassIn uint16 = 0x0001 // Internet class
 )
 
-// NBTNSHeader represents the header of a NetBIOS name service packet
-type NBTNSHeader struct {
+// NBNSHeader represents the header of a NetBIOS name service packet
+type NBNSHeader struct {
 	TransactionID uint16
 	Flags         uint16
 	Questions     uint16
@@ -52,15 +52,15 @@ type NBTNSHeader struct {
 	Additional    uint16
 }
 
-// NBTNSQuestion represents a question section in a NetBIOS name service packet
-type NBTNSQuestion struct {
+// NBNSQuestion represents a question section in a NetBIOS name service packet
+type NBNSQuestion struct {
 	Name  *NetBIOSName
 	Type  uint16
 	Class uint16
 }
 
-// NBTNSResourceRecord represents a resource record in a NetBIOS name service packet
-type NBTNSResourceRecord struct {
+// NBNSResourceRecord represents a resource record in a NetBIOS name service packet
+type NBNSResourceRecord struct {
 	Name     *NetBIOSName
 	Type     uint16
 	Class    uint16
@@ -69,17 +69,17 @@ type NBTNSResourceRecord struct {
 	RData    []byte
 }
 
-// NBTNSPacket represents a complete NetBIOS name service packet
-type NBTNSPacket struct {
-	Header     NBTNSHeader
-	Questions  []NBTNSQuestion
-	Answers    []NBTNSResourceRecord
-	Authority  []NBTNSResourceRecord
-	Additional []NBTNSResourceRecord
+// NBNSPacket represents a complete NetBIOS name service packet
+type NBNSPacket struct {
+	Header     NBNSHeader
+	Questions  []NBNSQuestion
+	Answers    []NBNSResourceRecord
+	Authority  []NBNSResourceRecord
+	Additional []NBNSResourceRecord
 }
 
-// Marshal encodes an NBTNSPacket into a byte slice
-func (p *NBTNSPacket) Marshal() ([]byte, error) {
+// Marshal encodes an NBNSPacket into a byte slice
+func (p *NBNSPacket) Marshal() ([]byte, error) {
 	buf := make([]byte, 12, 512) // Initial size for header, will grow as needed
 
 	// Marshal header
@@ -107,7 +107,7 @@ func (p *NBTNSPacket) Marshal() ([]byte, error) {
 	}
 
 	// Marshal resource records (answers, authority, additional)
-	for _, section := range [][]NBTNSResourceRecord{p.Answers, p.Authority, p.Additional} {
+	for _, section := range [][]NBNSResourceRecord{p.Answers, p.Authority, p.Additional} {
 		for _, rr := range section {
 			encoded, err := rr.Name.FirstLevelEncode()
 			if err != nil {
@@ -133,8 +133,8 @@ func (p *NBTNSPacket) Marshal() ([]byte, error) {
 	return buf, nil
 }
 
-// Unmarshal decodes a byte slice into an NBTNSPacket
-func (p *NBTNSPacket) Unmarshal(data []byte) (int, error) {
+// Unmarshal decodes a byte slice into an NBNSPacket
+func (p *NBNSPacket) Unmarshal(data []byte) (int, error) {
 	if len(data) < 12 {
 		return 0, fmt.Errorf("packet too short")
 	}
@@ -172,7 +172,7 @@ func (p *NBTNSPacket) Unmarshal(data []byte) (int, error) {
 			return 0, fmt.Errorf("truncated question")
 		}
 
-		q := NBTNSQuestion{
+		q := NBNSQuestion{
 			Name:  name,
 			Type:  binary.BigEndian.Uint16(data[offset : offset+2]),
 			Class: binary.BigEndian.Uint16(data[offset+2 : offset+4]),
@@ -183,8 +183,8 @@ func (p *NBTNSPacket) Unmarshal(data []byte) (int, error) {
 	}
 
 	// Helper function to unmarshal resource records
-	unmarshalRRs := func(count uint16) ([]NBTNSResourceRecord, error) {
-		var rrs []NBTNSResourceRecord
+	unmarshalRRs := func(count uint16) ([]NBNSResourceRecord, error) {
+		var rrs []NBNSResourceRecord
 
 		for i := uint16(0); i < count; i++ {
 			if offset >= len(data) {
@@ -208,7 +208,7 @@ func (p *NBTNSPacket) Unmarshal(data []byte) (int, error) {
 				return nil, fmt.Errorf("truncated resource record")
 			}
 
-			rr := NBTNSResourceRecord{
+			rr := NBNSResourceRecord{
 				Name:     name,
 				Type:     binary.BigEndian.Uint16(data[offset : offset+2]),
 				Class:    binary.BigEndian.Uint16(data[offset+2 : offset+4]),

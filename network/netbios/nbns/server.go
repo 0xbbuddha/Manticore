@@ -1,4 +1,4 @@
-package nbtns
+package nbns
 
 import (
 	"encoding/binary"
@@ -11,7 +11,7 @@ import (
 
 const (
 	// Default ports for NetBIOS name service
-	DefaultNBTNSPort = 137
+	DefaultNBNSPort = 137
 
 	// Timeouts and retry counts
 	ReadTimeout  = 5 * time.Second
@@ -20,14 +20,14 @@ const (
 
 // Server represents a NetBIOS Name Server
 type Server struct {
-	nbtns    *NetBIOSNameServer
+	nbns    *NetBIOSNameServer
 	listener *net.UDPConn
 	addr     *net.UDPAddr
 	wg       sync.WaitGroup
 	quit     chan struct{}
 }
 
-// NewServer creates a new NBTNS server instance
+// NewServer creates a new NBNS server instance
 func NewServer(addr string, secured bool) (*Server, error) {
 	udpAddr, err := net.ResolveUDPAddr("udp", addr)
 	if err != nil {
@@ -35,13 +35,13 @@ func NewServer(addr string, secured bool) (*Server, error) {
 	}
 
 	return &Server{
-		nbtns: NewNetBIOSNameServer(secured),
+		nbns: NewNetBIOSNameServer(secured),
 		addr:  udpAddr,
 		quit:  make(chan struct{}),
 	}, nil
 }
 
-// Start begins listening for NBTNS requests
+// Start begins listening for NBNS requests
 func (s *Server) Start() error {
 	var err error
 	s.listener, err = net.ListenUDP("udp", s.addr)
@@ -52,7 +52,7 @@ func (s *Server) Start() error {
 	s.wg.Add(1)
 	go s.serve()
 
-	log.Printf("NBTNS server listening on %s", s.addr)
+	log.Printf("NBNS server listening on %s", s.addr)
 	return nil
 }
 
@@ -65,7 +65,7 @@ func (s *Server) Stop() {
 	s.wg.Wait()
 }
 
-// serve handles incoming NBTNS requests
+// serve handles incoming NBNS requests
 func (s *Server) serve() {
 	defer s.wg.Done()
 
@@ -95,9 +95,9 @@ func (s *Server) serve() {
 	}
 }
 
-// handlePacket processes a single NBTNS packet
+// handlePacket processes a single NBNS packet
 func (s *Server) handlePacket(data []byte, remoteAddr *net.UDPAddr) {
-	var packet NBTNSPacket
+	var packet NBNSPacket
 	bytesRead, err := packet.Unmarshal(data)
 	if err != nil {
 		log.Printf("Failed to unmarshal packet: %v", err)
@@ -110,8 +110,8 @@ func (s *Server) handlePacket(data []byte, remoteAddr *net.UDPAddr) {
 	}
 
 	// Create response packet
-	response := &NBTNSPacket{
-		Header: NBTNSHeader{
+	response := &NBNSPacket{
+		Header: NBNSHeader{
 			TransactionID: packet.Header.TransactionID,
 			Flags:         FlagResponse | FlagAuthoritative,
 			Questions:     packet.Header.Questions,
@@ -150,9 +150,9 @@ func (s *Server) handlePacket(data []byte, remoteAddr *net.UDPAddr) {
 }
 
 // handleNameQuery processes a name query request
-func (s *Server) handleNameQuery(request *NBTNSPacket, response *NBTNSPacket) {
+func (s *Server) handleNameQuery(request *NBNSPacket, response *NBNSPacket) {
 	for _, q := range request.Questions {
-		owners, nameType, err := s.nbtns.QueryName(q.Name.Name)
+		owners, nameType, err := s.nbns.QueryName(q.Name.Name)
 		if err != nil {
 			response.Header.Flags |= RcodeNameError
 			return
@@ -164,7 +164,7 @@ func (s *Server) handleNameQuery(request *NBTNSPacket, response *NBTNSPacket) {
 				Address: binary.BigEndian.Uint32(ip.To4()),
 				Flags:   0x0000,
 			}
-			rr := NBTNSResourceRecord{
+			rr := NBNSResourceRecord{
 				Name:     q.Name,
 				Type:     q.Type,
 				Class:    q.Class,
@@ -185,14 +185,14 @@ func (s *Server) handleNameQuery(request *NBTNSPacket, response *NBTNSPacket) {
 }
 
 // handleRegistration processes a name registration request
-func (s *Server) handleRegistration(request *NBTNSPacket, response *NBTNSPacket) {
+func (s *Server) handleRegistration(request *NBNSPacket, response *NBNSPacket) {
 	for _, rr := range request.Answers {
 		nameType := Unique
 		if request.Header.Flags&0x0080 != 0 {
 			nameType = Group
 		}
 
-		err := s.nbtns.RegisterName(
+		err := s.nbns.RegisterName(
 			rr.Name.Name,
 			nameType,
 			net.IP(rr.RData),
@@ -207,9 +207,9 @@ func (s *Server) handleRegistration(request *NBTNSPacket, response *NBTNSPacket)
 }
 
 // handleRelease processes a name release request
-func (s *Server) handleRelease(request *NBTNSPacket, response *NBTNSPacket) {
+func (s *Server) handleRelease(request *NBNSPacket, response *NBNSPacket) {
 	for _, rr := range request.Answers {
-		if err := s.nbtns.ReleaseName(rr.Name.Name, net.IP(rr.RData)); err != nil {
+		if err := s.nbns.ReleaseName(rr.Name.Name, net.IP(rr.RData)); err != nil {
 			response.Header.Flags |= RcodeServerError
 			return
 		}
@@ -217,9 +217,9 @@ func (s *Server) handleRelease(request *NBTNSPacket, response *NBTNSPacket) {
 }
 
 // handleRefresh processes a name refresh request
-func (s *Server) handleRefresh(request *NBTNSPacket, response *NBTNSPacket) {
+func (s *Server) handleRefresh(request *NBNSPacket, response *NBNSPacket) {
 	for _, rr := range request.Answers {
-		if err := s.nbtns.RefreshName(rr.Name.Name, net.IP(rr.RData)); err != nil {
+		if err := s.nbns.RefreshName(rr.Name.Name, net.IP(rr.RData)); err != nil {
 			response.Header.Flags |= RcodeServerError
 			return
 		}

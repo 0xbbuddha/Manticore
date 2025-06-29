@@ -1,4 +1,4 @@
-package nbtns
+package nbns
 
 import (
 	"net"
@@ -6,16 +6,16 @@ import (
 	"time"
 )
 
-func TestNBTNSIntegration(t *testing.T) {
-	// Create NBTNS server
-	nbtns := NewNetBIOSNameServer(true)
+func TestNBNSIntegration(t *testing.T) {
+	// Create NBNS server
+	nbns := NewNetBIOSNameServer(true)
 	// Create UDP and TCP servers
-	udpServer, err := NewUDPServer(":0", nbtns)
+	udpServer, err := NewUDPServer(":0", nbns)
 	if err != nil {
 		t.Fatalf("Failed to create UDP server: %v", err)
 	}
 
-	tcpServer, err := NewTCPServer(":0", nbtns)
+	tcpServer, err := NewTCPServer(":0", nbns)
 	if err != nil {
 		t.Fatalf("Failed to create TCP server: %v", err)
 	}
@@ -35,13 +35,13 @@ func TestNBTNSIntegration(t *testing.T) {
 	t.Run("NameRegistration", func(t *testing.T) {
 		name := "TESTNAME"
 		ip := net.ParseIP("192.168.1.1")
-		err := nbtns.RegisterName(name, Unique, ip, 24*time.Hour)
+		err := nbns.RegisterName(name, Unique, ip, 24*time.Hour)
 		if err != nil {
 			t.Errorf("Failed to register name: %v", err)
 		}
 
 		// Verify registration
-		owners, nameType, err := nbtns.QueryName(name)
+		owners, nameType, err := nbns.QueryName(name)
 		if err != nil {
 			t.Errorf("Failed to query name: %v", err)
 		}
@@ -60,13 +60,13 @@ func TestNBTNSIntegration(t *testing.T) {
 		ip2 := net.ParseIP("192.168.1.3")
 
 		// Register first name
-		err := nbtns.RegisterName(name, Unique, ip1, 24*time.Hour)
+		err := nbns.RegisterName(name, Unique, ip1, 24*time.Hour)
 		if err != nil {
 			t.Errorf("Failed to register first name: %v", err)
 		}
 
 		// Try to register same name
-		err = nbtns.RegisterName(name, Unique, ip2, 24*time.Hour)
+		err = nbns.RegisterName(name, Unique, ip2, 24*time.Hour)
 		if err == nil {
 			t.Error("Expected conflict error, got nil")
 		}
@@ -79,18 +79,18 @@ func TestNBTNSIntegration(t *testing.T) {
 		ip2 := net.ParseIP("192.168.1.5")
 
 		// Register group members
-		err := nbtns.RegisterName(name, Group, ip1, 24*time.Hour)
+		err := nbns.RegisterName(name, Group, ip1, 24*time.Hour)
 		if err != nil {
 			t.Errorf("Failed to register first group member: %v", err)
 		}
 
-		err = nbtns.RegisterName(name, Group, ip2, 24*time.Hour)
+		err = nbns.RegisterName(name, Group, ip2, 24*time.Hour)
 		if err != nil {
 			t.Errorf("Failed to register second group member: %v", err)
 		}
 
 		// Verify group
-		owners, nameType, err := nbtns.QueryName(name)
+		owners, nameType, err := nbns.QueryName(name)
 		if err != nil {
 			t.Errorf("Failed to query group: %v", err)
 		}

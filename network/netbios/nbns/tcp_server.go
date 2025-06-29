@@ -1,4 +1,4 @@
-package nbtns
+package nbns
 
 import (
 	"encoding/binary"
@@ -12,7 +12,7 @@ import (
 
 const (
 	// Default TCP port for NetBIOS name service
-	DefaultNBTNSTCPPort = 137
+	DefaultNBNSTCPPort = 137
 
 	// TCP timeouts
 	TCPReadTimeout  = 30 * time.Second
@@ -24,7 +24,7 @@ const (
 
 // TCPServer represents a NetBIOS Name Server TCP component
 type TCPServer struct {
-	nbtns    *NetBIOSNameServer
+	nbns    *NetBIOSNameServer
 	listener net.Listener
 	addr     string
 	wg       sync.WaitGroup
@@ -33,13 +33,13 @@ type TCPServer struct {
 	handlers *PacketHandler
 }
 
-// NewTCPServer creates a new NBTNS TCP server instance
-func NewTCPServer(addr string, nbtns *NetBIOSNameServer) (*TCPServer, error) {
+// NewTCPServer creates a new NBNS TCP server instance
+func NewTCPServer(addr string, nbns *NetBIOSNameServer) (*TCPServer, error) {
 	return &TCPServer{
-		nbtns:    nbtns,
+		nbns:    nbns,
 		addr:     addr,
 		quit:     make(chan struct{}),
-		handlers: NewPacketHandler(nbtns),
+		handlers: NewPacketHandler(nbns),
 	}, nil
 }
 
@@ -54,7 +54,7 @@ func (s *TCPServer) Start() error {
 	s.wg.Add(1)
 	go s.serve()
 
-	log.Printf("NBTNS TCP server listening on %s", s.addr)
+	log.Printf("NBNS TCP server listening on %s", s.addr)
 	return nil
 }
 
@@ -174,7 +174,7 @@ func (s *TCPServer) handleConnection(conn net.Conn) {
 
 // handleMessage processes a single message and returns the response
 func (s *TCPServer) handleMessage(data []byte) ([]byte, error) {
-	var packet NBTNSPacket
+	var packet NBNSPacket
 	bytesRead, err := packet.Unmarshal(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal packet: %v", err)
@@ -185,8 +185,8 @@ func (s *TCPServer) handleMessage(data []byte) ([]byte, error) {
 	}
 
 	// Create response packet
-	response := &NBTNSPacket{
-		Header: NBTNSHeader{
+	response := &NBNSPacket{
+		Header: NBNSHeader{
 			TransactionID: packet.Header.TransactionID,
 			Flags:         FlagResponse | FlagAuthoritative,
 			Questions:     packet.Header.Questions,

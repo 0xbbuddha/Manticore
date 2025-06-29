@@ -1,4 +1,4 @@
-package nbtns
+package nbns
 
 import (
 	"encoding/binary"
@@ -8,20 +8,20 @@ import (
 
 // PacketHandler provides common packet handling methods for both TCP and UDP servers
 type PacketHandler struct {
-	nbtns *NetBIOSNameServer
+	nbns *NetBIOSNameServer
 }
 
 // NewPacketHandler creates a new packet handler instance
-func NewPacketHandler(nbtns *NetBIOSNameServer) *PacketHandler {
+func NewPacketHandler(nbns *NetBIOSNameServer) *PacketHandler {
 	return &PacketHandler{
-		nbtns: nbtns,
+		nbns: nbns,
 	}
 }
 
 // handleNameQuery processes a name query request
-func (h *PacketHandler) handleNameQuery(request *NBTNSPacket, response *NBTNSPacket) {
+func (h *PacketHandler) handleNameQuery(request *NBNSPacket, response *NBNSPacket) {
 	for _, q := range request.Questions {
-		owners, nameType, err := h.nbtns.QueryName(q.Name.Name)
+		owners, nameType, err := h.nbns.QueryName(q.Name.Name)
 		if err != nil {
 			response.Header.Flags |= RcodeNameError
 			return
@@ -33,7 +33,7 @@ func (h *PacketHandler) handleNameQuery(request *NBTNSPacket, response *NBTNSPac
 				Address: binary.BigEndian.Uint32(ip.To4()),
 				Flags:   0x0000,
 			}
-			rr := NBTNSResourceRecord{
+			rr := NBNSResourceRecord{
 				Name:     q.Name,
 				Type:     q.Type,
 				Class:    q.Class,
@@ -55,14 +55,14 @@ func (h *PacketHandler) handleNameQuery(request *NBTNSPacket, response *NBTNSPac
 }
 
 // handleRegistration processes a name registration request
-func (h *PacketHandler) handleRegistration(request *NBTNSPacket, response *NBTNSPacket) {
+func (h *PacketHandler) handleRegistration(request *NBNSPacket, response *NBNSPacket) {
 	for _, rr := range request.Answers {
 		nameType := Unique
 		if request.Header.Flags&0x0080 != 0 {
 			nameType = Group
 		}
 
-		err := h.nbtns.RegisterName(
+		err := h.nbns.RegisterName(
 			rr.Name.Name,
 			nameType,
 			net.IP(rr.RData),
@@ -77,9 +77,9 @@ func (h *PacketHandler) handleRegistration(request *NBTNSPacket, response *NBTNS
 }
 
 // handleRelease processes a name release request
-func (h *PacketHandler) handleRelease(request *NBTNSPacket, response *NBTNSPacket) {
+func (h *PacketHandler) handleRelease(request *NBNSPacket, response *NBNSPacket) {
 	for _, rr := range request.Answers {
-		if err := h.nbtns.ReleaseName(rr.Name.Name, net.IP(rr.RData)); err != nil {
+		if err := h.nbns.ReleaseName(rr.Name.Name, net.IP(rr.RData)); err != nil {
 			response.Header.Flags |= RcodeServerError
 			return
 		}
@@ -87,9 +87,9 @@ func (h *PacketHandler) handleRelease(request *NBTNSPacket, response *NBTNSPacke
 }
 
 // handleRefresh processes a name refresh request
-func (h *PacketHandler) handleRefresh(request *NBTNSPacket, response *NBTNSPacket) {
+func (h *PacketHandler) handleRefresh(request *NBNSPacket, response *NBNSPacket) {
 	for _, rr := range request.Answers {
-		if err := h.nbtns.RefreshName(rr.Name.Name, net.IP(rr.RData)); err != nil {
+		if err := h.nbns.RefreshName(rr.Name.Name, net.IP(rr.RData)); err != nil {
 			response.Header.Flags |= RcodeServerError
 			return
 		}
