@@ -1,7 +1,7 @@
-package errors
+package status
 
-type GSSAPIErrorCode int32
-type GSSAPIInformativeStatus int32
+type GSSAPIMajorStatus int32
+type GSSAPIMinorStatus int32
 
 // GSSAPI error codes
 // Sources:
@@ -9,35 +9,37 @@ type GSSAPIInformativeStatus int32
 // https://docs.oracle.com/cd/E19455-01/806-3814/reference-7/index.html
 const (
 	// FATAL ERROR CODES
-	GSS_S_BAD_MECH             GSSAPIErrorCode = 1  // unsupported mechanism requested
-	GSS_S_BAD_NAME             GSSAPIErrorCode = 2  // invalid name provided
-	GSS_S_BAD_NAMETYPE         GSSAPIErrorCode = 3  // name of unsupported type provided
-	GSS_S_BAD_BINDINGS         GSSAPIErrorCode = 4  // channel binding mismatch
-	GSS_S_BAD_STATUS           GSSAPIErrorCode = 5  // invalid input status selector
-	GSS_S_BAD_SIG              GSSAPIErrorCode = 6  // token had invalid integrity check
-	GSS_S_BAD_MIC              GSSAPIErrorCode = 6  // preferred alias for GSS_S_BAD_SIG
-	GSS_S_NO_CRED              GSSAPIErrorCode = 7  // no valid credentials provided
-	GSS_S_NO_CONTEXT           GSSAPIErrorCode = 8  // no valid security context specified
-	GSS_S_DEFECTIVE_TOKEN      GSSAPIErrorCode = 9  // defective token detected
-	GSS_S_DEFECTIVE_CREDENTIAL GSSAPIErrorCode = 10 // defective credential detected
-	GSS_S_CREDENTIALS_EXPIRED  GSSAPIErrorCode = 11 // expired credentials detected
-	GSS_S_CONTEXT_EXPIRED      GSSAPIErrorCode = 12 // specified security context expired
-	GSS_S_FAILURE              GSSAPIErrorCode = 13 // failure, unspecified at GSS-API level
-	GSS_S_BAD_QOP              GSSAPIErrorCode = 14 // unsupported QOP value
-	GSS_S_UNAUTHORIZED         GSSAPIErrorCode = 15 // operation unauthorized
-	GSS_S_UNAVAILABLE          GSSAPIErrorCode = 16 // operation unavailable
-	GSS_S_DUPLICATE_ELEMENT    GSSAPIErrorCode = 17 // duplicate credential element requested
-	GSS_S_NAME_NOT_MN          GSSAPIErrorCode = 18 // name contains multi-mechanism elements
-
-	// INFORMATORY STATUS CODES
-	GSS_S_CONTINUE_NEEDED GSSAPIInformativeStatus = 0 // continuation call to routine required, Returned only by gss_init_sec_context() or gss_accept_sec_context(). The routine must be called again to complete its function
-	GSS_S_DUPLICATE_TOKEN GSSAPIInformativeStatus = 1 // duplicate per-message token detected
-	GSS_S_OLD_TOKEN       GSSAPIInformativeStatus = 2 // timed-out per-message token detected
-	GSS_S_UNSEQ_TOKEN     GSSAPIInformativeStatus = 3 // reordered (early) per-message token detected
-	GSS_S_GAP_TOKEN       GSSAPIInformativeStatus = 4 // skipped predecessor token(s) detected
+	GSS_S_BAD_MECH             GSSAPIMajorStatus = 1  // unsupported mechanism requested
+	GSS_S_BAD_NAME             GSSAPIMajorStatus = 2  // invalid name provided
+	GSS_S_BAD_NAMETYPE         GSSAPIMajorStatus = 3  // name of unsupported type provided
+	GSS_S_BAD_BINDINGS         GSSAPIMajorStatus = 4  // channel binding mismatch
+	GSS_S_BAD_STATUS           GSSAPIMajorStatus = 5  // invalid input status selector
+	GSS_S_BAD_SIG              GSSAPIMajorStatus = 6  // token had invalid integrity check
+	GSS_S_BAD_MIC              GSSAPIMajorStatus = 6  // preferred alias for GSS_S_BAD_SIG
+	GSS_S_NO_CRED              GSSAPIMajorStatus = 7  // no valid credentials provided
+	GSS_S_NO_CONTEXT           GSSAPIMajorStatus = 8  // no valid security context specified
+	GSS_S_DEFECTIVE_TOKEN      GSSAPIMajorStatus = 9  // defective token detected
+	GSS_S_DEFECTIVE_CREDENTIAL GSSAPIMajorStatus = 10 // defective credential detected
+	GSS_S_CREDENTIALS_EXPIRED  GSSAPIMajorStatus = 11 // expired credentials detected
+	GSS_S_CONTEXT_EXPIRED      GSSAPIMajorStatus = 12 // specified security context expired
+	GSS_S_FAILURE              GSSAPIMajorStatus = 13 // failure, unspecified at GSS-API level
+	GSS_S_BAD_QOP              GSSAPIMajorStatus = 14 // unsupported QOP value
+	GSS_S_UNAUTHORIZED         GSSAPIMajorStatus = 15 // operation unauthorized
+	GSS_S_UNAVAILABLE          GSSAPIMajorStatus = 16 // operation unavailable
+	GSS_S_DUPLICATE_ELEMENT    GSSAPIMajorStatus = 17 // duplicate credential element requested
+	GSS_S_NAME_NOT_MN          GSSAPIMajorStatus = 18 // name contains multi-mechanism elements
 )
 
-var GSSAPIErrorMessages = map[GSSAPIErrorCode]string{
+const (
+	// INFORMATORY STATUS CODES
+	GSS_S_CONTINUE_NEEDED GSSAPIMinorStatus = 0 // continuation call to routine required, Returned only by gss_init_sec_context() or gss_accept_sec_context(). The routine must be called again to complete its function
+	GSS_S_DUPLICATE_TOKEN GSSAPIMinorStatus = 1 // duplicate per-message token detected
+	GSS_S_OLD_TOKEN       GSSAPIMinorStatus = 2 // timed-out per-message token detected
+	GSS_S_UNSEQ_TOKEN     GSSAPIMinorStatus = 3 // reordered (early) per-message token detected
+	GSS_S_GAP_TOKEN       GSSAPIMinorStatus = 4 // skipped predecessor token(s) detected
+)
+
+var GSSAPIMajorStatusMessages = map[GSSAPIMajorStatus]string{
 	// FATAL ERROR CODES
 	GSS_S_BAD_MECH:             "Unsupported mechanism requested",
 	GSS_S_BAD_NAME:             "Invalid name provided",
@@ -59,7 +61,7 @@ var GSSAPIErrorMessages = map[GSSAPIErrorCode]string{
 	GSS_S_NAME_NOT_MN:          "Name contains multi-mechanism elements",
 }
 
-var GSSAPIInformativeStatusMessages = map[GSSAPIInformativeStatus]string{
+var GSSAPIMinorStatusMessages = map[GSSAPIMinorStatus]string{
 	// INFORMATORY STATUS CODES
 	GSS_S_CONTINUE_NEEDED: "Continuation call to routine required",
 	GSS_S_DUPLICATE_TOKEN: "Duplicate per-message token detected",
@@ -68,8 +70,8 @@ var GSSAPIInformativeStatusMessages = map[GSSAPIInformativeStatus]string{
 	GSS_S_GAP_TOKEN:       "Skipped predecessor token(s) detected",
 }
 
-// GSSAPIErrorCode Messages
-func (code GSSAPIErrorCode) String() string {
+// GSSAPIMajorStatus Messages
+func (code GSSAPIMajorStatus) String() string {
 	switch code {
 	case GSS_S_BAD_MECH:
 		return "GSS_S_BAD_MECH"
@@ -108,12 +110,12 @@ func (code GSSAPIErrorCode) String() string {
 	case GSS_S_NAME_NOT_MN:
 		return "GSS_S_NAME_NOT_MN"
 	default:
-		return "UNKNOWN_GSS_ERROR_CODE"
+		return "UNKNOWN_GSS_MAJOR_STATUS_CODE"
 	}
 }
 
-// GSSAPIInformativeStatus Messages
-func (code GSSAPIInformativeStatus) String() string {
+// GSSAPIMinorStatus Messages
+func (code GSSAPIMinorStatus) String() string {
 	switch code {
 	case GSS_S_CONTINUE_NEEDED:
 		return "GSS_S_CONTINUE_NEEDED"
@@ -126,6 +128,6 @@ func (code GSSAPIInformativeStatus) String() string {
 	case GSS_S_GAP_TOKEN:
 		return "GSS_S_GAP_TOKEN"
 	default:
-		return "UNKNOWN_GSS_INFORMATIVE_STATUS_CODE"
+		return "UNKNOWN_GSS_MINOR_STATUS_CODE"
 	}
 }
