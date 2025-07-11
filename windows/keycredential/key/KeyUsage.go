@@ -12,7 +12,7 @@ type KeyUsage struct {
 
 const (
 	// Key Usage
-	// See: https://msdn.microsoft.com/en-us/library/mt220501.aspx
+	// See: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/d4b9b239-dbe8-4475-b6f9-745612c64ed0
 
 	// Admin key (pin-reset key)
 	KeyUsage_AdminKey uint8 = 0
@@ -40,15 +40,41 @@ const (
 	KeyUsage_DPAPI uint8 = 0x09
 )
 
-// Parse parses the key usage from a byte array.
+// Unmarshal parses the key usage from a byte array.
 //
 // Parameters:
-// - value: A byte array representing the key usage.
-func (ku *KeyUsage) FromBytes(value byte) {
-	ku.RawBytes = []byte{value}
+// - data: A byte array representing the key usage.
+//
+// Returns:
+// - The number of bytes read from the data.
+// - An error if the parsing fails, otherwise nil.
+//
+// Note:
+// The function expects the byte slice to contain a single byte representing the key usage.
+// It extracts the key usage value from the byte slice and assigns it to the KeyUsage structure.
+func (ku *KeyUsage) Unmarshal(data []byte) (int, error) {
+	if len(data) < 1 {
+		return 0, fmt.Errorf("invalid data length: %d", len(data))
+	}
+
+	ku.RawBytes = data[:1]
 	ku.RawBytesSize = 1
 
-	ku.Value = value
+	ku.Value = data[0]
+
+	return 1, nil
+}
+
+// Marshal returns the raw bytes of the KeyUsage structure.
+//
+// Returns:
+// - A byte slice representing the raw bytes of the KeyUsage structure.
+// - An error if the conversion fails.
+func (ku *KeyUsage) Marshal() ([]byte, error) {
+	ku.RawBytes = []byte{ku.Value}
+	ku.RawBytesSize = 1
+
+	return ku.RawBytes, nil
 }
 
 // String returns a string representation of the key usage.
