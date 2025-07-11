@@ -30,16 +30,41 @@ const (
 	CustomKeyInformationVolumeType_Removable uint8 = 0x03
 )
 
-// Parse parses the provided byte slice into the CustomKeyInformationVolumeType structure.
+// Unmarshal parses the provided byte slice into the CustomKeyInformationVolumeType structure.
 //
 // Parameters:
-// - value: A byte slice containing the raw volume type to be parsed.
+// - data: A byte slice containing the raw volume type to be parsed.
+//
+// Returns:
+// - The number of bytes read from the data.
+// - An error if the parsing fails, otherwise nil.
 //
 // Note:
 // The function expects the byte slice to contain a single byte representing the volume type.
 // It extracts the volume type value from the byte slice and assigns it to the CustomKeyInformationVolumeType structure.
-func (vt *CustomKeyInformationVolumeType) FromBytes(value byte) {
-	vt.Value = value
+func (vt *CustomKeyInformationVolumeType) Unmarshal(data []byte) (int, error) {
+	if len(data) < 1 {
+		return 0, fmt.Errorf("invalid data length: %d", len(data))
+	}
+
+	vt.Value = data[0]
+
+	vt.RawBytes = data
+	vt.RawBytesSize = uint32(len(data))
+
+	return 1, nil
+}
+
+// Marshal returns the raw bytes of the CustomKeyInformationVolumeType structure.
+//
+// Returns:
+// - A byte slice representing the raw bytes of the CustomKeyInformationVolumeType structure.
+// - An error if the conversion fails.
+func (vt *CustomKeyInformationVolumeType) Marshal() ([]byte, error) {
+	vt.RawBytes = []byte{vt.Value}
+	vt.RawBytesSize = 1
+
+	return vt.RawBytes, nil
 }
 
 // String returns a string representation of the CustomKeyInformationVolumeType.

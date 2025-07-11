@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/binary"
+	"fmt"
 	"time"
 )
 
@@ -95,13 +96,33 @@ func (dt DateTime) String() string {
 	return dt.Time.String()
 }
 
-// ToBytes converts the DateTime instance to its binary representation in little-endian format.
+// Marshal converts the DateTime instance to its binary representation in little-endian format.
 //
 // Returns:
-// - A byte slice containing the binary representation of the DateTime instance in little-endian format.
+// - A byte slice containing the binary representation of the DateTime instance in little-endian format, otherwise an error.
 //
 // Note:
 // This function encodes the Ticks field of the DateTime instance as a 64-bit unsigned integer in little-endian format.
-func (dt DateTime) ToBytes() []byte {
-	return binary.LittleEndian.AppendUint64(nil, dt.Ticks)
+// The function returns a byte slice containing the binary representation of the DateTime instance in little-endian format.
+func (dt DateTime) Marshal() ([]byte, error) {
+	return binary.LittleEndian.AppendUint64(nil, dt.Ticks), nil
+}
+
+// Unmarshal converts the binary representation of the DateTime instance to a DateTime object.
+//
+// Parameters:
+// - data: A byte slice containing the binary representation of the DateTime instance.
+//
+// Returns:
+// - An error if the unmarshalling fails, otherwise nil.
+//
+// Note:
+// This function decodes the Ticks field of the DateTime instance from a 64-bit unsigned integer in little-endian format.
+// The function expects the data to be a 64-bit unsigned integer in little-endian format.
+func (dt *DateTime) Unmarshal(data []byte) error {
+	if len(data) != 8 {
+		return fmt.Errorf("invalid data length: %d", len(data))
+	}
+	dt.Ticks = binary.LittleEndian.Uint64(data)
+	return nil
 }

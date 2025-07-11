@@ -5,147 +5,172 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+
+	"github.com/TheManticoreProject/Manticore/windows/keycredential"
 )
 
 // CustomKeyInformation represents the CUSTOM_KEY_INFORMATION structure.
 //
 // See: https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/701a55dc-d062-4032-a2da-dbdfc384c8cf
 type CustomKeyInformation struct {
-	Version                 int
+	// Version (1 byte): An 8-bit unsigned integer that MUST be set to 1.
+	Version int
+
+	// Flags (1 byte): An 8-bit unsigned integer that specifies zero or more of the following bit-flag values:
 	Flags                   CustomKeyInformationFlags
 	CurrentVersion          int
 	ShortRepresentationSize int
 	ReservedSize            int
-	VolumeType              CustomKeyInformationVolumeType
-	SupportsNotification    bool
-	FekKeyVersion           uint8
-	Strength                KeyStrength
-	Reserved                []byte
-	EncodedExtendedCKI      []byte
+
+	// VolType (1 byte): An 8-bit unsigned integer that specifies one of the following volume types:
+	VolumeType           CustomKeyInformationVolumeType
+	SupportsNotification bool
+	FekKeyVersion        uint8
+	Strength             KeyStrength
+	Reserved             []byte
+	EncodedExtendedCKI   []byte
 
 	// Internal
 	RawBytes     []byte
 	RawBytesSize uint32
 }
 
-// Parse parses the provided byte slice into the CustomKeyInformation structure.
+// Unmarshal parses the provided byte slice into the CustomKeyInformation structure.
 //
 // Parameters:
-// - blob: A byte slice containing the raw custom key information to be parsed.
+// - data: A byte slice containing the raw custom key information to be parsed.
+// - version: The version of the key credential.
 //
 // Returns:
+// - The number of bytes read from the data.
 // - An error if the parsing fails, otherwise nil.
 //
 // Note:
 // The function expects the byte slice to follow the CUSTOM_KEY_INFORMATION structure format.
 // It extracts the version, flags, volume type, supports notification, FEK key version, strength, reserved, and encoded extended CKI fields from the byte slice.
 // The parsed values are stored in the CustomKeyInformation structure.
-func (cki *CustomKeyInformation) FromBytes(blob []byte, version KeyCredentialVersion) error {
-	cki.RawBytes = blob
-	cki.RawBytesSize = uint32(len(blob))
+func (cki *CustomKeyInformation) Unmarshal(data []byte, version keycredential.KeyCredentialVersion) (int, error) {
+	cki.RawBytes = data
+	cki.RawBytesSize = uint32(len(data))
 
-	if len(blob) < 2 {
-		return fmt.Errorf("invalid blob size: %d", len(blob))
+	if len(data) < 2 {
+		return 0, fmt.Errorf("invalid data size: %d", len(data))
 	}
 
 	// An 8-bit unsigned integer that must be set to 1:
-	cki.Version = int(blob[0])
+	cki.Version = int(data[0])
 	if cki.Version != 1 {
-		return fmt.Errorf("invalid CustomKeyInformation version: %d", cki.Version)
+		return 0, fmt.Errorf("invalid CustomKeyInformation version: %d", cki.Version)
 	}
 
 	// An 8-bit unsigned integer that specifies zero or more bit-flag values.
-	cki.Flags.FromBytes(blob[1])
+	bytesRead, err := cki.Flags.Unmarshal(data)
+	if err != nil {
+		return 0, err
+	}
+	data = data[bytesRead:]
 
 	// An 8-bit unsigned integer that specifies one of the volume types.
 	if 2 < cki.RawBytesSize && cki.RawBytesSize >= 3 {
-		cki.VolumeType.FromBytes(blob[2])
+		bytesRead, err := cki.VolumeType.Unmarshal(data)
+		if err != nil {
+			return 0, err
+		}
+		data = data[bytesRead:]
 	} else {
-		return nil
+		return 0, nil
 	}
 
 	// An 8-bit unsigned integer that specifies whether the device associated with this credential supports notification.
 	if 3 < cki.RawBytesSize && cki.RawBytesSize >= 4 {
-		cki.SupportsNotification = (blob[3] != 0)
+		cki.SupportsNotification = (data[3] != 0)
 	} else {
-		return nil
+		return 0, nil
 	}
 
 	// An 8-bit unsigned integer that specifies the version of the File Encryption Key (FEK). This field must be set to 1.
 	if 4 < cki.RawBytesSize && cki.RawBytesSize >= 5 {
-		cki.FekKeyVersion = blob[4]
+		cki.FekKeyVersion = data[4]
 	} else {
-		return nil
+		return 0, nil
 	}
 
 	// An 32-bit unsigned integer that specifies the strength of the NGC key.
 	if 5 < cki.RawBytesSize && cki.RawBytesSize >= 9 {
-		cki.Strength.FromBytes(blob[5:9])
+		bytesRead, err := cki.Strength.Unmarshal(data)
+		if err != nil {
+			return 0, err
+		}
+		data = data[bytesRead:]
 	} else {
-		return nil
+		return 0, nil
 	}
 
 	// 10 bytes reserved for future use.
 	// Note: With FIDO, Azure incorrectly puts here 9 bytes instead of 10.
 	if 9 < cki.RawBytesSize && cki.RawBytesSize >= 19 {
 		cki.Reserved = make([]byte, 10)
-		copy(cki.Reserved, blob[9:19])
+		copy(cki.Reserved, data[9:19])
 	} else {
-		return nil
+		return 0, nil
 	}
 
 	// Extended custom key information.
 	if 19 < cki.RawBytesSize {
 		cki.EncodedExtendedCKI = make([]byte, cki.RawBytesSize-19)
-		copy(cki.EncodedExtendedCKI, blob[19:])
+		copy(cki.EncodedExtendedCKI, data[19:])
 	} else {
-		return nil
+		return 0, nil
 	}
 
-	return nil
+	return 0, nil
 }
 
-// ToBytes returns the raw bytes of the CustomKeyInformation structure.
-func (cki *CustomKeyInformation) ToBytes() []byte {
-	blob := make([]byte, 0)
+// Marshal returns the raw bytes of the CustomKeyInformation structure.
+//
+// Returns:
+// - A byte slice representing the raw bytes of the CustomKeyInformation structure.
+// - An error if the conversion fails.
+func (cki *CustomKeyInformation) Marshal() ([]byte, error) {
+	data := make([]byte, 0)
 
-	blob = append(blob, byte(cki.Version))
+	data = append(data, byte(cki.Version))
 
 	if 2 < cki.RawBytesSize && cki.RawBytesSize >= 3 {
-		blob = append(blob, byte(cki.Flags.Value))
+		data = append(data, byte(cki.Flags.Value))
 	}
 
 	if 3 < cki.RawBytesSize && cki.RawBytesSize >= 4 {
-		blob = append(blob, byte(cki.VolumeType.Value))
+		data = append(data, byte(cki.VolumeType.Value))
 	}
 
 	if 4 < cki.RawBytesSize && cki.RawBytesSize >= 5 {
 		if cki.SupportsNotification {
-			blob = append(blob, 1)
+			data = append(data, 1)
 		} else {
-			blob = append(blob, 0)
+			data = append(data, 0)
 		}
 	}
 
 	if 5 < cki.RawBytesSize && cki.RawBytesSize >= 6 {
-		blob = append(blob, byte(cki.FekKeyVersion))
+		data = append(data, byte(cki.FekKeyVersion))
 	}
 
 	if 6 < cki.RawBytesSize && cki.RawBytesSize >= 10 {
 		buffer := make([]byte, 4)
 		binary.LittleEndian.PutUint32(buffer, cki.Strength.Value)
-		blob = append(blob, buffer...)
+		data = append(data, buffer...)
 	}
 
 	if 10 < cki.RawBytesSize && cki.RawBytesSize >= 20 {
-		blob = append(blob, cki.Reserved...)
+		data = append(data, cki.Reserved...)
 	}
 
 	if 20 < cki.RawBytesSize {
-		blob = append(blob, cki.EncodedExtendedCKI...)
+		data = append(data, cki.EncodedExtendedCKI...)
 	}
 
-	return blob
+	return data, nil
 }
 
 // Describe prints a detailed description of the CustomKeyInformation instance.

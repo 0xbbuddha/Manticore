@@ -1,6 +1,7 @@
-package keycredentiallink
+package keycredential
 
 import (
+	"github.com/TheManticoreProject/Manticore/network/ldap"
 	"github.com/TheManticoreProject/Manticore/windows/keycredential/crypto"
 	"github.com/TheManticoreProject/Manticore/windows/keycredential/key"
 	"github.com/TheManticoreProject/Manticore/windows/keycredential/utils"
@@ -138,35 +139,43 @@ func NewKeyCredential(
 //
 // The function handles various entry types, including key identifier, key hash, key material, key usage, legacy usage, key source, last logon time, and creation time.
 // Unsupported entry types, such as device ID and custom key information, are commented out for future implementation.
-func (kc *KeyCredential) ParseDNWithBinary(dnWithBinary DNWithBinary) error {
-	err := kc.FromBytes(dnWithBinary.BinaryData)
+func (kc *KeyCredential) ParseDNWithBinary(dnWithBinary ldap.DNWithBinary) error {
+	_, err := kc.Unmarshal(dnWithBinary.BinaryData)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// ParseDNWithBinary parses the provided DNWithBinary object into the KeyCredential structure.
+// Unmarshal parses the provided binary data into the KeyCredential structure.
 //
 // Parameters:
-// - dnWithBinary: A DNWithBinary object containing the distinguished name and binary data to be parsed.
+// - data: A byte slice containing the binary data to be parsed.
 //
 // Returns:
-// - An error if the parsing fails, otherwise nil.
+// - bytesRead: The number of bytes read from the data.
+// - error: An error if the parsing fails, otherwise nil.
 //
 // Note:
 // The function performs the following steps:
-// 1. Sets the RawBytes and RawBytesSize fields to the provided binary data and its length, respectively.
-// 2. Sets the Owner field to the distinguished name from the DNWithBinary object.
-// 3. Parses the version information from the binary data and updates the RawBytesSize and remainder accordingly.
-// 4. Iterates through the remaining binary data, parsing each entry based on its type and length.
-// 5. Updates the corresponding fields of the KeyCredential structure based on the parsed entry type and data.
+// 1. Sets the RawBytes and RawBytesSize fields to the provided binary data and its length.
+// 2. Parses the version information from the binary data.
+// 3. Iterates through the remaining binary data, parsing each entry based on its type and length.
+// 4. Updates the corresponding fields of the KeyCredential structure based on the parsed entry type and data.
 //
-// The function handles various entry types, including key identifier, key hash, key material, key usage, legacy usage, key source, last logon time, and creation time.
-// Unsupported entry types, such as device ID and custom key information, are commented out for future implementation.
-func (kc *KeyCredential) FromBytes(rawBytes []byte) error {
-	kc.RawBytes = rawBytes
-	remainder := rawBytes
+// The function handles various entry types, including:
+// - Key identifier
+// - Key hash
+// - Key material
+// - Key usage (both V2 enum and legacy string formats)
+// - Key source
+// - Device ID
+// - Custom key information
+// - Last logon timestamp
+// - Creation time
+func (kc *KeyCredential) Unmarshal(data []byte) (int, error) {
+	kc.RawBytes = data
+	remainder := data
 	kc.RawBytesSize = 0
 
 	kc.Version.FromBytes(kc.RawBytes)
@@ -215,7 +224,7 @@ func (kc *KeyCredential) FromBytes(rawBytes []byte) error {
 		}
 	}
 
-	return nil
+	return 0, nil
 }
 
 // CheckIntegrity checks the integrity of the key credential.
@@ -247,7 +256,7 @@ func (kc *KeyCredential) ComputeKeyHash() []byte {
 	data := []byte{}
 
 	if len(kc.RawBytes) < 4 {
-		rawBytes, err := kc.ToBytes()
+		rawBytes, err := kc.Marshal()
 		if err != nil {
 			return nil
 		}
@@ -289,12 +298,14 @@ func writeEntry(buffer *bytes.Buffer, entryType key.KeyCredentialEntryType, data
 	buffer.Write(data)
 }
 
-// ToBytes returns the raw bytes of the KeyCredential structure.
+// Marshal returns the raw bytes of the KeyCredential structure.
 //
 // Returns:
 // - A byte slice representing the raw bytes of the KeyCredential structure.
 // - An error if the conversion fails.
-func (kc *KeyCredential) ToBytes() ([]byte, error) {
+func (kc *KeyCredential) Marshal() ([]byte, error) {
+	var err error
+
 	buffer := bytes.NewBuffer(nil)
 
 	// kc.Version
@@ -352,12 +363,18 @@ func (kc *KeyCredential) ToBytes() ([]byte, error) {
 
 	// kc.LastLogonTime
 	entryType = key.KeyCredentialEntryType{Value: key.KeyCredentialEntryType_KeyApproximateLastLogonTimeStamp}
-	data = kc.LastLogonTime.ToBytes()
+	data, err = kc.LastLogonTime.Marshal()
+	if err != nil {
+		return nil, err
+	}
 	writeEntry(buffer, entryType, data)
 
 	// kc.CreationTime
 	entryType = key.KeyCredentialEntryType{Value: key.KeyCredentialEntryType_KeyCreationTime}
-	data = kc.CreationTime.ToBytes()
+	data, err = kc.CreationTime.Marshal()
+	if err != nil {
+		return nil, err
+	}
 	writeEntry(buffer, entryType, data)
 
 	return buffer.Bytes(), nil
