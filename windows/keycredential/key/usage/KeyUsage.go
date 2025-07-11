@@ -1,4 +1,4 @@
-package key
+package usage
 
 import "fmt"
 

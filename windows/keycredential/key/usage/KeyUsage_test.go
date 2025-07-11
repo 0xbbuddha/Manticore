@@ -1,31 +1,31 @@
-package key_test
+package usage_test
 
 import (
 	"bytes"
 	"fmt"
 	"testing"
 
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/key"
+	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/usage"
 )
 
 func TestKeyUsage_Unmarshal(t *testing.T) {
 	tests := []struct {
 		input    byte
-		expected key.KeyUsage
+		expected usage.KeyUsage
 	}{
-		{0x00, key.KeyUsage{Value: 0x00, RawBytes: []byte{0x00}, RawBytesSize: 1}},
-		{0x01, key.KeyUsage{Value: 0x01, RawBytes: []byte{0x01}, RawBytesSize: 1}},
-		{0x02, key.KeyUsage{Value: 0x02, RawBytes: []byte{0x02}, RawBytesSize: 1}},
-		{0x03, key.KeyUsage{Value: 0x03, RawBytes: []byte{0x03}, RawBytesSize: 1}},
-		{0x04, key.KeyUsage{Value: 0x04, RawBytes: []byte{0x04}, RawBytesSize: 1}},
-		{0x07, key.KeyUsage{Value: 0x07, RawBytes: []byte{0x07}, RawBytesSize: 1}},
-		{0x08, key.KeyUsage{Value: 0x08, RawBytes: []byte{0x08}, RawBytesSize: 1}},
-		{0x09, key.KeyUsage{Value: 0x09, RawBytes: []byte{0x09}, RawBytesSize: 1}},
+		{0x00, usage.KeyUsage{Value: 0x00, RawBytes: []byte{0x00}, RawBytesSize: 1}},
+		{0x01, usage.KeyUsage{Value: 0x01, RawBytes: []byte{0x01}, RawBytesSize: 1}},
+		{0x02, usage.KeyUsage{Value: 0x02, RawBytes: []byte{0x02}, RawBytesSize: 1}},
+		{0x03, usage.KeyUsage{Value: 0x03, RawBytes: []byte{0x03}, RawBytesSize: 1}},
+		{0x04, usage.KeyUsage{Value: 0x04, RawBytes: []byte{0x04}, RawBytesSize: 1}},
+		{0x07, usage.KeyUsage{Value: 0x07, RawBytes: []byte{0x07}, RawBytesSize: 1}},
+		{0x08, usage.KeyUsage{Value: 0x08, RawBytes: []byte{0x08}, RawBytesSize: 1}},
+		{0x09, usage.KeyUsage{Value: 0x09, RawBytes: []byte{0x09}, RawBytesSize: 1}},
 	}
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("input=%x", tt.input), func(t *testing.T) {
-			var ku key.KeyUsage
+			var ku usage.KeyUsage
 			ku.Unmarshal([]byte{tt.input})
 			if ku.Value != tt.expected.Value || !bytes.Equal(ku.RawBytes, tt.expected.RawBytes) || ku.RawBytesSize != tt.expected.RawBytesSize {
 				t.Errorf("got %+v, want %+v", ku, tt.expected)
@@ -36,17 +36,17 @@ func TestKeyUsage_Unmarshal(t *testing.T) {
 
 func TestKeyUsage_Marshal(t *testing.T) {
 	tests := []struct {
-		input    key.KeyUsage
+		input    usage.KeyUsage
 		expected []byte
 	}{
-		{key.KeyUsage{Value: 0x00}, []byte{0x00}},
-		{key.KeyUsage{Value: 0x01}, []byte{0x01}},
-		{key.KeyUsage{Value: 0x02}, []byte{0x02}},
-		{key.KeyUsage{Value: 0x03}, []byte{0x03}},
-		{key.KeyUsage{Value: 0x04}, []byte{0x04}},
-		{key.KeyUsage{Value: 0x07}, []byte{0x07}},
-		{key.KeyUsage{Value: 0x08}, []byte{0x08}},
-		{key.KeyUsage{Value: 0x09}, []byte{0x09}},
+		{usage.KeyUsage{Value: 0x00}, []byte{0x00}},
+		{usage.KeyUsage{Value: 0x01}, []byte{0x01}},
+		{usage.KeyUsage{Value: 0x02}, []byte{0x02}},
+		{usage.KeyUsage{Value: 0x03}, []byte{0x03}},
+		{usage.KeyUsage{Value: 0x04}, []byte{0x04}},
+		{usage.KeyUsage{Value: 0x07}, []byte{0x07}},
+		{usage.KeyUsage{Value: 0x08}, []byte{0x08}},
+		{usage.KeyUsage{Value: 0x09}, []byte{0x09}},
 	}
 
 	for _, tt := range tests {
@@ -78,7 +78,7 @@ func TestKeyUsage_MarshalUnmarshal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("value=%x", tt.value), func(t *testing.T) {
-			original := key.KeyUsage{Value: tt.value}
+			original := usage.KeyUsage{Value: tt.value}
 
 			// Marshal
 			data, err := original.Marshal()
@@ -87,7 +87,7 @@ func TestKeyUsage_MarshalUnmarshal(t *testing.T) {
 			}
 
 			// Unmarshal
-			var unmarshaled key.KeyUsage
+			var unmarshaled usage.KeyUsage
 			_, err = unmarshaled.Unmarshal(data)
 			if err != nil {
 				t.Fatalf("Unmarshal failed: %v", err)
