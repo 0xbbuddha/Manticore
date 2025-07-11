@@ -1,4 +1,4 @@
-package key
+package customkeyinformation
 
 import (
 	"encoding/binary"
@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/TheManticoreProject/Manticore/windows/keycredential"
+	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/strength"
 )
 
 // CustomKeyInformation represents the CUSTOM_KEY_INFORMATION structure.
@@ -26,7 +27,7 @@ type CustomKeyInformation struct {
 	VolumeType           CustomKeyInformationVolumeType
 	SupportsNotification bool
 	FekKeyVersion        uint8
-	Strength             KeyStrength
+	Strength             strength.KeyStrength
 	Reserved             []byte
 	EncodedExtendedCKI   []byte
 
