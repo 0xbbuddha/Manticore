@@ -1,6 +1,7 @@
 package utils_test
 
 import (
+	"bytes"
 	"encoding/base64"
 	"testing"
 	"time"
@@ -85,8 +86,8 @@ func TestConvertFromBinaryTime(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := utils.ConvertFromBinaryTime(tc.input, tc.source, tc.version)
-			if !result.Time.Equal(tc.expected) {
-				t.Errorf("Expected %v, got %v", tc.expected, result.Time)
+			if !result.GetTime().Equal(tc.expected) {
+				t.Errorf("Expected %v, got %v", tc.expected, result.GetTime())
 			}
 		})
 	}
@@ -126,8 +127,104 @@ func TestConvertToBinaryTime(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			converted := utils.ConvertFromBinaryTime(tc.input, tc.source, tc.version)
-			if !converted.Time.Equal(testTimeStruct) {
-				t.Errorf("Time conversion mismatch. \n | Expected '%v'\n | utils.ConvertToBinaryTime(_) = %v\n | final decoded time '%v'", testTimeStruct, tc.input, converted.Time)
+			if !converted.GetTime().Equal(testTimeStruct) {
+				t.Errorf("Time conversion mismatch. \n | Expected '%v'\n | utils.ConvertToBinaryTime(_) = %v\n | final decoded time '%v'", testTimeStruct, tc.input, converted.GetTime())
+			}
+		})
+	}
+}
+
+func TestBinaryTimeInvolution(t *testing.T) {
+	testCases := []struct {
+		name    string
+		time    time.Time
+		source  source.KeySource
+		version version.KeyCredentialVersion
+	}{
+		{
+			name:    "Version 0 AD source - Current time",
+			time:    time.Now().UTC(),
+			source:  source.KeySource{Value: source.KeySource_AD},
+			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0},
+		},
+		{
+			name:    "Version 1 AD source - Current time",
+			time:    time.Now().UTC(),
+			source:  source.KeySource{Value: source.KeySource_AD},
+			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1},
+		},
+		{
+			name:    "Version 2 AD source - Current time",
+			time:    time.Now().UTC(),
+			source:  source.KeySource{Value: source.KeySource_AD},
+			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2},
+		},
+		{
+			name:    "Version 0 AD source - Past time",
+			time:    time.Date(2020, 1, 1, 12, 0, 0, 0, time.UTC),
+			source:  source.KeySource{Value: source.KeySource_AD},
+			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0},
+		},
+		{
+			name:    "Version 1 AD source - Past time",
+			time:    time.Date(2020, 1, 1, 12, 0, 0, 0, time.UTC),
+			source:  source.KeySource{Value: source.KeySource_AD},
+			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1},
+		},
+		{
+			name:    "Version 2 AD source - Past time",
+			time:    time.Date(2020, 1, 1, 12, 0, 0, 0, time.UTC),
+			source:  source.KeySource{Value: source.KeySource_AD},
+			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2},
+		},
+		{
+			name:    "Version 0 AD source - Future time",
+			time:    time.Date(2025, 12, 31, 23, 59, 59, 0, time.UTC),
+			source:  source.KeySource{Value: source.KeySource_AD},
+			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0},
+		},
+		{
+			name:    "Version 1 AD source - Future time",
+			time:    time.Date(2025, 12, 31, 23, 59, 59, 0, time.UTC),
+			source:  source.KeySource{Value: source.KeySource_AD},
+			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1},
+		},
+		{
+			name:    "Version 2 AD source - Future time",
+			time:    time.Date(2025, 12, 31, 23, 59, 59, 0, time.UTC),
+			source:  source.KeySource{Value: source.KeySource_AD},
+			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Convert time to binary
+			dt := utils.NewDateTime(0)
+			dt.SetTime(tc.time)
+			binary, err := dt.Marshal()
+			if err != nil {
+				t.Fatalf("Failed to marshal time: %v", err)
+			}
+
+			// Convert binary back to time
+			result := utils.ConvertFromBinaryTime(binary, tc.source, tc.version)
+
+			// Check if the final time matches the original
+			if !result.GetTime().Equal(dt.GetTime()) {
+				t.Errorf("Time involution failed.\n | Original time : %v\n | Final time    : %v",
+					dt.GetTime(), result.GetTime())
+			}
+
+			// Additional check for exact tick matching
+			resultBinary, err := result.Marshal()
+			if err != nil {
+				t.Fatalf("Failed to marshal result time: %v", err)
+			}
+
+			if !bytes.Equal(binary, resultBinary) {
+				t.Errorf("Binary representation mismatch after involution.\n | Original: %v\n | Final: %v",
+					binary, resultBinary)
 			}
 		})
 	}
