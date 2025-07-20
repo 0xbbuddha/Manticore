@@ -5,33 +5,34 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/key"
+	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/source"
 	"github.com/TheManticoreProject/Manticore/windows/keycredential/utils"
+	"github.com/TheManticoreProject/Manticore/windows/keycredential/version"
 )
 
 func TestConvertFromBinaryIdentifier(t *testing.T) {
 	testCases := []struct {
 		name     string
 		input    []byte
-		version  key.KeyCredentialVersion
+		version  version.KeyCredentialVersion
 		expected string
 	}{
 		{
 			name:     "Version 0 hex encoding",
 			input:    []byte{0x12, 0x34, 0x56},
-			version:  key.KeyCredentialVersion{Value: key.KeyCredentialVersion_0},
+			version:  version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0},
 			expected: "123456",
 		},
 		{
 			name:     "Version 1 hex encoding",
 			input:    []byte{0x12, 0x34, 0x56},
-			version:  key.KeyCredentialVersion{Value: key.KeyCredentialVersion_1},
+			version:  version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1},
 			expected: "123456",
 		},
 		{
 			name:     "Version 2 base64 encoding",
 			input:    []byte{0x12, 0x34, 0x56},
-			version:  key.KeyCredentialVersion{Value: key.KeyCredentialVersion_2},
+			version:  version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2},
 			expected: base64.StdEncoding.EncodeToString([]byte{0x12, 0x34, 0x56}),
 		},
 	}
@@ -53,29 +54,29 @@ func TestConvertFromBinaryTime(t *testing.T) {
 	testCases := []struct {
 		name     string
 		input    []byte
-		source   key.KeySource
-		version  key.KeyCredentialVersion
+		source   source.KeySource
+		version  version.KeyCredentialVersion
 		expected time.Time
 	}{
 		{
 			name:     "Version 0 AD source",
 			input:    testTime,
-			source:   key.KeySource_AD,
-			version:  key.KeyCredentialVersion{Value: key.KeyCredentialVersion_0},
+			source:   source.KeySource{Value: source.KeySource_AD},
+			version:  version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0},
 			expected: time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC),
 		},
 		{
 			name:     "Version 1 AD source",
 			input:    testTime,
-			source:   key.KeySource_AD,
-			version:  key.KeyCredentialVersion{Value: key.KeyCredentialVersion_1},
+			source:   source.KeySource{Value: source.KeySource_AD},
+			version:  version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1},
 			expected: time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC),
 		},
 		{
 			name:     "Version 2 AD source",
 			input:    testTime,
-			source:   key.KeySource_AD,
-			version:  key.KeyCredentialVersion{Value: key.KeyCredentialVersion_2},
+			source:   source.KeySource{Value: source.KeySource_AD},
+			version:  version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2},
 			expected: time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC),
 		},
 	}
@@ -96,26 +97,26 @@ func TestConvertToBinaryTime(t *testing.T) {
 	testCases := []struct {
 		name    string
 		input   time.Time
-		source  key.KeySource
-		version key.KeyCredentialVersion
+		source  source.KeySource
+		version version.KeyCredentialVersion
 	}{
 		{
 			name:    "Version 0 AD source",
 			input:   testTime,
-			source:  key.KeySource_AD,
-			version: key.KeyCredentialVersion{Value: key.KeyCredentialVersion_0},
+			source:  source.KeySource{Value: source.KeySource_AD},
+			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0},
 		},
 		{
 			name:    "Version 1 AD source",
 			input:   testTime,
-			source:  key.KeySource_AD,
-			version: key.KeyCredentialVersion{Value: key.KeyCredentialVersion_1},
+			source:  source.KeySource{Value: source.KeySource_AD},
+			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1},
 		},
 		{
 			name:    "Version 2 AD source",
 			input:   testTime,
-			source:  key.KeySource_AD,
-			version: key.KeyCredentialVersion{Value: key.KeyCredentialVersion_2},
+			source:  source.KeySource{Value: source.KeySource_AD},
+			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2},
 		},
 	}
 

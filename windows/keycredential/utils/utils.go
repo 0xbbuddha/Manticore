@@ -1,7 +1,8 @@
 package utils
 
 import (
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/key"
+	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/source"
+	"github.com/TheManticoreProject/Manticore/windows/keycredential/version"
 
 	"crypto/sha256"
 	"encoding/base64"
@@ -34,11 +35,11 @@ import (
 // - For version 2, the key identifier is expected to be in base64 format and is decoded using base64.StdEncoding.DecodeString with padding.
 //
 // - For any other version, the key identifier is treated as base64 format and is decoded using base64.StdEncoding.DecodeString with padding.
-func ConvertToBinaryIdentifier(keyIdentifier string, version key.KeyCredentialVersion) ([]byte, error) {
-	switch version.Value {
-	case key.KeyCredentialVersion_0, key.KeyCredentialVersion_1:
+func ConvertToBinaryIdentifier(keyIdentifier string, kcv version.KeyCredentialVersion) ([]byte, error) {
+	switch kcv.Value {
+	case version.KeyCredentialVersion_0, version.KeyCredentialVersion_1:
 		return hex.DecodeString(keyIdentifier)
-	case key.KeyCredentialVersion_2:
+	case version.KeyCredentialVersion_2:
 		return base64.StdEncoding.DecodeString(strings.TrimRight(keyIdentifier, "=") + "=")
 	default:
 		return base64.StdEncoding.DecodeString(strings.TrimRight(keyIdentifier, "=") + "=")
@@ -59,11 +60,11 @@ func ConvertToBinaryIdentifier(keyIdentifier string, version key.KeyCredentialVe
 // - For version 0 and 1, the key identifier is encoded to a hexadecimal string using hex.EncodeToString.
 // - For version 2, the key identifier is encoded to a base64 string using base64.StdEncoding.EncodeToString.
 // - For any other version, the key identifier is treated as base64 format and is encoded using base64.StdEncoding.EncodeToString.
-func ConvertFromBinaryIdentifier(keyIdentifier []byte, version key.KeyCredentialVersion) string {
-	switch version.Value {
-	case key.KeyCredentialVersion_0, key.KeyCredentialVersion_1:
+func ConvertFromBinaryIdentifier(keyIdentifier []byte, kcv version.KeyCredentialVersion) string {
+	switch kcv.Value {
+	case version.KeyCredentialVersion_0, version.KeyCredentialVersion_1:
 		return hex.EncodeToString(keyIdentifier)
-	case key.KeyCredentialVersion_2:
+	case version.KeyCredentialVersion_2:
 		return base64.StdEncoding.EncodeToString(keyIdentifier)
 	default:
 		return base64.StdEncoding.EncodeToString(keyIdentifier)
@@ -86,21 +87,21 @@ func ConvertFromBinaryIdentifier(keyIdentifier []byte, version key.KeyCredential
 // timestamp directly to a Unix time in nanoseconds.
 //
 // Src : https://github.com/microsoft/referencesource/blob/master/mscorlib/system/datetime.cs
-func ConvertFromBinaryTime(rawBinaryTime []byte, source key.KeySource, version key.KeyCredentialVersion) DateTime {
+func ConvertFromBinaryTime(rawBinaryTime []byte, ksrc source.KeySource, kcv version.KeyCredentialVersion) DateTime {
 	timeStamp := binary.LittleEndian.Uint64(rawBinaryTime)
 
-	switch version.Value {
-	case key.KeyCredentialVersion_0, key.KeyCredentialVersion_1:
+	switch kcv.Value {
+	case version.KeyCredentialVersion_0, version.KeyCredentialVersion_1:
 		return NewDateTime(uint64(timeStamp))
-	case key.KeyCredentialVersion_2:
-		if source == key.KeySource_AD {
+	case version.KeyCredentialVersion_2:
+		if ksrc.Value == source.KeySource_AD {
 			return NewDateTime(uint64(timeStamp))
 		} else {
 			// This is not fully supported right now, you may encounter issues.
 			return NewDateTime(uint64(timeStamp))
 		}
 	default:
-		if source == key.KeySource_AD {
+		if ksrc.Value == source.KeySource_AD {
 			return NewDateTime(uint64(timeStamp))
 		} else {
 			// This is not fully supported right now, you may encounter issues.
@@ -122,20 +123,20 @@ func ConvertFromBinaryTime(rawBinaryTime []byte, source key.KeySource, version k
 // Note:
 // The function currently treats all versions and sources the same way, converting the time
 // directly to a Unix time in nanoseconds and then encoding it in little-endian format.
-func ConvertToBinaryTime(date time.Time, source key.KeySource, version key.KeyCredentialVersion) []byte {
+func ConvertToBinaryTime(date time.Time, ksrc source.KeySource, kcv version.KeyCredentialVersion) []byte {
 	timeStamp := date.UnixNano()
 
-	switch version.Value {
-	case key.KeyCredentialVersion_0, key.KeyCredentialVersion_1:
+	switch kcv.Value {
+	case version.KeyCredentialVersion_0, version.KeyCredentialVersion_1:
 		return binary.LittleEndian.AppendUint64(nil, uint64(timeStamp))
-	case key.KeyCredentialVersion_2:
-		if source == key.KeySource_AD {
+	case version.KeyCredentialVersion_2:
+		if ksrc.Value == source.KeySource_AD {
 			return binary.LittleEndian.AppendUint64(nil, uint64(timeStamp))
 		} else {
 			return binary.LittleEndian.AppendUint64(nil, uint64(timeStamp))
 		}
 	default:
-		if source == key.KeySource_AD {
+		if ksrc.Value == source.KeySource_AD {
 			return binary.LittleEndian.AppendUint64(nil, uint64(timeStamp))
 		} else {
 			return binary.LittleEndian.AppendUint64(nil, uint64(timeStamp))
@@ -165,7 +166,7 @@ func ComputeHash(data []byte) []byte {
 //
 // Parameters:
 // - keyMaterial: A byte slice containing the key material to be used for generating the key identifier.
-// - version: A key.KeyCredentialVersion value representing the version of the key credential.
+// - version: A version.KeyCredentialVersion value representing the version of the key credential.
 //
 // Returns:
 // - A string representing the generated key identifier.
@@ -175,7 +176,7 @@ func ComputeHash(data []byte) []byte {
 // It then converts the resulting binary hash to a string representation based on the specified version
 // using the ConvertFromBinaryIdentifier function. The generated key identifier can be used for various
 // purposes, such as uniquely identifying cryptographic keys and credentials.
-func ComputeKeyIdentifier(keyMaterial []byte, version key.KeyCredentialVersion) string {
+func ComputeKeyIdentifier(keyMaterial []byte, version version.KeyCredentialVersion) string {
 	binaryId := ComputeHash(keyMaterial)
 	return ConvertFromBinaryIdentifier(binaryId, version)
 }
