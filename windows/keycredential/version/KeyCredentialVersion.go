@@ -1,4 +1,4 @@
-package keycredential
+package version
 
 import (
 	"encoding/binary"
@@ -19,15 +19,27 @@ const (
 	KeyCredentialVersion_2 uint32 = 0x00000200
 )
 
-// Parse parses the KeyCredentialVersion from a byte array.
+// Unmarshal parses the KeyCredentialVersion from a byte array.
 //
 // Parameters:
 // - value: A byte array representing the KeyCredentialVersion.
-func (kcv *KeyCredentialVersion) FromBytes(value []byte) {
+func (kcv *KeyCredentialVersion) Unmarshal(value []byte) (int, error) {
 	kcv.RawBytes = value[:4]
 	kcv.RawBytesSize = 4
 
 	kcv.Value = binary.LittleEndian.Uint32(value[:4])
+
+	return 4, nil
+}
+
+// Marshal returns the raw bytes of the KeyCredentialVersion structure.
+//
+// Returns:
+// - A byte slice representing the raw bytes of the KeyCredentialVersion structure.
+func (kcv *KeyCredentialVersion) Marshal() ([]byte, error) {
+	buffer := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buffer, kcv.Value)
+	return buffer, nil
 }
 
 // String returns a string representation of the KeyCredentialVersion.
@@ -44,15 +56,5 @@ func (kcv *KeyCredentialVersion) String() string {
 		return "KeyCredential_v2"
 	}
 
-	return fmt.Sprintf("Unknown version: %d", int(kcv.Value))
-}
-
-// ToBytes returns the raw bytes of the KeyCredentialVersion structure.
-//
-// Returns:
-// - A byte slice representing the raw bytes of the KeyCredentialVersion structure.
-func (kcv *KeyCredentialVersion) ToBytes() []byte {
-	buffer := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buffer, kcv.Value)
-	return buffer
+	return fmt.Sprintf("Unknown version: 0x%08x", kcv.Value)
 }

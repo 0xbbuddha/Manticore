@@ -1,43 +1,46 @@
-package keycredential_test
+package version_test
 
 import (
 	"bytes"
 	"fmt"
 	"testing"
 
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/key"
+	"github.com/TheManticoreProject/Manticore/windows/keycredential/version"
 )
 
-func TestKeyCredentialVersionFromBytes(t *testing.T) {
+func TestKeyCredentialVersion_Unmarshal(t *testing.T) {
 	tests := []struct {
 		input    []byte
-		expected uint32
+		expected version.KeyCredentialVersion
 	}{
-		{[]byte{0x00, 0x00, 0x00, 0x00}, key.KeyCredentialVersion{Value: 0}},
-		{[]byte{0x00, 0x01, 0x00, 0x00}, key.KeyCredentialVersion{Value: 1}},
-		{[]byte{0x00, 0x02, 0x00, 0x00}, key.KeyCredentialVersion{Value: 2}},
+		{[]byte{0x00, 0x00, 0x00, 0x00}, version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0}},
+		{[]byte{0x00, 0x01, 0x00, 0x00}, version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1}},
+		{[]byte{0x00, 0x02, 0x00, 0x00}, version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2}},
 	}
 
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("input: %v", test.input), func(t *testing.T) {
-			var kcv key.KeyCredentialVersion
-			kcv.FromBytes(test.input)
-			if kcv.Value != test.expected {
-				t.Errorf("Expected %d, but got %d", test.expected, kcv.Value)
+			var kcv version.KeyCredentialVersion
+			_, err := kcv.Unmarshal(test.input)
+			if err != nil {
+				t.Errorf("\n| Expected : no error \n| But got  : %v", err)
+			}
+			if kcv.Value != test.expected.Value {
+				t.Errorf("\n| Expected : 0x%08X \n| But got  : 0x%08X", test.expected.Value, kcv.Value)
 			}
 		})
 	}
 }
 
-func TestKeyCredentialVersionString(t *testing.T) {
+func TestKeyCredentialVersion_String(t *testing.T) {
 	tests := []struct {
-		version  key.KeyCredentialVersion
+		version  version.KeyCredentialVersion
 		expected string
 	}{
-		{key.KeyCredentialVersion{Value: key.KeyCredentialVersion_0}, "KeyCredential_v0"},
-		{key.KeyCredentialVersion{Value: key.KeyCredentialVersion_1}, "KeyCredential_v1"},
-		{key.KeyCredentialVersion{Value: key.KeyCredentialVersion_2}, "KeyCredential_v2"},
-		{key.KeyCredentialVersion{Value: 0x00000300}, "Unknown version: 768"},
+		{version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0}, "KeyCredential_v0"},
+		{version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1}, "KeyCredential_v1"},
+		{version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2}, "KeyCredential_v2"},
+		{version.KeyCredentialVersion{Value: 0x00000300}, "Unknown version: 0x00000300"},
 	}
 
 	for _, test := range tests {
@@ -50,19 +53,22 @@ func TestKeyCredentialVersionString(t *testing.T) {
 	}
 }
 
-func TestKeyCredentialVersionToBytes(t *testing.T) {
+func TestKeyCredentialVersion_Marshal(t *testing.T) {
 	tests := []struct {
-		version  key.KeyCredentialVersion
+		version  version.KeyCredentialVersion
 		expected []byte
 	}{
-		{key.KeyCredentialVersion{Value: key.KeyCredentialVersion_0}, []byte{0x00, 0x00, 0x00, 0x00}},
-		{key.KeyCredentialVersion{Value: key.KeyCredentialVersion_1}, []byte{0x00, 0x01, 0x00, 0x00}},
-		{key.KeyCredentialVersion{Value: key.KeyCredentialVersion_2}, []byte{0x00, 0x02, 0x00, 0x00}},
+		{version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0}, []byte{0x00, 0x00, 0x00, 0x00}},
+		{version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1}, []byte{0x00, 0x01, 0x00, 0x00}},
+		{version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2}, []byte{0x00, 0x02, 0x00, 0x00}},
 	}
 
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("version: %d", test.version.Value), func(t *testing.T) {
-			result := test.version.ToBytes()
+			result, err := test.version.Marshal()
+			if err != nil {
+				t.Errorf("Expected no error, but got %v", err)
+			}
 			if !bytes.Equal(result, test.expected) {
 				t.Errorf("Expected %v, but got %v", test.expected, result)
 			}
