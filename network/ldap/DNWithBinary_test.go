@@ -1,8 +1,10 @@
-package keycredentiallink
+package ldap_test
 
 import (
 	"bytes"
 	"testing"
+
+	"github.com/TheManticoreProject/Manticore/network/ldap"
 )
 
 func TestParse(t *testing.T) {
@@ -39,7 +41,7 @@ func TestParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d := &DNWithBinary{}
+			d := &ldap.DNWithBinary{}
 			err := d.Parse(tt.rawBytes)
 			if (err != nil) != tt.expectError {
 				t.Errorf("Parse() error = %v, expectError %v", err, tt.expectError)

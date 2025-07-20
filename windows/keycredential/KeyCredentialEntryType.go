@@ -1,6 +1,8 @@
-package key
+package keycredential
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 )
 
@@ -47,11 +49,28 @@ const (
 	KeyCredentialEntryType_KeyCreationTime uint8 = 0x09
 )
 
-func (k *KeyCredentialEntryType) FromBytes(value byte) {
-	k.RawBytes = []byte{value}
+// Unmarshal parses the provided byte slice into the KeyCredentialEntryType structure.
+//
+// Parameters:
+// - data: A byte slice containing the raw key credential entry type to be parsed.
+//
+// Returns:
+// - The number of bytes read from the data.
+func (k *KeyCredentialEntryType) Unmarshal(data []byte) (int, error) {
+	k.RawBytes = data[:1]
 	k.RawBytesSize = 1
 
-	k.Value = value
+	k.Value = data[0]
+
+	return 1, nil
+}
+
+// Marshal returns the raw bytes of the KeyCredentialEntryType structure.
+//
+// Returns:
+// - A byte slice representing the raw bytes of the KeyCredentialEntryType structure.
+func (k *KeyCredentialEntryType) Marshal() ([]byte, error) {
+	return []byte{k.Value}, nil
 }
 
 // String returns a string representation of the KeyCredentialEntryType.
@@ -83,10 +102,18 @@ func (k *KeyCredentialEntryType) String() string {
 	}
 }
 
-// ToBytes returns the raw bytes of the KeyCredentialEntryType structure.
+// WriteEntry writes a typed KeyCredentialEntry to the buffer.
 //
-// Returns:
-// - A byte slice representing the raw bytes of the KeyCredentialEntryType structure.
-func (k *KeyCredentialEntryType) ToBytes() []byte {
-	return []byte{k.Value}
+// Parameters:
+// - buffer: A pointer to a bytes.Buffer object.
+// - entryType: A KeyCredentialEntryType object representing the type of the entry.
+// - data: A byte slice representing the data to be written.
+func WriteEntry(buffer *bytes.Buffer, entryType KeyCredentialEntryType, data []byte) {
+	binary.Write(buffer, binary.LittleEndian, uint16(len(data)))
+	entryTypeBytes, err := entryType.Marshal()
+	if err != nil {
+		return
+	}
+	buffer.Write(entryTypeBytes)
+	buffer.Write(data)
 }

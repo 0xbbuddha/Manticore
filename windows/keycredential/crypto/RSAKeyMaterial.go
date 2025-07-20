@@ -1,7 +1,8 @@
 package crypto
 
 import (
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/key"
+	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/strength"
+	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/usage"
 
 	"crypto/rsa"
 	"crypto/x509"
@@ -22,8 +23,8 @@ import (
 // https://docs.microsoft.com/en-us/archive/msdn-magazine/2007/july/images/cc163389.fig11.gif
 // https://docs.microsoft.com/en-us/windows/win32/api/bcrypt/ns-bcrypt-bcrypt_rsakey_blob
 type RSAKeyMaterial struct {
-	KeyUsage    key.KeyUsage
-	KeyStrength key.KeyStrength
+	KeyUsage    usage.KeyUsage
+	KeyStrength strength.KeyStrength
 
 	Exponent uint32
 	Modulus  []byte
