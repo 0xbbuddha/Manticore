@@ -3,11 +3,11 @@ package keycredential
 import (
 	"github.com/TheManticoreProject/Manticore/network/ldap"
 	"github.com/TheManticoreProject/Manticore/windows/keycredential/crypto"
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/key"
 	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/customkeyinformation"
 	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/source"
 	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/usage"
 	"github.com/TheManticoreProject/Manticore/windows/keycredential/utils"
+	"github.com/TheManticoreProject/Manticore/windows/keycredential/version"
 
 	"bytes"
 	"encoding/binary"
@@ -42,7 +42,7 @@ import (
 // The structure includes fields for version, identifier, key hash, raw key material, usage, legacy usage, source, last logon time, creation time, owner, and raw binary data.
 // The ParseDNWithBinary method is used to parse a DNWithBinary object and populate the fields of the KeyCredential structure.
 type KeyCredential struct {
-	Version        KeyCredentialVersion
+	Version        version.KeyCredentialVersion
 	Identifier     string
 	KeyHash        []byte
 	RawKeyMaterial crypto.RSAKeyMaterial
@@ -91,7 +91,7 @@ type KeyCredential struct {
 //
 // - A pointer to a KeyCredential object.
 func NewKeyCredential(
-	Version KeyCredentialVersion,
+	Version version.KeyCredentialVersion,
 	Identifier string,
 	RawKeyMaterial crypto.RSAKeyMaterial,
 	DeviceId guid.GUID,
@@ -183,7 +183,10 @@ func (kc *KeyCredential) Unmarshal(data []byte) (int, error) {
 	remainder := data
 	kc.RawBytesSize = 0
 
-	kc.Version.FromBytes(kc.RawBytes)
+	_, err := kc.Version.Unmarshal(kc.RawBytes)
+	if err != nil {
+		return 0, err
+	}
 	kc.RawBytesSize += kc.Version.RawBytesSize
 	remainder = remainder[kc.Version.RawBytesSize:]
 
@@ -193,7 +196,10 @@ func (kc *KeyCredential) Unmarshal(data []byte) (int, error) {
 		length := binary.LittleEndian.Uint16(remainder[:2])
 
 		entryType := KeyCredentialEntryType{}
-		entryType.FromBytes(remainder[2])
+		_, err := entryType.Unmarshal(remainder)
+		if err != nil {
+			return 0, err
+		}
 
 		remainder = remainder[3:]
 
@@ -220,7 +226,10 @@ func (kc *KeyCredential) Unmarshal(data []byte) (int, error) {
 				kc.LegacyUsage = string(entryData)
 			}
 		case KeyCredentialEntryType_KeySource:
-			kc.Source = key.KeySource(entryData[0])
+			_, err := kc.Source.Unmarshal(entryData)
+			if err != nil {
+				return 0, err
+			}
 		case KeyCredentialEntryType_DeviceId:
 			kc.DeviceId.FromRawBytes(entryData)
 		case KeyCredentialEntryType_CustomKeyInformation:
@@ -280,14 +289,17 @@ func (kc *KeyCredential) ComputeKeyHash() []byte {
 	for len(remainder) > 3 {
 		// A 16-bit unsigned integer that specifies the length of the Value field.
 		length := binary.LittleEndian.Uint16(remainder[:2])
-		entryType := key.KeyCredentialEntryType{}
-		entryType.FromBytes(remainder[2])
+		entryType := KeyCredentialEntryType{}
+		_, err := entryType.Unmarshal(remainder)
+		if err != nil {
+			return nil
+		}
 
 		remainder = remainder[3:]
 		remainder = remainder[length:]
 
 		switch entryType.Value {
-		case key.KeyCredentialEntryType_KeyHash:
+		case KeyCredentialEntryType_KeyHash:
 			data = append(data, remainder...)
 		}
 	}
@@ -295,18 +307,6 @@ func (kc *KeyCredential) ComputeKeyHash() []byte {
 	hash := utils.ComputeHash(data)
 
 	return hash
-}
-
-// writeEntry writes a typed KeyCredentialEntry to the buffer.
-//
-// Parameters:
-// - buffer: A pointer to a bytes.Buffer object.
-// - entryType: A KeyCredentialEntryType object representing the type of the entry.
-// - data: A byte slice representing the data to be written.
-func writeEntry(buffer *bytes.Buffer, entryType key.KeyCredentialEntryType, data []byte) {
-	binary.Write(buffer, binary.LittleEndian, uint16(len(data)))
-	buffer.Write(entryType.ToBytes())
-	buffer.Write(data)
 }
 
 // Marshal returns the raw bytes of the KeyCredential structure.
@@ -320,53 +320,57 @@ func (kc *KeyCredential) Marshal() ([]byte, error) {
 	buffer := bytes.NewBuffer(nil)
 
 	// kc.Version
-	buffer.Write(kc.Version.ToBytes())
+	versionBytes, err := kc.Version.Marshal()
+	if err != nil {
+		return nil, err
+	}
+	buffer.Write(versionBytes)
 
 	// kc.Identifier
 	if len(kc.Identifier) > 0 {
-		entryType := key.KeyCredentialEntryType{Value: key.KeyCredentialEntryType_KeyID}
+		entryType := KeyCredentialEntryType{Value: KeyCredentialEntryType_KeyID}
 		identifierBytes, err := utils.ConvertToBinaryIdentifier(kc.Identifier, kc.Version)
 		if err != nil {
 			return nil, err
 		}
-		writeEntry(buffer, entryType, identifierBytes)
+		WriteEntry(buffer, entryType, identifierBytes)
 	}
 
 	// kc.KeyHash
 	if len(kc.KeyHash) > 0 {
-		entryType := key.KeyCredentialEntryType{Value: key.KeyCredentialEntryType_KeyHash}
-		writeEntry(buffer, entryType, kc.KeyHash)
+		entryType := KeyCredentialEntryType{Value: KeyCredentialEntryType_KeyHash}
+		WriteEntry(buffer, entryType, kc.KeyHash)
 	} else {
-		entryType := key.KeyCredentialEntryType{Value: key.KeyCredentialEntryType_KeyHash}
-		writeEntry(buffer, entryType, make([]byte, 32))
+		entryType := KeyCredentialEntryType{Value: KeyCredentialEntryType_KeyHash}
+		WriteEntry(buffer, entryType, make([]byte, 32))
 	}
 
 	// kc.RawKeyMaterial
-	entryType := key.KeyCredentialEntryType{Value: key.KeyCredentialEntryType_KeyMaterial}
-	writeEntry(buffer, entryType, kc.RawKeyMaterial.ToBytes())
+	entryType := KeyCredentialEntryType{Value: KeyCredentialEntryType_KeyMaterial}
+	WriteEntry(buffer, entryType, kc.RawKeyMaterial.ToBytes())
 
 	// kc.Usage
-	entryType = key.KeyCredentialEntryType{Value: key.KeyCredentialEntryType_KeyUsage}
-	writeEntry(buffer, entryType, []byte{kc.Usage.Value})
+	entryType = KeyCredentialEntryType{Value: KeyCredentialEntryType_KeyUsage}
+	WriteEntry(buffer, entryType, []byte{kc.Usage.Value})
 
 	// kc.LegacyUsage
 	if len(kc.LegacyUsage) > 0 {
-		entryType = key.KeyCredentialEntryType{Value: key.KeyCredentialEntryType_KeyUsage}
+		entryType = KeyCredentialEntryType{Value: KeyCredentialEntryType_KeyUsage}
 		data := []byte(kc.LegacyUsage)
-		writeEntry(buffer, entryType, data)
+		WriteEntry(buffer, entryType, data)
 	}
 
 	// kc.Source
-	entryType = key.KeyCredentialEntryType{Value: key.KeyCredentialEntryType_KeySource}
+	entryType = KeyCredentialEntryType{Value: KeyCredentialEntryType_KeySource}
 	data, err := kc.Source.Marshal()
 	if err != nil {
 		return nil, err
 	}
-	writeEntry(buffer, entryType, data)
+	WriteEntry(buffer, entryType, data)
 
 	// kc.DeviceId
-	entryType = key.KeyCredentialEntryType{Value: key.KeyCredentialEntryType_DeviceId}
-	writeEntry(buffer, entryType, kc.DeviceId.ToBytes())
+	entryType = KeyCredentialEntryType{Value: KeyCredentialEntryType_DeviceId}
+	WriteEntry(buffer, entryType, kc.DeviceId.ToBytes())
 
 	// kc.CustomKeyInfo
 	customKeyInfoBytes, err := kc.CustomKeyInfo.Marshal()
@@ -374,25 +378,25 @@ func (kc *KeyCredential) Marshal() ([]byte, error) {
 		return nil, err
 	}
 	if len(customKeyInfoBytes) > 0 {
-		entryType := key.KeyCredentialEntryType{Value: key.KeyCredentialEntryType_CustomKeyInformation}
-		writeEntry(buffer, entryType, customKeyInfoBytes)
+		entryType := KeyCredentialEntryType{Value: KeyCredentialEntryType_CustomKeyInformation}
+		WriteEntry(buffer, entryType, customKeyInfoBytes)
 	}
 
 	// kc.LastLogonTime
-	entryType = key.KeyCredentialEntryType{Value: key.KeyCredentialEntryType_KeyApproximateLastLogonTimeStamp}
+	entryType = KeyCredentialEntryType{Value: KeyCredentialEntryType_KeyApproximateLastLogonTimeStamp}
 	data, err = kc.LastLogonTime.Marshal()
 	if err != nil {
 		return nil, err
 	}
-	writeEntry(buffer, entryType, data)
+	WriteEntry(buffer, entryType, data)
 
 	// kc.CreationTime
-	entryType = key.KeyCredentialEntryType{Value: key.KeyCredentialEntryType_KeyCreationTime}
+	entryType = KeyCredentialEntryType{Value: KeyCredentialEntryType_KeyCreationTime}
 	data, err = kc.CreationTime.Marshal()
 	if err != nil {
 		return nil, err
 	}
-	writeEntry(buffer, entryType, data)
+	WriteEntry(buffer, entryType, data)
 
 	return buffer.Bytes(), nil
 }
@@ -419,7 +423,7 @@ func (kc *KeyCredential) Describe(indent int) {
 	} else {
 		fmt.Printf("%s │ \x1b[93mLegacyUsage\x1b[0m: None\n", indentPrompt)
 	}
-	fmt.Printf("%s │ \x1b[93mSource\x1b[0m: %s\n", indentPrompt, kc.Source)
+	fmt.Printf("%s │ \x1b[93mSource\x1b[0m: 0x%02x (%s)\n", indentPrompt, kc.Source.Value, kc.Source.String())
 	fmt.Printf("%s │ \x1b[93mDeviceId\x1b[0m: %s\n", indentPrompt, kc.DeviceId.ToFormatD())
 	kc.CustomKeyInfo.Describe(indent + 1)
 	fmt.Printf("%s │ \x1b[93mLastLogonTime (UTC)\x1b[0m: %s\n", indentPrompt, kc.LastLogonTime.String())
