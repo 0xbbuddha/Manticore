@@ -26,20 +26,20 @@ func TestNewDateTime(t *testing.T) {
 
 	t.Run("with specific ticks should set correct time", func(t *testing.T) {
 		// 132918192030000000 ticks = 2022-03-15 12:00:03 UTC
-		dt := utils.NewDateTime(132918192030000000)
+		dt := utils.NewDateTime(uint64(132918192030000000))
 
 		expected := time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC)
 		if !dt.GetTime().UTC().Equal(expected) {
 			t.Errorf("Expected time %v, got %v", expected, dt.GetTime().UTC())
 		}
-		if dt.GetTicks() != 132918192030000000 {
-			t.Errorf("Expected ticks %d, got %d", 132918192030000000, dt.GetTicks())
+		if dt.GetTicks() != uint64(132918192030000000) {
+			t.Errorf("Expected ticks %d, got %d", uint64(132918192030000000), dt.GetTicks())
 		}
 	})
 }
 
 func TestDateTime_ToUniversalTime(t *testing.T) {
-	dt := utils.NewDateTime(132918192030000000) // 2022-03-15 12:00:03 UTC
+	dt := utils.NewDateTime(uint64(132918192030000000)) // 2022-03-15 12:00:03 UTC
 	utc := dt.ToUniversalTime()
 
 	expected := time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC)
@@ -58,7 +58,7 @@ func TestDateTime_ToTicks(t *testing.T) {
 }
 
 func TestDateTime_String(t *testing.T) {
-	dt := utils.NewDateTime(132918192030000000) // 2022-03-15 12:00:03 UTC
+	dt := utils.NewDateTime(uint64(132918192030000000)) // 2022-03-15 12:00:03 UTC
 	expected := time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC)
 
 	// Compare the actual time values instead of string representations to avoid timezone issues
@@ -68,7 +68,7 @@ func TestDateTime_String(t *testing.T) {
 }
 
 func TestDateTime_Marshal(t *testing.T) {
-	dt := utils.NewDateTime(132918192030000000)
+	dt := utils.NewDateTime(uint64(132918192030000000))
 	data, err := dt.Marshal()
 
 	if err != nil {
@@ -89,8 +89,8 @@ func TestDateTime_Unmarshal(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		if dt.GetTicks() != 132918192030000000 {
-			t.Errorf("Expected ticks %d, got %d", 132918192030000000, dt.GetTicks())
+		if dt.GetTicks() != uint64(132918192030000000) {
+			t.Errorf("Expected ticks %d, got %d", uint64(132918192030000000), dt.GetTicks())
 		}
 	})
 
@@ -160,7 +160,7 @@ func TestDateTime_GetTicks_SetTicks(t *testing.T) {
 	}{
 		{
 			name:        "Typical value",
-			setTicks:    132918192030000000, // 2022-03-15 12:00:03 UTC
+			setTicks:    uint64(132918192030000000), // 2022-03-15 12:00:03 UTC
 			expectedErr: false,
 		},
 		{
@@ -170,7 +170,7 @@ func TestDateTime_GetTicks_SetTicks(t *testing.T) {
 		},
 		{
 			name:        "Early date",
-			setTicks:    116444736000000000, // 1970-01-01 00:00:00 UTC
+			setTicks:    uint64(116444736000000000), // 1970-01-01 00:00:00 UTC
 			expectedErr: false,
 		},
 	}
