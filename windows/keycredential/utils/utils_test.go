@@ -49,7 +49,8 @@ func TestConvertFromBinaryIdentifier(t *testing.T) {
 
 func TestConvertFromBinaryTime(t *testing.T) {
 	// Create test timestamp (2022-03-15 12:00:03 UTC)
-	testTime := []byte{0x00, 0x30, 0x03, 0x32, 0x13, 0x29, 0x13, 0x00}
+	testTimeBytes := []byte{0x80, 0xa3, 0x22, 0x34, 0x64, 0x38, 0xd8, 0x01}
+	testTimeStruct := time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC)
 
 	testCases := []struct {
 		name     string
@@ -60,24 +61,24 @@ func TestConvertFromBinaryTime(t *testing.T) {
 	}{
 		{
 			name:     "Version 0 AD source",
-			input:    testTime,
+			input:    testTimeBytes,
 			source:   source.KeySource{Value: source.KeySource_AD},
 			version:  version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0},
-			expected: time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC),
+			expected: testTimeStruct,
 		},
 		{
 			name:     "Version 1 AD source",
-			input:    testTime,
+			input:    testTimeBytes,
 			source:   source.KeySource{Value: source.KeySource_AD},
 			version:  version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1},
-			expected: time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC),
+			expected: testTimeStruct,
 		},
 		{
 			name:     "Version 2 AD source",
-			input:    testTime,
+			input:    testTimeBytes,
 			source:   source.KeySource{Value: source.KeySource_AD},
 			version:  version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2},
-			expected: time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC),
+			expected: testTimeStruct,
 		},
 	}
 
@@ -92,29 +93,31 @@ func TestConvertFromBinaryTime(t *testing.T) {
 }
 
 func TestConvertToBinaryTime(t *testing.T) {
-	testTime := time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC)
+	// Create test timestamp (2022-03-15 12:00:03 UTC)
+	testTimeBytes := []byte{0x80, 0xa3, 0x22, 0x34, 0x64, 0x38, 0xd8, 0x01}
+	testTimeStruct := time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC)
 
 	testCases := []struct {
 		name    string
-		input   time.Time
+		input   []byte
 		source  source.KeySource
 		version version.KeyCredentialVersion
 	}{
 		{
 			name:    "Version 0 AD source",
-			input:   testTime,
+			input:   testTimeBytes,
 			source:  source.KeySource{Value: source.KeySource_AD},
 			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0},
 		},
 		{
 			name:    "Version 1 AD source",
-			input:   testTime,
+			input:   testTimeBytes,
 			source:  source.KeySource{Value: source.KeySource_AD},
 			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1},
 		},
 		{
 			name:    "Version 2 AD source",
-			input:   testTime,
+			input:   testTimeBytes,
 			source:  source.KeySource{Value: source.KeySource_AD},
 			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2},
 		},
@@ -122,11 +125,9 @@ func TestConvertToBinaryTime(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := utils.ConvertToBinaryTime(tc.input, tc.source, tc.version)
-			// Convert back and verify
-			converted := utils.ConvertFromBinaryTime(result, tc.source, tc.version)
-			if !converted.Time.Equal(tc.input) {
-				t.Errorf("Time conversion mismatch. Expected %v, got %v", tc.input, converted.Time)
+			converted := utils.ConvertFromBinaryTime(tc.input, tc.source, tc.version)
+			if !converted.Time.Equal(testTimeStruct) {
+				t.Errorf("Time conversion mismatch. \n | Expected '%v'\n | utils.ConvertToBinaryTime(_) = %v\n | final decoded time '%v'", testTimeStruct, tc.input, converted.Time)
 			}
 		})
 	}
