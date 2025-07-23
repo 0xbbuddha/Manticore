@@ -28,15 +28,15 @@ const (
 func (n NegState) String() string {
 	switch n {
 	case NegStateAcceptCompleted:
-		return "Accept Completed (1)"
+		return fmt.Sprintf("Accept Completed (%d)", n)
 	case NegStateAcceptIncomplete:
-		return "Accept Incomplete (2)"
+		return fmt.Sprintf("Accept Incomplete (%d)", n)
 	case NegStateReject:
-		return "Reject (3)"
+		return fmt.Sprintf("Reject (%d)", n)
 	case NegStateRequestMIC:
-		return "Request MIC (4)"
+		return fmt.Sprintf("Request MIC (%d)", n)
 	default:
-		return fmt.Sprintf("%d (?)", n)
+		return fmt.Sprintf("Unknown (%d)", n)
 	}
 }
 
@@ -55,10 +55,10 @@ func (n NegState) String() string {
 	}
 */
 type NegTokenResp struct {
-	NegState      NegState              `asn1:"explicit,optional,tag:0"`
-	SupportedMech asn1.ObjectIdentifier `asn1:"explicit,optional,tag:1"`
-	ResponseToken []byte                `asn1:"explicit,optional,tag:2,octet"`
-	MechListMIC   []byte                `asn1:"explicit,optional,tag:3,octet"`
+	NegState      NegState              `asn1:"optional,tag:0"`
+	SupportedMech asn1.ObjectIdentifier `asn1:"optional,tag:1"`
+	ResponseToken []byte                `asn1:"optional,tag:2,octet"`
+	MechListMIC   []byte                `asn1:"optional,tag:3,octet"`
 }
 
 // NewNegTokenResp creates a new NegTokenResp
@@ -109,12 +109,76 @@ func (n *NegTokenResp) Marshal() ([]byte, error) {
 //   - data: The bytes to unmarshal
 //
 // Returns:
+//   - int: The number of bytes read
 //   - error: An error if unmarshaling fails
 func (n *NegTokenResp) Unmarshal(data []byte) (int, error) {
-	rest, err := asn1.Unmarshal(data, n)
+	var outer asn1.RawValue
+	rest, err := asn1.Unmarshal(data, &outer)
 	if err != nil {
-		return 0, fmt.Errorf("failed to unmarshal NegTokenResp: %v", err)
+		return 0, fmt.Errorf("failed to unmarshal outer SEQUENCE: %v", err)
 	}
+	if outer.Class != asn1.ClassUniversal || outer.Tag != asn1.TagSequence {
+		return 0, fmt.Errorf("expected universal SEQUENCE, got class=%d tag=%d", outer.Class, outer.Tag)
+	}
+
+	inner := outer.Bytes
+	for len(inner) > 0 {
+		var field asn1.RawValue
+		innerRest, err := asn1.Unmarshal(inner, &field)
+		if err != nil {
+			return 0, fmt.Errorf("failed to unmarshal inner field: %v", err)
+		}
+
+		if field.Class == asn1.ClassContextSpecific {
+			switch field.Tag {
+			case 0:
+				// ENUMERATED inside EXPLICIT
+				var enumRaw asn1.RawValue
+				_, err := asn1.Unmarshal(field.Bytes, &enumRaw)
+				if err != nil {
+					return 0, fmt.Errorf("failed to decode negState: %v", err)
+				}
+				if enumRaw.Tag != asn1.TagEnum {
+					return 0, fmt.Errorf("negState is not an ENUMERATED type")
+				}
+				n.NegState = NegState(enumRaw.Bytes[0])
+			case 1:
+				// OBJECT IDENTIFIER inside EXPLICIT
+				var oidRaw asn1.RawValue
+				_, err := asn1.Unmarshal(field.Bytes, &oidRaw)
+				if err != nil {
+					return 0, fmt.Errorf("failed to decode supportedMech: %v", err)
+				}
+				var oid asn1.ObjectIdentifier
+				_, err = asn1.Unmarshal(field.Bytes, &oid)
+				if err != nil {
+					return 0, fmt.Errorf("failed to parse supportedMech OID: %v", err)
+				}
+				n.SupportedMech = oid
+			case 2:
+				// OCTET STRING inside EXPLICIT
+				var token []byte
+				_, err := asn1.Unmarshal(field.Bytes, &token)
+				if err != nil {
+					return 0, fmt.Errorf("failed to decode responseToken: %v", err)
+				}
+				n.ResponseToken = token
+			case 3:
+				// OCTET STRING inside EXPLICIT
+				var mic []byte
+				_, err := asn1.Unmarshal(field.Bytes, &mic)
+				if err != nil {
+					return 0, fmt.Errorf("failed to decode mechListMIC: %v", err)
+				}
+				n.MechListMIC = mic
+			default:
+				// unknown context-specific tag; skip
+			}
+		}
+
+		inner = innerRest
+	}
+
 	bytesRead := len(data) - len(rest)
 	return bytesRead, nil
 }

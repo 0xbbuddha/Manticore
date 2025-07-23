@@ -8,42 +8,67 @@ import (
 )
 
 func TestUnmarshalRealNegTokenResp(t *testing.T) {
-	// Test data from a real SPNEGO NegTokenResp message
-	blob, err := hex.DecodeString("3081e5a0030a0101a10c060a2b06010401823702020aa281cf0481cc4e544c4d5353500002000000180018003800000005828aa2cfa9315d6d0bc75200000000000000007c007c00500000000501280a0000000f5400480049004e004b005000410044002d00580036003100020018005400480049004e004b005000410044002d00580036003100010018005400480049004e004b005000410044002d00580036003100040018007400680069006e006b007000610064002d00780036003100030018007400680069006e006b007000610064002d00780036003100060004000100000000000000")
-	if err != nil {
-		t.Fatalf("Failed to decode test data: %v", err)
+	tests := []struct {
+		name        string
+		hexData     string
+		wantState   spnego.NegState
+		wantMech    []int
+		wantNTLMSSP bool
+		wantMIC     bool
+	}{
+		{
+			name:        "Real SPNEGO NegTokenResp with NTLM",
+			hexData:     "3081e5a0030a0101a10c060a2b06010401823702020aa281cf0481cc4e544c4d5353500002000000180018003800000005828aa2cfa9315d6d0bc75200000000000000007c007c00500000000501280a0000000f5400480049004e004b005000410044002d00580036003100020018005400480049004e004b005000410044002d00580036003100010018005400480049004e004b005000410044002d00580036003100040018007400680069006e006b007000610064002d00780036003100030018007400680069006e006b007000610064002d00780036003100060004000100000000000000",
+			wantState:   spnego.NegStateAcceptIncomplete,
+			wantMech:    []int{1, 3, 6, 1, 4, 1, 311, 2, 2, 10}, // NTLM OID
+			wantNTLMSSP: true,
+			wantMIC:     false,
+		},
 	}
 
-	var resp spnego.NegTokenResp
-	bytesRead, err := resp.Unmarshal(blob)
-	if err != nil {
-		t.Fatalf("Failed to unmarshal NegTokenResp: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			blob, err := hex.DecodeString(tt.hexData)
+			if err != nil {
+				t.Fatalf("Failed to decode test data: %v", err)
+			}
 
-	if bytesRead != len(blob) {
-		t.Errorf("Expected %d bytes read, got %d", len(blob), bytesRead)
-	}
+			var resp spnego.NegTokenResp
+			bytesRead, err := resp.Unmarshal(blob)
+			if err != nil {
+				t.Fatalf("Failed to unmarshal NegTokenResp: %v", err)
+			}
 
-	// Verify the NegState
-	if resp.NegState != spnego.NegStateAcceptCompleted {
-		t.Errorf("tag [0] Expected '%s', got '%s'", spnego.NegStateAcceptCompleted.String(), resp.NegState.String())
-	}
+			if bytesRead != len(blob) {
+				t.Errorf("Expected %d bytes read, got %d", len(blob), bytesRead)
+			}
 
-	// Verify the SupportedMech is NTLM
-	if !resp.SupportedMech.Equal(spnego.NtlmOID) {
-		t.Errorf("tag [1] Expected '%s', got '%s'", spnego.NtlmOID.String(), resp.SupportedMech.String())
-	}
+			if resp.NegState != tt.wantState {
+				t.Errorf("tag [0] Expected '%s', got '%s'", tt.wantState.String(), resp.NegState.String())
+			}
 
-	// Verify ResponseToken exists and starts with NTLMSSP signature
-	if len(resp.ResponseToken) == 0 {
-		t.Error("tag [2] ResponseToken is empty")
-	} else if string(resp.ResponseToken[:8]) != "NTLMSSP\x00" {
-		t.Errorf("tag [2] Expected NTLMSSP signature in ResponseToken, got %x", resp.ResponseToken[:8])
-	}
+			if tt.wantMech != nil {
+				if !resp.SupportedMech.Equal(tt.wantMech) {
+					t.Errorf("tag [1] Expected mech %v, got %v", tt.wantMech, resp.SupportedMech)
+				}
+			} else if resp.SupportedMech != nil {
+				t.Error("tag [1] Expected nil SupportedMech")
+			}
 
-	// Verify MechListMIC is not present (optional field)
-	if resp.MechListMIC != nil {
-		t.Error("tag [3] Expected MechListMIC to be nil")
+			if tt.wantNTLMSSP {
+				if len(resp.ResponseToken) == 0 {
+					t.Error("tag [2] ResponseToken is empty")
+				} else if string(resp.ResponseToken[:8]) != "NTLMSSP\x00" {
+					t.Errorf("tag [2] Expected NTLMSSP signature in ResponseToken, got %x", resp.ResponseToken[:8])
+				}
+			}
+
+			if tt.wantMIC && resp.MechListMIC == nil {
+				t.Error("tag [3] Expected MechListMIC to be present")
+			} else if !tt.wantMIC && resp.MechListMIC != nil {
+				t.Error("tag [3] Expected MechListMIC to be nil")
+			}
+		})
 	}
 }
 
