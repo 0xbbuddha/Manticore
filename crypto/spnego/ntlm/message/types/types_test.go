@@ -3,7 +3,7 @@ package types_test
 import (
 	"testing"
 
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/types"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/types"
 )
 
 func TestMessageTypeString(t *testing.T) {

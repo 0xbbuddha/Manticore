@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/negotiate"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/negotiate/flags"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/version"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/negotiate"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/negotiate/flags"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/version"
 )
 
 // CreateNegotiateToken creates the initial SPNEGO token with NTLM negotiate message

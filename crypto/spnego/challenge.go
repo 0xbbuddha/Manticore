@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/authenticate"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/challenge"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/authenticate"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/challenge"
 )
 
 // CreateAuthenticateTokenFromChallengeToken processes the server's challenge token and creates an authenticate token

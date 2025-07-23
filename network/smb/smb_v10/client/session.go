@@ -4,15 +4,15 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/TheManticoreProject/Manticore/crypto/spnego"
+	spnego_ntlm_negotiate_flags "github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/negotiate/flags"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/version"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/capabilities"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message/commands"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message/commands/codes"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message/header/flags"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message/header/flags2"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego"
-	negotiate_flags "github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/negotiate/flags"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/version"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/types"
 	"github.com/TheManticoreProject/Manticore/utils/encoding/utf16"
 	"github.com/TheManticoreProject/Manticore/windows/credentials"
@@ -114,18 +114,18 @@ func (s *Session) SessionSetup() error {
 				useUnicode,
 			)
 
-			negotiateFlags := negotiate_flags.NegotiateFlags(
-				negotiate_flags.NTLMSSP_NEGOTIATE_NTLM |
-					negotiate_flags.NTLMSSP_NEGOTIATE_ALWAYS_SIGN |
-					negotiate_flags.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY |
-					negotiate_flags.NTLMSSP_NEGOTIATE_128 |
-					negotiate_flags.NTLMSSP_NEGOTIATE_56 |
-					negotiate_flags.NTLMSSP_REQUEST_TARGET |
-					negotiate_flags.NTLMSSP_NEGOTIATE_TARGET_INFO |
-					negotiate_flags.NTLMSSP_NEGOTIATE_VERSION,
+			negotiateFlags := spnego_ntlm_negotiate_flags.NegotiateFlags(
+				spnego_ntlm_negotiate_flags.NTLMSSP_NEGOTIATE_NTLM |
+					spnego_ntlm_negotiate_flags.NTLMSSP_NEGOTIATE_ALWAYS_SIGN |
+					spnego_ntlm_negotiate_flags.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY |
+					spnego_ntlm_negotiate_flags.NTLMSSP_NEGOTIATE_128 |
+					spnego_ntlm_negotiate_flags.NTLMSSP_NEGOTIATE_56 |
+					spnego_ntlm_negotiate_flags.NTLMSSP_REQUEST_TARGET |
+					spnego_ntlm_negotiate_flags.NTLMSSP_NEGOTIATE_TARGET_INFO |
+					spnego_ntlm_negotiate_flags.NTLMSSP_NEGOTIATE_VERSION,
 			)
-			if useUnicode && !negotiateFlags.HasFlag(negotiate_flags.NTLMSSP_NEGOTIATE_UNICODE) {
-				negotiateFlags |= negotiate_flags.NTLMSSP_NEGOTIATE_UNICODE
+			if useUnicode && !negotiateFlags.HasFlag(spnego_ntlm_negotiate_flags.NTLMSSP_NEGOTIATE_UNICODE) {
+				negotiateFlags |= spnego_ntlm_negotiate_flags.NTLMSSP_NEGOTIATE_UNICODE
 			}
 
 			v := &version.Version{

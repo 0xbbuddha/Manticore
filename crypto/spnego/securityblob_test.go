@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego"
 )
 
 func TestUnmarshalSecurityBlob(t *testing.T) {

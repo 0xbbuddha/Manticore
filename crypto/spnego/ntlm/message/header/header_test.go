@@ -3,8 +3,8 @@ package header_test
 import (
 	"testing"
 
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/header"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/types"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/header"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/types"
 )
 
 func TestHeaderMarshalUnmarshal(t *testing.T) {

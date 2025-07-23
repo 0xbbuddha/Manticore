@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/version"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/version"
 )
 
 func TestDefaultVersion(t *testing.T) {

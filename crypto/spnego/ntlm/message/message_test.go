@@ -3,10 +3,10 @@ package message_test
 import (
 	"testing"
 
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/authenticate"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/challenge"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/negotiate"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/authenticate"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/challenge"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/negotiate"
 )
 
 func TestMessageInterface(t *testing.T) {

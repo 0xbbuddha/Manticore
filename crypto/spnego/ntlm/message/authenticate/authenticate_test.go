@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/authenticate"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/challenge"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/negotiate/flags"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/authenticate"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/challenge"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/negotiate/flags"
 )
 
 func TestMarshalUnmarshal(t *testing.T) {

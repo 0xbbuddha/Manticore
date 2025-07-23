@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/types"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/types"
 )
 
 // NTLM signature

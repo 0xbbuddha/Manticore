@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/avpair"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/avpair"
 )
 
 // ParseTargetInfo parses the target info from a challenge message

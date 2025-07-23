@@ -3,7 +3,7 @@ package avpair_test
 import (
 	"testing"
 
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/avpair"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/avpair"
 )
 
 func TestAvIdString(t *testing.T) {

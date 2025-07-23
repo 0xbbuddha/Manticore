@@ -8,12 +8,12 @@ import (
 
 	"github.com/TheManticoreProject/Manticore/crypto/ntlmv1"
 	"github.com/TheManticoreProject/Manticore/crypto/ntlmv2"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/datafields"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/challenge"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/header"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/negotiate/flags"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/types"
-	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/version"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/datafields"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/challenge"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/header"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/negotiate/flags"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/types"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/version"
 	"github.com/TheManticoreProject/Manticore/utils/encoding/utf16"
 )
 
