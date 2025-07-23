@@ -19,24 +19,31 @@ import (
 func (ctx *AuthContext) CreateNegotiateToken(negotiateFlags flags.NegotiateFlags, version *version.Version) ([]byte, error) {
 	switch ctx.Type {
 	case AuthTypeNTLM:
-		// Create NTLM NEGOTIATE message
-		ntlmNegotiate, err := negotiate.CreateNegotiateMessage(ctx.Domain, ctx.Workstation, negotiateFlags, version)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create NTLM NEGOTIATE message: %v", err)
-		}
-
-		ntlmNegotiateBytes, err := ntlmNegotiate.Marshal()
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal NTLM NEGOTIATE message: %v", err)
-		}
-
-		// Wrap in SPNEGO
-		return CreateNegTokenInit(ntlmNegotiateBytes)
-
+		return ctx.processNegotiateInnerTokenNTLM(negotiateFlags, version)
 	case AuthTypeKerberos:
-		return nil, errors.New("kerberos authentication is not yet implemented")
-
+		return ctx.processNegotiateInnerTokenKerberos(negotiateFlags, version)
 	default:
 		return nil, fmt.Errorf("unsupported authentication type: %v", ctx.Type)
 	}
+}
+
+func (ctx *AuthContext) processNegotiateInnerTokenNTLM(negotiateFlags flags.NegotiateFlags, version *version.Version) ([]byte, error) {
+	// Create NTLM NEGOTIATE message
+	ntlmNegotiate, err := negotiate.CreateNegotiateMessage(ctx.Domain, ctx.Workstation, negotiateFlags, version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create NTLM NEGOTIATE message: %v", err)
+	}
+
+	ntlmNegotiateBytes, err := ntlmNegotiate.Marshal()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal NTLM NEGOTIATE message: %v", err)
+	}
+
+	// Wrap in SPNEGO
+	return CreateNegTokenInit(ntlmNegotiateBytes)
+}
+
+func (ctx *AuthContext) processNegotiateInnerTokenKerberos(negotiateFlags flags.NegotiateFlags, version *version.Version) ([]byte, error) {
+	// TODO: Implement kerberos authentication
+	return nil, errors.New("kerberos authentication is not yet implemented")
 }

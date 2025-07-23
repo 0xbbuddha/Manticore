@@ -7,36 +7,6 @@ import (
 	"fmt"
 )
 
-// OIDs for various authentication mechanisms
-var (
-	// SPNEGO OID: 1.3.6.1.5.5.2
-	SpnegoOID = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 2}
-
-	// NTLM OID: 1.3.6.1.4.1.311.2.2.10
-	NtlmOID = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 311, 2, 2, 10}
-
-	// Kerberos OID: 1.2.840.113554.1.2.2
-	KerberosOID = asn1.ObjectIdentifier{1, 2, 840, 113554, 1, 2, 2}
-)
-
-// NegTokenInit is the initial SPNEGO token sent by the client
-// wrapped in a [0] EXPLICIT context tag.
-type NegTokenInit struct {
-	MechTypes    []asn1.ObjectIdentifier `asn1:"explicit,tag:0"`
-	ReqFlags     asn1.BitString          `asn1:"explicit,optional,tag:1"`
-	MechToken    []byte                  `asn1:"explicit,optional,tag:2"`
-	MechTokenMIC []byte                  `asn1:"explicit,optional,tag:3"`
-}
-
-// NegTokenResp is the response token sent by the server
-// wrapped in a [0] EXPLICIT context tag.
-type NegTokenResp struct {
-	NegState      asn1.Enumerated       `asn1:"explicit,optional,tag:0"`
-	SupportedMech asn1.ObjectIdentifier `asn1:"explicit,optional,tag:1"`
-	ResponseToken []byte                `asn1:"explicit,optional,tag:2"`
-	MechListMIC   []byte                `asn1:"explicit,optional,tag:3"`
-}
-
 // GSS API constants
 const (
 	GSS_API_SPNEGO = 0x60 // [APPLICATION 0]
@@ -90,79 +60,6 @@ func writeLength(buf *bytes.Buffer, length int) {
 	}
 	buf.WriteByte(0x80 | byte(len(lenBytes)))
 	buf.Write(lenBytes)
-}
-
-// CreateNegTokenInit creates an ASN.1 encoded SPNEGO NegTokenInit
-func CreateNegTokenInit(ntlmToken []byte) ([]byte, error) {
-	// Inner NegTokenInit sequence
-	token := NegTokenInit{
-		MechTypes: []asn1.ObjectIdentifier{NtlmOID},
-		MechToken: ntlmToken,
-	}
-
-	tknBytes, err := asn1.Marshal(token)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal NegTokenInit: %v", err)
-	}
-	// Wrap and return
-	return wrapSPNEGO(tknBytes)
-}
-
-// CreateNegTokenResp creates an ASN.1 encoded SPNEGO NegTokenResp
-func CreateNegTokenResp(state asn1.Enumerated, mech asn1.ObjectIdentifier, token []byte) ([]byte, error) {
-	resp := NegTokenResp{
-		NegState:      state,
-		SupportedMech: mech,
-		ResponseToken: token,
-	}
-
-	respBytes, err := asn1.Marshal(resp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal NegTokenResp: %v", err)
-	}
-	return wrapSPNEGO(respBytes)
-}
-
-// ParseNegTokenResp parses a server's NegTokenResp and returns the struct
-// This function is used to parse the server's NegTokenResp and extract the NTLM token
-// It is used to parse the server's NegTokenResp and extract the NTLM token
-func ParseNegTokenResp(data []byte) (*NegTokenResp, error) {
-	naked, err := stripGSSHeader(data)
-	if err != nil {
-		return nil, err
-	}
-
-	var oid asn1.ObjectIdentifier
-	rest, err := asn1.Unmarshal(naked, &oid)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal OID: %v", err)
-	}
-	if !oid.Equal(SpnegoOID) {
-		return nil, fmt.Errorf("unexpected SPNEGO OID: %v", oid)
-	}
-
-	var raw asn1.RawValue
-	rest, err = asn1.Unmarshal(rest, &raw)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal context tag: %v", err)
-	}
-	if raw.Class != asn1.ClassContextSpecific || raw.Tag != 0 || !raw.IsCompound {
-		return nil, errors.New("invalid SPNEGO context tag")
-	}
-
-	var inner asn1.RawValue
-	_, err = asn1.Unmarshal(raw.Bytes, &inner)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal inner SEQUENCE: %v", err)
-	}
-
-	var resp NegTokenResp
-	_, err = asn1.Unmarshal(inner.FullBytes, &resp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal NegTokenResp: %v", err)
-	}
-
-	return &resp, nil
 }
 
 // ExtractNTLMToken extracts the NTLM token from a SPNEGO token (init or resp)

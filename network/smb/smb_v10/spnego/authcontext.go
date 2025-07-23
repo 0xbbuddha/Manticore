@@ -1,0 +1,78 @@
+package spnego
+
+import (
+	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/spnego/ntlm/message/challenge"
+	"github.com/TheManticoreProject/Manticore/utils/encoding/utf16"
+)
+
+// AuthType represents the authentication type
+type AuthType int
+
+const (
+	AuthTypeNTLM AuthType = iota
+	AuthTypeKerberos
+)
+
+// AuthContext holds the state for an authentication session
+type AuthContext struct {
+	Type        AuthType
+	Domain      string
+	Username    string
+	Password    string
+	Workstation string
+	UseUnicode  bool
+
+	// NTLM specific fields
+	NTLMChallenge *challenge.ChallengeMessage
+}
+
+// NewAuthContext creates a new authentication context
+// Parameters:
+//   - authType: The type of authentication to use (NTLM or Kerberos)
+//   - domain: The domain name for authentication
+//   - username: The username to authenticate with
+//   - password: The password for authentication
+//   - workstation: The name of the client workstation
+//   - useUnicode: Whether to use Unicode encoding
+//
+// Returns:
+//   - *AuthContext: A new authentication context initialized with the provided parameters
+func NewAuthContext(authType AuthType, domain, username, password, workstation string, useUnicode bool) *AuthContext {
+	return &AuthContext{
+		Type:        authType,
+		Domain:      domain,
+		Username:    username,
+		Password:    password,
+		Workstation: workstation,
+		UseUnicode:  useUnicode,
+	}
+}
+
+// PrepareSessionSetupRequest prepares the SMB session setup request with SPNEGO token
+// Parameters:
+//   - token: The SPNEGO token bytes to prepare
+//   - useUnicode: Whether to encode the token in UTF-16LE
+//
+// Returns:
+//   - []byte: The prepared token, encoded in UTF-16LE if useUnicode is true
+func PrepareSessionSetupRequest(token []byte, useUnicode bool) []byte {
+	if useUnicode {
+		return utf16.EncodeUTF16LE(string(token))
+	} else {
+		return token
+	}
+}
+
+// GetAuthType returns the authentication type
+// Returns:
+//   - AuthType: The authentication type (NTLM or Kerberos) for this context
+func (ctx *AuthContext) GetAuthType() AuthType {
+	return ctx.Type
+}
+
+// SetAuthType sets the authentication type
+// Parameters:
+//   - authType: The authentication type (NTLM or Kerberos) to set
+func (ctx *AuthContext) SetAuthType(authType AuthType) {
+	ctx.Type = authType
+}

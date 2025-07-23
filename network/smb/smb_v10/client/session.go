@@ -39,7 +39,6 @@ func (s *Session) SessionSetup() error {
 	}
 
 	// Prepare and send a NTLMSSP NEGOTIATE message =============================================================================================
-
 	request_msg := message.NewMessage()
 	session_setup_cmd := commands.NewSessionSetupAndxRequest()
 
@@ -178,7 +177,7 @@ func (s *Session) SessionSetup() error {
 	}
 
 	// Wait for a NTLMSSP CHALLENGE response message =============================================================================================
-
+	fmt.Printf("session_setup step 1\n")
 	raw_response_message, err := s.Client.Transport.Receive()
 	if err != nil {
 		return fmt.Errorf("failed to receive response message: %v", err)
@@ -198,8 +197,10 @@ func (s *Session) SessionSetup() error {
 
 	fmt.Printf("session_setup_response_challenge->NativeOS: %s\n", string(session_setup_response_challenge.NativeOS))
 	fmt.Printf("session_setup_response_challenge->NativeLanMan: %s\n", string(session_setup_response_challenge.NativeLanMan))
+	fmt.Printf("session_setup_response_challenge->SecurityBlob: %s\n", hex.EncodeToString(session_setup_response_challenge.SecurityBlob))
 
 	// Prepare and send a NTLMSSP AUTH message ==================================================================================================
+	fmt.Printf("session_setup step 2\n")
 
 	useUnicode := s.Client.Connection.Server.Capabilities&capabilities.CAP_UNICODE == capabilities.CAP_UNICODE
 
@@ -212,9 +213,7 @@ func (s *Session) SessionSetup() error {
 		useUnicode,
 	)
 
-	fmt.Printf("session_setup_response_challenge.SecurityBlob: %s\n", hex.EncodeToString(session_setup_response_challenge.SecurityBlob))
-
-	authenticateToken, err := authCtx.ProcessChallengeToken(session_setup_response_challenge.SecurityBlob)
+	authenticateToken, err := authCtx.CreateAuthenticateTokenFromChallengeToken(session_setup_response_challenge.SecurityBlob)
 	if err != nil {
 		return fmt.Errorf("failed to process challenge token: %v", err)
 	}
