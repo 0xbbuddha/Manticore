@@ -13,7 +13,7 @@ type AvPair struct {
 	// MUST be a value from the following table. The corresponding Value
 	// field in this AV_PAIR MUST contain the information specified in the
 	// description of that AvId.
-	AvID uint16
+	AvID AvId
 
 	// AvLen (2 bytes): A 16-bit unsigned integer that defines the length,
 	// in bytes, of the Value field.
@@ -27,18 +27,13 @@ type AvPair struct {
 	AvData []byte
 }
 
-// String returns a string representation of the AV_PAIR.
-func (a *AvPair) String() string {
-	return fmt.Sprintf("AvId: %d, AvLen: %d, AvData: %v", a.AvID, a.AvLen, a.AvData)
-}
-
 // Marshal serializes the AV_PAIR to a byte slice.
 func (a *AvPair) Marshal() ([]byte, error) {
 	marshaledData := []byte{}
 
 	// AvId
 	buf2 := make([]byte, 2)
-	binary.LittleEndian.PutUint16(buf2, a.AvID)
+	binary.LittleEndian.PutUint16(buf2, uint16(a.AvID))
 	marshaledData = append(marshaledData, buf2...)
 
 	// AvLen
@@ -54,10 +49,14 @@ func (a *AvPair) Marshal() ([]byte, error) {
 
 // Unmarshal parses the AV_PAIR from a byte slice.
 func (a *AvPair) Unmarshal(marshaledData []byte) (int, error) {
+	if len(marshaledData) < 4 {
+		return 0, fmt.Errorf("data too short to unmarshal AV_PAIR, expected at least 4 bytes, got %d bytes", len(marshaledData))
+	}
+
 	buf := []byte{}
 
 	// AvId
-	a.AvID = binary.LittleEndian.Uint16(marshaledData[0:2])
+	a.AvID = AvId(binary.LittleEndian.Uint16(marshaledData[0:2]))
 
 	// AvLen
 	a.AvLen = binary.LittleEndian.Uint16(marshaledData[2:4])
@@ -66,4 +65,9 @@ func (a *AvPair) Unmarshal(marshaledData []byte) (int, error) {
 	a.AvData = marshaledData[4:]
 
 	return len(buf), nil
+}
+
+// String returns a string representation of the AV_PAIR.
+func (a *AvPair) String() string {
+	return fmt.Sprintf("AvId: %s, AvLen: %d, AvData: %v", a.AvID.String(), a.AvLen, a.AvData)
 }

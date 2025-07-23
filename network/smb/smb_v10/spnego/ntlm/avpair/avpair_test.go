@@ -14,19 +14,19 @@ func TestAvPairString(t *testing.T) {
 	}{
 		{
 			avpair: avpair.AvPair{
-				AvID:   0x0001,
+				AvID:   avpair.MsvAvNbComputerName,
 				AvLen:  4,
 				AvData: []byte{0x01, 0x02, 0x03, 0x04},
 			},
-			expected: "AvId: 1, AvLen: 4, AvData: [1 2 3 4]",
+			expected: "AvId: MsvAvNbComputerName, AvLen: 4, AvData: [1 2 3 4]",
 		},
 		{
 			avpair: avpair.AvPair{
-				AvID:   0x0002,
+				AvID:   avpair.MsvAvNbDomainName,
 				AvLen:  3,
 				AvData: []byte{0x05, 0x06, 0x07},
 			},
-			expected: "AvId: 2, AvLen: 3, AvData: [5 6 7]",
+			expected: "AvId: MsvAvNbDomainName, AvLen: 3, AvData: [5 6 7]",
 		},
 	}
 
@@ -44,7 +44,7 @@ func TestAvPairMarshal(t *testing.T) {
 	}{
 		{
 			avpair: avpair.AvPair{
-				AvID:   0x0001,
+				AvID:   avpair.MsvAvNbComputerName,
 				AvLen:  4,
 				AvData: []byte{0x01, 0x02, 0x03, 0x04},
 			},
@@ -52,7 +52,7 @@ func TestAvPairMarshal(t *testing.T) {
 		},
 		{
 			avpair: avpair.AvPair{
-				AvID:   0x0002,
+				AvID:   avpair.MsvAvNbDomainName,
 				AvLen:  3,
 				AvData: []byte{0x05, 0x06, 0x07},
 			},
@@ -75,19 +75,19 @@ func TestAvPairMarshal(t *testing.T) {
 func TestAvPairUnmarshal(t *testing.T) {
 	tests := []struct {
 		data           []byte
-		expectedAvID   uint16
+		expectedAvID   avpair.AvId
 		expectedAvLen  uint16
 		expectedAvData []byte
 	}{
 		{
 			data:           []byte{0x01, 0x00, 0x04, 0x00, 0x01, 0x02, 0x03, 0x04},
-			expectedAvID:   0x0001,
+			expectedAvID:   avpair.MsvAvNbComputerName,
 			expectedAvLen:  4,
 			expectedAvData: []byte{0x01, 0x02, 0x03, 0x04},
 		},
 		{
 			data:           []byte{0x02, 0x00, 0x03, 0x00, 0x05, 0x06, 0x07},
-			expectedAvID:   0x0002,
+			expectedAvID:   avpair.MsvAvNbDomainName,
 			expectedAvLen:  3,
 			expectedAvData: []byte{0x05, 0x06, 0x07},
 		},
@@ -111,5 +111,39 @@ func TestAvPairUnmarshal(t *testing.T) {
 		if !bytes.Equal(av.AvData, test.expectedAvData) {
 			t.Errorf("Expected AvData to be %v, got %v", test.expectedAvData, av.AvData)
 		}
+	}
+}
+
+func TestAvPairUnmarshalTooShort(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+	}{
+		{
+			name: "empty data",
+			data: []byte{},
+		},
+		{
+			name: "1 byte",
+			data: []byte{0x01},
+		},
+		{
+			name: "2 bytes",
+			data: []byte{0x01, 0x00},
+		},
+		{
+			name: "3 bytes",
+			data: []byte{0x01, 0x00, 0x04},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			av := avpair.AvPair{}
+			_, err := av.Unmarshal(test.data)
+			if err == nil {
+				t.Error("Expected error for too short data but got nil")
+			}
+		})
 	}
 }
