@@ -1,5 +1,7 @@
 package avpair
 
+import "fmt"
+
 type AvId uint16
 
 // AV_PAIR types used in NTLM authentication
@@ -54,3 +56,38 @@ const (
 	// An all-zero value of the hash is used to indicate absence of channel bindings.
 	MsvAvChannelBindings AvId = 0x000A
 )
+
+// Compare returns true if the two AvIds are equal.
+func (id AvId) Compare(other AvId) bool {
+	return id == other
+}
+
+// String returns a human-readable name for a given AV ID.
+func (id AvId) String() string {
+	switch id {
+	case MsvAvEOL:
+		return "MsvAvEOL"
+	case MsvAvNbComputerName:
+		return "MsvAvNbComputerName"
+	case MsvAvNbDomainName:
+		return "MsvAvNbDomainName"
+	case MsvAvDnsComputerName:
+		return "MsvAvDnsComputerName"
+	case MsvAvDnsDomainName:
+		return "MsvAvDnsDomainName"
+	case MsvAvDnsTreeName:
+		return "MsvAvDnsTreeName"
+	case MsvAvFlags:
+		return "MsvAvFlags"
+	case MsvAvTimestamp:
+		return "MsvAvTimestamp"
+	case MsvAvSingleHost:
+		return "MsvAvSingleHost"
+	case MsvAvTargetName:
+		return "MsvAvTargetName"
+	case MsvAvChannelBindings:
+		return "MsvAvChannelBindings"
+	default:
+		return fmt.Sprintf("Unknown(0x%04x)", uint16(id))
+	}
+}
