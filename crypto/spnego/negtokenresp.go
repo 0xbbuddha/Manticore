@@ -97,11 +97,86 @@ func (n *NegTokenResp) SetMechTokenNTLM(responseToken []byte) {
 //   - []byte: The marshaled bytes
 //   - error: An error if marshaling fails
 func (n *NegTokenResp) Marshal() ([]byte, error) {
-	marshalledData, err := asn1.Marshal(*n)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal NegTokenResp: %v", err)
+	var seq []asn1.RawValue
+
+	// [0] EXPLICIT ENUMERATED
+	{
+		enumBytes, err := asn1.Marshal(asn1.Enumerated(n.NegState))
+		if err != nil {
+			return nil, fmt.Errorf("marshal negState: %v", err)
+		}
+		seq = append(seq, asn1.RawValue{
+			Class:      asn1.ClassContextSpecific,
+			Tag:        0,
+			IsCompound: true,
+			Bytes:      enumBytes,
+		})
 	}
-	return marshalledData, nil
+
+	// [1] EXPLICIT OBJECT IDENTIFIER
+	if len(n.SupportedMech) > 0 {
+		oidBytes, err := asn1.Marshal(n.SupportedMech)
+		if err != nil {
+			return nil, fmt.Errorf("marshal SupportedMech: %v", err)
+		}
+		seq = append(seq, asn1.RawValue{
+			Class:      asn1.ClassContextSpecific,
+			Tag:        1,
+			IsCompound: true,
+			Bytes:      oidBytes,
+		})
+	}
+
+	// [2] EXPLICIT OCTET STRING
+	if len(n.ResponseToken) > 0 {
+		tokenBytes, err := asn1.Marshal(n.ResponseToken)
+		if err != nil {
+			return nil, fmt.Errorf("marshal ResponseToken: %v", err)
+		}
+		seq = append(seq, asn1.RawValue{
+			Class:      asn1.ClassContextSpecific,
+			Tag:        2,
+			IsCompound: true,
+			Bytes:      tokenBytes,
+		})
+	}
+
+	// [3] EXPLICIT OCTET STRING (optional)
+	if len(n.MechListMIC) > 0 {
+		micBytes, err := asn1.Marshal(n.MechListMIC)
+		if err != nil {
+			return nil, fmt.Errorf("marshal MechListMIC: %v", err)
+		}
+		seq = append(seq, asn1.RawValue{
+			Class:      asn1.ClassContextSpecific,
+			Tag:        3,
+			IsCompound: true,
+			Bytes:      micBytes,
+		})
+	}
+
+	// Marshal the whole SEQUENCE
+	var seqBytes []byte
+	for _, field := range seq {
+		b, err := asn1.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("marshal field with tag [%d]: %v", field.Tag, err)
+		}
+		seqBytes = append(seqBytes, b...)
+	}
+
+	// Wrap as SEQUENCE
+	final, err := asn1.Marshal(asn1.RawValue{
+		Class:      asn1.ClassUniversal,
+		Tag:        asn1.TagSequence,
+		IsCompound: true,
+		Bytes:      seqBytes,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal final SEQUENCE: %v", err)
+	}
+
+	return final, nil
 }
 
 // Unmarshal unmarshals the NegTokenResp from a byte slice
