@@ -28,3 +28,9 @@ func NTHashHex(password string) string {
 	ntHash := NTHash(password)
 	return strings.ToLower(hex.EncodeToString(ntHash[:]))
 }
+
+// NTOWFv1, this is the same as NTHash
+// Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-nlmp/464551a8-9fc4-428e-b3d3-bc5bfb2e73a5
+func NTOWFv1(Passwd, User, UserDom string) [16]byte {
+	return NTHash(Passwd)
+}

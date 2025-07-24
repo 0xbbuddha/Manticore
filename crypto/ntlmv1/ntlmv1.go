@@ -3,27 +3,38 @@ package ntlmv1
 import (
 	"bytes"
 	"crypto/des"
-	"encoding/hex"
 	"fmt"
-	"strings"
 
 	"github.com/TheManticoreProject/Manticore/crypto/lm"
 	"github.com/TheManticoreProject/Manticore/crypto/nt"
 )
 
-// NTLMv1 represents the components needed for NTLMv1 authentication
+// NTLMv1Ctx represents the components needed for NTLMv1 authentication.
 // Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-nlmp/464551a8-9fc4-428e-b3d3-bc5bfb2e73a5
-type NTLMv1 struct {
-	Username        string
-	Password        string
-	Domain          string
-	ServerChallenge []byte
-	NTHash          []byte
-	LMHash          []byte
+type NTLMv1Ctx struct {
+	Username string // Username for authentication
+	Password string // Password for authentication
+	Domain   string // Domain name
+
+	NTHash []byte // NT hash of the password
+	LMHash []byte // LM hash of the password
+
+	ServerChallenge []byte // 8-byte challenge from server
 }
 
-// NewNTLMv1WithPassword creates a new NTLMv1 instance with the provided credentials and challenge
-func NewNTLMv1WithPassword(domain, username, password string, serverChallenge []byte) (*NTLMv1, error) {
+// NewNTLMv1CtxWithPassword creates a new NTLMv1 instance with the provided credentials and challenge.
+// It calculates both the NT and LM hashes from the provided password.
+//
+// Parameters:
+//   - domain: The domain name
+//   - username: The username
+//   - password: The plaintext password
+//   - serverChallenge: 8-byte challenge from the server
+//
+// Returns:
+//   - *NTLMv1Ctx: The initialized NTLMv1 context
+//   - error: If server challenge is not 8 bytes
+func NewNTLMv1CtxWithPassword(domain, username, password string, serverChallenge []byte) (*NTLMv1Ctx, error) {
 	if len(serverChallenge) != 8 {
 		return nil, fmt.Errorf("server challenge must be 8 bytes")
 	}
@@ -31,45 +42,71 @@ func NewNTLMv1WithPassword(domain, username, password string, serverChallenge []
 	ntHash := nt.NTHash(password)
 	lmHash := lm.LMHash(password)
 
-	ntlm := &NTLMv1{
-		Domain:          domain,
-		Username:        username,
-		Password:        password,
+	ntlm := &NTLMv1Ctx{
+		Domain:   domain,
+		Username: username,
+		Password: password,
+
 		ServerChallenge: serverChallenge,
-		NTHash:          ntHash[:],
-		LMHash:          lmHash[:],
+
+		NTHash: ntHash[:],
+		LMHash: lmHash[:],
 	}
 
 	return ntlm, nil
 }
 
-// NewNTLMv1WithNTHash creates a new NTLMv1 instance with the provided credentials and challenge
-func NewNTLMv1WithNTHash(domain, username string, nthash []byte, serverChallenge []byte) (*NTLMv1, error) {
+// NewNTLMv1CtxWithNTHash creates a new NTLMv1 instance using a pre-computed NT hash.
+// The LM hash will be computed from an empty password.
+//
+// Parameters:
+//   - domain: The domain name
+//   - username: The username
+//   - nthash: The pre-computed NT hash
+//   - serverChallenge: 8-byte challenge from the server
+//
+// Returns:
+//   - *NTLMv1Ctx: The initialized NTLMv1 context
+//   - error: If server challenge is not 8 bytes
+func NewNTLMv1CtxWithNTHash(domain, username string, nthash []byte, serverChallenge []byte) (*NTLMv1Ctx, error) {
 	if len(serverChallenge) != 8 {
 		return nil, fmt.Errorf("server challenge must be 8 bytes")
 	}
 
-	ntlm := &NTLMv1{
-		Domain:          domain,
-		Username:        username,
-		Password:        "",
+	ntlm := &NTLMv1Ctx{
+		Domain:   domain,
+		Username: username,
+		Password: "",
+
 		ServerChallenge: serverChallenge,
-		NTHash:          nthash,
-		LMHash:          lm.LMHash(""),
+
+		NTHash: nthash,
+		LMHash: lm.LMHash(""),
 	}
 
 	return ntlm, nil
 }
 
-// NewNTLMv1WithNTHash creates a new NTLMv1 instance with the provided credentials and challenge
-func NewNTLMv1WithLMHash(domain, username string, lmhash []byte, serverChallenge []byte) (*NTLMv1, error) {
+// NewNTLMv1CtxWithLMHash creates a new NTLMv1 instance using a pre-computed LM hash.
+// The NT hash will be computed from an empty password.
+//
+// Parameters:
+//   - domain: The domain name
+//   - username: The username
+//   - lmhash: The pre-computed LM hash
+//   - serverChallenge: 8-byte challenge from the server
+//
+// Returns:
+//   - *NTLMv1Ctx: The initialized NTLMv1 context
+//   - error: If server challenge is not 8 bytes
+func NewNTLMv1CtxWithLMHash(domain, username string, lmhash []byte, serverChallenge []byte) (*NTLMv1Ctx, error) {
 	if len(serverChallenge) != 8 {
 		return nil, fmt.Errorf("server challenge must be 8 bytes")
 	}
 
 	ntHash := nt.NTHash("")
 
-	ntlm := &NTLMv1{
+	ntlm := &NTLMv1Ctx{
 		Domain:          domain,
 		Username:        username,
 		Password:        "",
@@ -81,13 +118,24 @@ func NewNTLMv1WithLMHash(domain, username string, lmhash []byte, serverChallenge
 	return ntlm, nil
 }
 
-// NewNTLMv1WithNTHash creates a new NTLMv1 instance with the provided credentials and challenge
-func NewNTLMv1WithHashes(domain, username string, lmhash []byte, nthash []byte, serverChallenge []byte) (*NTLMv1, error) {
+// NewNTLMv1CtxWithHashes creates a new NTLMv1 instance using pre-computed NT and LM hashes.
+//
+// Parameters:
+//   - domain: The domain name
+//   - username: The username
+//   - lmhash: The pre-computed LM hash
+//   - nthash: The pre-computed NT hash
+//   - serverChallenge: 8-byte challenge from the server
+//
+// Returns:
+//   - *NTLMv1Ctx: The initialized NTLMv1 context
+//   - error: If server challenge is not 8 bytes
+func NewNTLMv1CtxWithHashes(domain, username string, lmhash []byte, nthash []byte, serverChallenge []byte) (*NTLMv1Ctx, error) {
 	if len(serverChallenge) != 8 {
 		return nil, fmt.Errorf("server challenge must be 8 bytes")
 	}
 
-	ntlm := &NTLMv1{
+	ntlm := &NTLMv1Ctx{
 		Domain:          domain,
 		Username:        username,
 		Password:        "",
@@ -99,12 +147,16 @@ func NewNTLMv1WithHashes(domain, username string, lmhash []byte, nthash []byte, 
 	return ntlm, nil
 }
 
-// NTLMv1Hash calculates the NTLMv1 hash
+// Hash calculates the NTLMv1 response using the NT hash.
+//
+// The NT hash is split into three 7-byte keys. Each key is adjusted for DES parity
+// and used to encrypt the server challenge. The results are concatenated to form
+// the final 24-byte response.
 //
 // Returns:
-//   - The NTLMv1 hash as a byte slice
-//   - An error if the NTHash or Password is not set
-func (h *NTLMv1) Hash() ([]byte, error) {
+//   - []byte: The 24-byte NTLMv1 response
+//   - error: If NT hash calculation fails or if neither NTHash nor Password is set
+func (h *NTLMv1Ctx) Hash() ([]byte, error) {
 	// Start with the NT hash of the password
 	if len(h.NTHash) == 0 && len(h.Password) == 0 {
 		return nil, fmt.Errorf("NTHash and Password are not set")
@@ -170,77 +222,23 @@ func (h *NTLMv1) Hash() ([]byte, error) {
 
 }
 
-// String returns the NTLMv1 hash as a hexadecimal string
-//
-// Returns:
-//   - The NTLMv1 hash as an uppercase hexadecimal string
-func (h *NTLMv1) String() string {
-	hash, err := h.Hash()
-	if err != nil {
-		return ""
-	}
-	return strings.ToUpper(hex.EncodeToString(hash))
-}
-
-// ParityBit calculates the parity bit for a given integer.
-// It returns 1 if the number of set bits (1s) in the binary representation
-// of the input is even, and 0 if the number is odd.
-// This is used in DES key generation to ensure each byte has odd parity.
-func ParityBit(n int) int {
-	parity := 1
-	for n != 0 {
-		if (n & 1) == 1 {
-			parity ^= 1
-		}
-		n >>= 1
-	}
-	return parity
-}
-
-// ParityAdjust takes a byte slice as input and adjusts it for DES key parity.
-// For each 7 bits of the input, it adds a parity bit as the 8th bit to ensure
-// odd parity (each byte has an odd number of 1 bits).
-// This is required for DES key generation in NTLM authentication.
-//
-// The function processes the input in 7-bit chunks, adding a parity bit to each chunk
-// to form 8-bit bytes in the output. If the input length is not a multiple of 7 bits,
-// it pads with zeros.
-//
-// Returns the parity-adjusted byte slice and any error encountered during processing.
-func ParityAdjust(key []byte) ([]byte, error) {
-	// Get a stream of bits from the key
-	keyBits := []byte{}
-	for _, b := range key {
-		for i := 7; i >= 0; i-- {
-			keyBits = append(keyBits, (b>>i)&1)
-		}
-	}
-	keyBits = keyBits[:len(keyBits)-len(keyBits)%7]
-
-	// Adjust the key for parity
-	parityAdjustedKey := []byte{}
-	for i := 0; i < len(keyBits); i += 7 {
-		parityAdjustedByte := byte(0)
-		for offset, bit := range keyBits[i : i+7] {
-			if bit == 1 {
-				parityAdjustedByte |= (1 << (7 - offset))
-			}
-		}
-		parityAdjustedByte = parityAdjustedByte | byte(ParityBit(int(parityAdjustedByte)))
-		parityAdjustedKey = append(parityAdjustedKey, parityAdjustedByte)
-	}
-
-	return parityAdjustedKey, nil
-}
-
-// NTResponse calculates the NT response for NTLMv1 authentication
+// NTResponse calculates the NT response for NTLMv1 authentication.
 //
 // The NT response is calculated by encrypting the server challenge with the NT hash
 // using DES encryption. The NT hash is split into three 7-byte keys, each adjusted
 // for DES parity, and each key is used to encrypt the challenge.
 //
-// Returns the 24-byte NT response or an error if the encryption fails.
-func (n *NTLMv1) NTResponse() ([]byte, error) {
+// The process:
+// 1. Split the NT hash into three 7-byte keys (padding the last key with zeros)
+// 2. Adjust each key for DES parity
+// 3. Create DES ciphers with each key
+// 4. Encrypt the server challenge with each cipher
+// 5. Concatenate the results
+//
+// Returns:
+//   - []byte: The 24-byte NT response
+//   - error: If key adjustment or encryption fails
+func (n *NTLMv1Ctx) NTResponse() ([]byte, error) {
 	// Split the NT hash into three 7-byte keys
 	key1 := n.NTHash[:7]
 	key2 := n.NTHash[7:14]
@@ -291,15 +289,23 @@ func (n *NTLMv1) NTResponse() ([]byte, error) {
 	return ntResponse, nil
 }
 
-// LMResponse calculates the LM response for NTLMv1 authentication
+// LMResponse calculates the LM response for NTLMv1 authentication.
 //
-// The LM response is calculated by first creating the LM hash from the password,
-// then encrypting the server challenge with the LM hash using DES encryption.
-// The LM hash is split into three 7-byte keys, each adjusted for DES parity,
-// and each key is used to encrypt the challenge.
+// The LM response is calculated by encrypting the server challenge with the LM hash
+// using DES encryption. The LM hash is split into three 7-byte keys, each adjusted
+// for DES parity, and each key is used to encrypt the challenge.
 //
-// Returns the 24-byte LM response or an error if the encryption fails.
-func (n *NTLMv1) LMResponse() ([]byte, error) {
+// The process:
+// 1. Split the LM hash into three 7-byte keys (padding the last key with zeros)
+// 2. Adjust each key for DES parity
+// 3. Create DES ciphers with each key
+// 4. Encrypt the server challenge with each cipher
+// 5. Concatenate the results
+//
+// Returns:
+//   - []byte: The 24-byte LM response
+//   - error: If key adjustment or encryption fails
+func (n *NTLMv1Ctx) LMResponse() ([]byte, error) {
 	// Create the LM hash
 	lmHash := lm.LMHash(n.Password)
 

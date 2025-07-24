@@ -119,17 +119,17 @@ func CreateAuthenticateMessage(challenge *challenge.ChallengeMessage, username, 
 		}
 	} else {
 		// Use NTLMv1
-		ntlmv1, err := ntlmv1.NewNTLMv1WithPassword(domain, username, password, challenge.ServerChallenge[:])
+		ntlmv1Ctx, err := ntlmv1.NewNTLMv1CtxWithPassword(domain, username, password, challenge.ServerChallenge[:])
 		if err != nil {
 			return nil, err
 		}
 
-		msg.LmChallengeResponse, err = ntlmv1.LMResponse()
+		msg.LmChallengeResponse, err = ntlmv1Ctx.LMResponse()
 		if err != nil {
 			return nil, err
 		}
 
-		msg.NtChallengeResponse, err = ntlmv1.NTResponse()
+		msg.NtChallengeResponse, err = ntlmv1Ctx.NTResponse()
 		if err != nil {
 			return nil, err
 		}

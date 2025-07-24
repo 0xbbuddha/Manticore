@@ -78,3 +78,9 @@ func LMHash(password string) []byte {
 func LMHashToHex(password string) string {
 	return strings.ToLower(hex.EncodeToString(LMHash(password)))
 }
+
+// LMOWFv1, this is the same as LMHash
+// Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-nlmp/464551a8-9fc4-428e-b3d3-bc5bfb2e73a5
+func LMOWFv1(Passwd, User, UserDom string) []byte {
+	return LMHash(Passwd)
+}
