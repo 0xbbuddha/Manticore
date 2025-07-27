@@ -31,7 +31,7 @@ type TreeConnectAndxResponse struct {
 	// The Service field MUST be encoded as a null-terminated array of OEM characters, even
 	// if the client and server have negotiated to use Unicode strings. The valid values for
 	// this field are as follows.
-	Service types.OEM_STRING
+	Service []types.UCHAR
 
 	// NativeFileSystem (variable): The name of the file system on the local resource to
 	// which the returned TID is connected. If SMB_FLAGS2_UNICODE is set in the Flags2 field
@@ -39,7 +39,7 @@ type TreeConnectAndxResponse struct {
 	// characters. Otherwise, this field MUST be a null-terminated string of OEM characters.
 	// For resources that are not backed by a file system, such as the IPC$ share used for
 	// named pipes, this field MUST be set to the empty string.
-	NativeFileSystem types.SMB_STRING
+	NativeFileSystem []types.UCHAR
 }
 
 // NewTreeConnectAndxResponse creates a new TreeConnectAndxResponse structure
@@ -52,8 +52,8 @@ func NewTreeConnectAndxResponse() *TreeConnectAndxResponse {
 		OptionalSupport: types.USHORT(0),
 
 		// Data
-		Service:          types.OEM_STRING{},
-		NativeFileSystem: types.SMB_STRING{},
+		Service:          []types.UCHAR{},
+		NativeFileSystem: []types.UCHAR{},
 	}
 
 	c.Command.SetCommandCode(codes.SMB_COM_TREE_CONNECT_ANDX)
@@ -101,18 +101,10 @@ func (c *TreeConnectAndxResponse) Marshal() ([]byte, error) {
 	rawDataContent := []byte{}
 
 	// Marshalling data Service
-	bytesStream, err := c.Service.Marshal()
-	if err != nil {
-		return nil, err
-	}
-	rawDataContent = append(rawDataContent, bytesStream...)
+	rawDataContent = append(rawDataContent, c.Service...)
 
 	// Marshalling data NativeFileSystem
-	bytesStream, err = c.NativeFileSystem.Marshal()
-	if err != nil {
-		return nil, err
-	}
-	rawDataContent = append(rawDataContent, bytesStream...)
+	rawDataContent = append(rawDataContent, c.NativeFileSystem...)
 
 	// Then marshal the parameters
 	rawParametersContent := []byte{}
@@ -186,18 +178,12 @@ func (c *TreeConnectAndxResponse) Unmarshal(data []byte) (int, error) {
 	offset = 0
 
 	// Unmarshalling data Service
-	bytesRead, err = c.Service.Unmarshal(rawDataContent[offset:])
-	if err != nil {
-		return offset, err
-	}
-	offset += bytesRead
+	c.Service = rawDataContent[offset:]
+	offset += len(c.Service)
 
 	// Unmarshalling data NativeFileSystem
-	bytesRead, err = c.NativeFileSystem.Unmarshal(rawDataContent[offset:])
-	if err != nil {
-		return offset, err
-	}
-	offset += bytesRead
+	c.NativeFileSystem = rawDataContent[offset:]
+	offset += len(c.NativeFileSystem)
 
 	return offset, nil
 }

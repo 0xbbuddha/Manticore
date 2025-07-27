@@ -1,7 +1,6 @@
 package client
 
 import (
-	"encoding/hex"
 	"fmt"
 
 	"github.com/TheManticoreProject/Manticore/crypto/spnego"
@@ -39,29 +38,29 @@ func (s *Session) SessionSetup() error {
 	}
 
 	// Prepare and send a NTLMSSP NEGOTIATE message =============================================================================================
-	request_msg := message.NewMessage()
+	request_step1_msg := message.NewMessage()
 	session_setup_cmd := commands.NewSessionSetupAndxRequest()
 
 	// Here put the common logic for all session setup commands
-	request_msg.Header.Command = codes.SMB_COM_SESSION_SETUP_ANDX
-	request_msg.Header.Flags = flags.Flags(flags.FLAGS_CANONICALIZED_PATHS | flags.FLAGS_CASE_INSENSITIVE)
-	request_msg.Header.Flags2 = flags2.Flags2(flags2.FLAGS2_NT_STATUS_ERROR_CODES | flags2.FLAGS2_LONG_NAMES_ALLOWED | flags2.FLAGS2_EXTENDED_SECURITY)
+	request_step1_msg.Header.Command = codes.SMB_COM_SESSION_SETUP_ANDX
+	request_step1_msg.Header.Flags = flags.Flags(flags.FLAGS_CANONICALIZED_PATHS | flags.FLAGS_CASE_INSENSITIVE)
+	request_step1_msg.Header.Flags2 = flags2.Flags2(flags2.FLAGS2_NT_STATUS_ERROR_CODES | flags2.FLAGS2_LONG_NAMES_ALLOWED | flags2.FLAGS2_EXTENDED_SECURITY)
 
 	// Add Unicode support if server supports it
 	if s.Client.Connection.Server.Capabilities&capabilities.CAP_UNICODE == capabilities.CAP_UNICODE {
-		request_msg.Header.Flags2 |= flags2.Flags2(flags2.FLAGS2_UNICODE)
+		request_step1_msg.Header.Flags2 |= flags2.Flags2(flags2.FLAGS2_UNICODE)
 	}
 
 	// Set message signing flags based on server security mode
 	if s.Client.Connection.Server.SecurityMode.IsSecuritySignatureEnabled() {
-		request_msg.Header.Flags2 |= flags2.Flags2(flags2.FLAGS2_SECURITY_SIGNATURE)
+		request_step1_msg.Header.Flags2 |= flags2.Flags2(flags2.FLAGS2_SECURITY_SIGNATURE)
 	}
 
 	// Set process ID and multiplex ID
-	request_msg.Header.SetPID(0)
-	request_msg.Header.MID = 0
-	request_msg.Header.TID = 65535
-	request_msg.Header.UID = 0
+	request_step1_msg.Header.SetPID(0)
+	request_step1_msg.Header.MID = 0
+	request_step1_msg.Header.TID = 65535
+	request_step1_msg.Header.UID = 0
 
 	session_setup_cmd.MaxBufferSize = types.USHORT(s.Client.Connection.Server.MaxBufferSize)
 	session_setup_cmd.MaxMpxCount = s.Client.Connection.MaxMpxCount
@@ -117,7 +116,7 @@ func (s *Session) SessionSetup() error {
 			negotiateFlags := spnego_ntlm_negotiate_flags.NegotiateFlags(
 				spnego_ntlm_negotiate_flags.NTLMSSP_NEGOTIATE_NTLM |
 					spnego_ntlm_negotiate_flags.NTLMSSP_NEGOTIATE_ALWAYS_SIGN |
-					spnego_ntlm_negotiate_flags.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY |
+					// spnego_ntlm_negotiate_flags.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY |
 					spnego_ntlm_negotiate_flags.NTLMSSP_NEGOTIATE_128 |
 					spnego_ntlm_negotiate_flags.NTLMSSP_NEGOTIATE_56 |
 					spnego_ntlm_negotiate_flags.NTLMSSP_REQUEST_TARGET |
@@ -163,9 +162,9 @@ func (s *Session) SessionSetup() error {
 			}
 		}
 	}
-	request_msg.AddCommand(session_setup_cmd)
+	request_step1_msg.AddCommand(session_setup_cmd)
 
-	marshalled_message, err := request_msg.Marshal()
+	marshalled_message, err := request_step1_msg.Marshal()
 	if err != nil {
 		return fmt.Errorf("failed to marshal negotiate message: %v", err)
 	}
@@ -177,7 +176,7 @@ func (s *Session) SessionSetup() error {
 	}
 
 	// Wait for a NTLMSSP CHALLENGE response message =============================================================================================
-	fmt.Printf("session_setup step 1\n")
+
 	raw_response_message, err := s.Client.Transport.Receive()
 	if err != nil {
 		return fmt.Errorf("failed to receive response message: %v", err)
@@ -195,12 +194,10 @@ func (s *Session) SessionSetup() error {
 
 	session_setup_response_challenge := response_msg.Command.(*commands.SessionSetupAndxResponse)
 
-	fmt.Printf("session_setup_response_challenge->NativeOS: %s\n", string(session_setup_response_challenge.NativeOS))
-	fmt.Printf("session_setup_response_challenge->NativeLanMan: %s\n", string(session_setup_response_challenge.NativeLanMan))
-	fmt.Printf("session_setup_response_challenge->SecurityBlob: %s\n", hex.EncodeToString(session_setup_response_challenge.SecurityBlob))
-
 	// Prepare and send a NTLMSSP AUTH message ==================================================================================================
-	fmt.Printf("session_setup step 2\n")
+
+	// Server supports challenge/response authentication
+	// Determine authentication type based on policies
 
 	useUnicode := s.Client.Connection.Server.Capabilities&capabilities.CAP_UNICODE == capabilities.CAP_UNICODE
 
@@ -213,12 +210,68 @@ func (s *Session) SessionSetup() error {
 		useUnicode,
 	)
 
+	request_step2_msg := message.NewMessage()
+	request_step2_msg.Header.Command = codes.SMB_COM_SESSION_SETUP_ANDX
+	request_step2_msg.Header.Flags = request_step1_msg.Header.Flags
+	request_step2_msg.Header.Flags2 = request_step1_msg.Header.Flags2
+	request_step2_msg.Header.SetPID(request_step1_msg.Header.GetPID())
+	request_step2_msg.Header.MID = request_step1_msg.Header.MID
+	request_step2_msg.Header.TID = request_step1_msg.Header.TID
+	// Here we need to set the UID to the UID of the response message
+	request_step2_msg.Header.UID = response_msg.Header.UID
+	// Save the session UID
+	s.SessionUID = request_step2_msg.Header.UID
+
+	session_setup_step2_cmd := commands.NewSessionSetupAndxRequest()
+	session_setup_step2_cmd.VcNumber = session_setup_cmd.VcNumber
+	session_setup_step2_cmd.SessionKey = session_setup_cmd.SessionKey
+	session_setup_step2_cmd.Capabilities = session_setup_cmd.Capabilities
+
 	authenticateToken, err := authCtx.CreateAuthenticateTokenFromChallengeToken(session_setup_response_challenge.SecurityBlob)
 	if err != nil {
 		return fmt.Errorf("failed to process challenge token: %v", err)
 	}
 
-	fmt.Printf("authenticateToken: %s\n", hex.EncodeToString(authenticateToken))
+	session_setup_step2_cmd.SecurityBlob = authenticateToken
+
+	request_step2_msg.AddCommand(session_setup_step2_cmd)
+
+	marshalled_message_step2, err := request_step2_msg.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal step 2 message: %v", err)
+	}
+
+	// Send the message
+	_, err = s.Client.Transport.Send(marshalled_message_step2)
+	if err != nil {
+		return fmt.Errorf("failed to send negotiate message: %v", err)
+	}
+
+	// Wait for a response message =============================================================================================
+
+	raw_response_message_step4, err := s.Client.Transport.Receive()
+	if err != nil {
+		return fmt.Errorf("failed to receive response message: %v", err)
+	}
+
+	response_msg_step4 := message.NewMessage()
+	err = response_msg_step4.Unmarshal(raw_response_message_step4)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal response message: %v", err)
+	}
+
+	if response_msg_step4.Header.Command != codes.SMB_COM_SESSION_SETUP_ANDX {
+		return fmt.Errorf("unexpected response command: %d", response_msg_step4.Header.Command)
+	}
+
+	_, ok := response_msg_step4.Command.(*commands.SessionSetupAndxResponse)
+	if !ok {
+		return fmt.Errorf("failed to cast response command to SessionSetupAndxResponse")
+	}
+
+	if response_msg_step4.Header.Status != 0x00 {
+		return fmt.Errorf("session setup failed: %d", response_msg_step4.Header.Status)
+	}
 
 	return nil
 }

@@ -22,8 +22,7 @@ func NewClientUsingNBTTransport(host net.IP, port int) *Client {
 				Port: port,
 			},
 		},
-		TreeConnect: nil,
-		Session:     nil,
+		Session: nil,
 	}
 }
 
@@ -42,8 +41,7 @@ func NewClientUsingTCPTransport(host net.IP, port int) *Client {
 				Port: port,
 			},
 		},
-		TreeConnect: nil,
-		Session:     nil,
+		Session: nil,
 	}
 }
 

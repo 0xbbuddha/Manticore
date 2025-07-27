@@ -92,9 +92,13 @@ func main() {
 	fmt.Printf("[info] Session key     : [0x%08x]\n", c.Connection.Server.SessionKey)
 	fmt.Printf("[info] Max buffer size : [0x%08x] (%d)\n", c.Connection.Server.MaxBufferSize, c.Connection.Server.MaxBufferSize)
 	fmt.Printf("[info] Max mpx count   : [0x%04x] (%d)\n", c.Connection.MaxMpxCount, c.Connection.MaxMpxCount)
-	fmt.Printf("[info] System time     : [0x%08x]\n", c.Connection.Server.SystemTime.ToInt64())
-	fmt.Printf("[info] System time     : [%s]\n", c.Connection.Server.SystemTime.GetTime())
-	fmt.Printf("[info] Time zone       : [%d]\n", c.Connection.Server.TimeZone)
+	fmt.Printf("[info] System time     : [0x%08x] (%s)\n", c.Connection.Server.SystemTime.ToInt64(), c.Connection.Server.SystemTime.GetTime())
+	timezoneShift := (-1 * c.Connection.Server.TimeZone) / 60.0
+	if timezoneShift > 0 {
+		fmt.Printf("[info] Time zone       : [%d] (UTC+%d)\n", c.Connection.Server.TimeZone, timezoneShift)
+	} else {
+		fmt.Printf("[info] Time zone       : [%d] (UTC-%d)\n", c.Connection.Server.TimeZone, timezoneShift)
+	}
 	fmt.Printf("[info] SecurityMode    : [0x%02x] (%s)\n", uint8(c.Connection.Server.SecurityMode), c.Connection.Server.SecurityMode.String())
 	if c.Connection.Server.SecurityMode.SupportsChallengeResponseAuth() {
 		fmt.Printf("[info] Server GUID     : [%s]\n", c.Connection.Server.ServerGUID.ToFormatD())
@@ -108,4 +112,12 @@ func main() {
 		fmt.Printf("[error] Error setting up session: %s\n", err)
 		return
 	}
+
+	err = c.TreeConnect("IPC$")
+	if err != nil {
+		fmt.Printf("[error] Error connecting to IPC$ share: %s\n", err)
+		return
+	}
+
+	fmt.Printf("[info] Connected to IPC$ share\n")
 }

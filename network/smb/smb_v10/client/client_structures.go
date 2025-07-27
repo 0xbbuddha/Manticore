@@ -15,9 +15,6 @@ type Client struct {
 	// Transport is the transport layer for the client
 	Transport transport.Transport
 
-	// TreeConnect is the tree connect for the client
-	TreeConnect *TreeConnect
-
 	// Session is the session for the client
 	Session *Session
 
