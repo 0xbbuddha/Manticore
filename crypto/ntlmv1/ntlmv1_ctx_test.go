@@ -31,22 +31,25 @@ func TestNTLMv1HashFromPassword(t *testing.T) {
 			t.Errorf("NewNTLMv1CtxWithPassword(%s, %s, %s, %s) returned error: %v", test.domain, test.username, test.password, test.challenge, err)
 		}
 
-		ntResponse, err := ntlmv1Ctx.NTResponse()
+		response, err := ntlmv1Ctx.ComputeResponse()
 		if err != nil {
-			t.Errorf("ntlmv1Ctx.NTResponse() returned error: %v", err)
+			t.Errorf("ntlmv1Ctx.ComputeResponse() returned error: %v", err)
 		}
-		hexNTResponse := hex.EncodeToString(ntResponse)
+		ntResponse := response.GetNtChallengeResponse()
+		hexNTResponse := hex.EncodeToString(ntResponse[:])
 		if hexNTResponse != test.expectedNTResponse {
-			t.Errorf("ntlmv1Ctx.NTResponse() = %s; expected %s", hexNTResponse, test.expectedNTResponse)
+			t.Errorf("ntlmv1Ctx.ComputeResponse() = %s; expected %s", hexNTResponse, test.expectedNTResponse)
 		}
 
-		lmResponse, err := ntlmv1Ctx.LMResponse()
-		if err != nil {
-			t.Errorf("ntlmv1Ctx.LMResponse() returned error: %v", err)
-		}
-		hexLMResponse := hex.EncodeToString(lmResponse)
+		lmResponse := response.GetLmChallengeResponse()
+		hexLMResponse := hex.EncodeToString(lmResponse[:])
 		if hexLMResponse != test.expectedLMResponse {
 			t.Errorf("ntlmv1Ctx.LMResponse() = %s; expected %s", hexLMResponse, test.expectedLMResponse)
 		}
 	}
 }
+
+// [SMB] NTLMv1-SSP Client   : 192.168.1.44
+// [SMB] NTLMv1-SSP Username : THINKPAD-X61\user
+// [SMB] NTLMv1-SSP Password : user
+// [SMB] NTLMv1-SSP Hash     : user::THINKPAD-X61:82D6653B1699997800000000000000000000000000000000:2C84F06960FE5F2687E6D42E181F10F324A70D055A511AF7:1122334455667788

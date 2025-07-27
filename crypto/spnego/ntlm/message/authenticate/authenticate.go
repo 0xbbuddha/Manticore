@@ -124,12 +124,19 @@ func CreateAuthenticateMessage(challenge *challenge.ChallengeMessage, username, 
 			return nil, err
 		}
 
-		msg.LmChallengeResponse, err = ntlmv1Ctx.LMResponse()
+		response, err := ntlmv1Ctx.ComputeResponse()
 		if err != nil {
 			return nil, err
 		}
 
-		msg.NtChallengeResponse, err = ntlmv1Ctx.NTResponse()
+		lmChallengeResponse := response.GetLmChallengeResponse()
+		msg.LmChallengeResponse = lmChallengeResponse[:]
+		if err != nil {
+			return nil, err
+		}
+
+		ntChallengeResponse := response.GetNtChallengeResponse()
+		msg.NtChallengeResponse = ntChallengeResponse[:]
 		if err != nil {
 			return nil, err
 		}
