@@ -15,10 +15,10 @@ type NTLMv1Ctx struct {
 	Password string // Password for authentication
 	Domain   string // Domain name
 
-	NTHash []byte // NT hash of the password
-	LMHash []byte // LM hash of the password
+	NTHash [16]byte // NT hash of the password
+	LMHash [16]byte // LM hash of the password
 
-	ServerChallenge []byte // 8-byte challenge from server
+	ServerChallenge [8]byte // 8-byte challenge from server
 }
 
 // NewNTLMv1CtxWithPassword creates a new NTLMv1 instance with the provided credentials and challenge.
@@ -33,7 +33,7 @@ type NTLMv1Ctx struct {
 // Returns:
 //   - *NTLMv1Ctx: The initialized NTLMv1 context
 //   - error: If server challenge is not 8 bytes
-func NewNTLMv1CtxWithPassword(domain, username, password string, serverChallenge []byte) (*NTLMv1Ctx, error) {
+func NewNTLMv1CtxWithPassword(domain, username, password string, serverChallenge [8]byte) (*NTLMv1Ctx, error) {
 	if len(serverChallenge) != 8 {
 		return nil, fmt.Errorf("server challenge must be 8 bytes")
 	}
@@ -48,8 +48,8 @@ func NewNTLMv1CtxWithPassword(domain, username, password string, serverChallenge
 
 		ServerChallenge: serverChallenge,
 
-		NTHash: ntHash[:],
-		LMHash: lmHash[:],
+		NTHash: ntHash,
+		LMHash: lmHash,
 	}
 
 	return ntlm, nil
@@ -67,7 +67,7 @@ func NewNTLMv1CtxWithPassword(domain, username, password string, serverChallenge
 // Returns:
 //   - *NTLMv1Ctx: The initialized NTLMv1 context
 //   - error: If server challenge is not 8 bytes
-func NewNTLMv1CtxWithNTHash(domain, username string, nthash []byte, serverChallenge []byte) (*NTLMv1Ctx, error) {
+func NewNTLMv1CtxWithNTHash(domain, username string, nthash [16]byte, serverChallenge [8]byte) (*NTLMv1Ctx, error) {
 	if len(serverChallenge) != 8 {
 		return nil, fmt.Errorf("server challenge must be 8 bytes")
 	}
@@ -98,7 +98,7 @@ func NewNTLMv1CtxWithNTHash(domain, username string, nthash []byte, serverChalle
 // Returns:
 //   - *NTLMv1Ctx: The initialized NTLMv1 context
 //   - error: If server challenge is not 8 bytes
-func NewNTLMv1CtxWithLMHash(domain, username string, lmhash []byte, serverChallenge []byte) (*NTLMv1Ctx, error) {
+func NewNTLMv1CtxWithLMHash(domain, username string, lmhash [16]byte, serverChallenge [8]byte) (*NTLMv1Ctx, error) {
 	if len(serverChallenge) != 8 {
 		return nil, fmt.Errorf("server challenge must be 8 bytes")
 	}
@@ -110,7 +110,7 @@ func NewNTLMv1CtxWithLMHash(domain, username string, lmhash []byte, serverChalle
 		Username:        username,
 		Password:        "",
 		ServerChallenge: serverChallenge,
-		NTHash:          ntHash[:],
+		NTHash:          ntHash,
 		LMHash:          lmhash,
 	}
 
@@ -129,7 +129,7 @@ func NewNTLMv1CtxWithLMHash(domain, username string, lmhash []byte, serverChalle
 // Returns:
 //   - *NTLMv1Ctx: The initialized NTLMv1 context
 //   - error: If server challenge is not 8 bytes
-func NewNTLMv1CtxWithHashes(domain, username string, lmhash []byte, nthash []byte, serverChallenge []byte) (*NTLMv1Ctx, error) {
+func NewNTLMv1CtxWithHashes(domain, username string, lmhash [16]byte, nthash [16]byte, serverChallenge [8]byte) (*NTLMv1Ctx, error) {
 	if len(serverChallenge) != 8 {
 		return nil, fmt.Errorf("server challenge must be 8 bytes")
 	}
@@ -164,15 +164,15 @@ func (h *NTLMv1Ctx) ComputeResponse() (*NTLMv1Response, error) {
 	}
 	if len(h.NTHash) == 0 {
 		ntHash := nt.NTHash(h.Password)
-		h.NTHash = ntHash[:]
+		h.NTHash = ntHash
 	}
 
-	ntResponse, err := h.NtChallengeResponse()
+	ntResponse, err := h.ComputeNtChallengeResponse()
 	if err != nil {
 		return nil, fmt.Errorf("failed to compute NT response: %v", err)
 	}
 
-	lmResponse, err := h.LmChallengeResponse()
+	lmResponse, err := h.ComputeLmChallengeResponse()
 	if err != nil {
 		return nil, fmt.Errorf("failed to compute LM response: %v", err)
 	}
@@ -180,7 +180,7 @@ func (h *NTLMv1Ctx) ComputeResponse() (*NTLMv1Response, error) {
 	serverChallenge := [8]byte(h.ServerChallenge[:])
 	lmResponseBytes := [24]byte(lmResponse[:])
 	ntResponseBytes := [24]byte(ntResponse[:])
-	response := NewNTLMv1Response(serverChallenge, lmResponseBytes, ntResponseBytes)
+	response := NewNTLMv1Response(h.Username, h.Domain, serverChallenge, lmResponseBytes, ntResponseBytes)
 
 	return response, nil
 }
@@ -201,7 +201,7 @@ func (h *NTLMv1Ctx) ComputeResponse() (*NTLMv1Response, error) {
 // Returns:
 //   - []byte: The 24-byte NT response
 //   - error: If key adjustment or encryption fails
-func (n *NTLMv1Ctx) NtChallengeResponse() ([]byte, error) {
+func (n *NTLMv1Ctx) ComputeNtChallengeResponse() ([24]byte, error) {
 	// Split the NT hash into three 7-byte keys
 	key1 := n.NTHash[:7]
 	key2 := n.NTHash[7:14]
@@ -212,44 +212,44 @@ func (n *NTLMv1Ctx) NtChallengeResponse() ([]byte, error) {
 	// Adjust keys for DES parity
 	key1, err := ParityAdjust(key1)
 	if err != nil {
-		return nil, fmt.Errorf("failed to adjust key1 parity: %v", err)
+		return [24]byte{}, fmt.Errorf("failed to adjust key1 parity: %v", err)
 	}
 	key2, err = ParityAdjust(key2)
 	if err != nil {
-		return nil, fmt.Errorf("failed to adjust key2 parity: %v", err)
+		return [24]byte{}, fmt.Errorf("failed to adjust key2 parity: %v", err)
 	}
 	key3, err = ParityAdjust(key3)
 	if err != nil {
-		return nil, fmt.Errorf("failed to adjust key3 parity: %v", err)
+		return [24]byte{}, fmt.Errorf("failed to adjust key3 parity: %v", err)
 	}
 
 	// Create DES ciphers with each key
 	cipher1, err := des.NewCipher(key1)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create DES cipher with key1: %v", err)
+		return [24]byte{}, fmt.Errorf("failed to create DES cipher with key1: %v", err)
 	}
 	cipher2, err := des.NewCipher(key2)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create DES cipher with key2: %v", err)
+		return [24]byte{}, fmt.Errorf("failed to create DES cipher with key2: %v", err)
 	}
 	cipher3, err := des.NewCipher(key3)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create DES cipher with key3: %v", err)
+		return [24]byte{}, fmt.Errorf("failed to create DES cipher with key3: %v", err)
 	}
 
 	// Encrypt the challenge with each cipher
 	result1 := make([]byte, 8)
 	result2 := make([]byte, 8)
 	result3 := make([]byte, 8)
-	cipher1.Encrypt(result1, n.ServerChallenge)
-	cipher2.Encrypt(result2, n.ServerChallenge)
-	cipher3.Encrypt(result3, n.ServerChallenge)
+	cipher1.Encrypt(result1, n.ServerChallenge[:])
+	cipher2.Encrypt(result2, n.ServerChallenge[:])
+	cipher3.Encrypt(result3, n.ServerChallenge[:])
 
 	// Concatenate the results
 	ntResponse := append(result1, result2...)
 	ntResponse = append(ntResponse, result3...)
 
-	return ntResponse, nil
+	return [24]byte(ntResponse), nil
 }
 
 // LmChallengeResponse calculates the LM response for NTLMv1 authentication.
@@ -268,7 +268,7 @@ func (n *NTLMv1Ctx) NtChallengeResponse() ([]byte, error) {
 // Returns:
 //   - []byte: The 24-byte LM response
 //   - error: If key adjustment or encryption fails
-func (n *NTLMv1Ctx) LmChallengeResponse() ([]byte, error) {
+func (n *NTLMv1Ctx) ComputeLmChallengeResponse() ([24]byte, error) {
 	// Create the LM hash
 	lmHash := lm.LMHash(n.Password)
 
@@ -282,42 +282,42 @@ func (n *NTLMv1Ctx) LmChallengeResponse() ([]byte, error) {
 	// Adjust keys for DES parity
 	key1, err := ParityAdjust(key1)
 	if err != nil {
-		return nil, fmt.Errorf("failed to adjust key1 parity: %v", err)
+		return [24]byte{}, fmt.Errorf("failed to adjust key1 parity: %v", err)
 	}
 	key2, err = ParityAdjust(key2)
 	if err != nil {
-		return nil, fmt.Errorf("failed to adjust key2 parity: %v", err)
+		return [24]byte{}, fmt.Errorf("failed to adjust key2 parity: %v", err)
 	}
 	key3, err = ParityAdjust(key3)
 	if err != nil {
-		return nil, fmt.Errorf("failed to adjust key3 parity: %v", err)
+		return [24]byte{}, fmt.Errorf("failed to adjust key3 parity: %v", err)
 	}
 
 	// Create DES ciphers with each key
 	cipher1, err := des.NewCipher(key1)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create DES cipher with key1: %v", err)
+		return [24]byte{}, fmt.Errorf("failed to create DES cipher with key1: %v", err)
 	}
 	cipher2, err := des.NewCipher(key2)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create DES cipher with key2: %v", err)
+		return [24]byte{}, fmt.Errorf("failed to create DES cipher with key2: %v", err)
 	}
 	cipher3, err := des.NewCipher(key3)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create DES cipher with key3: %v", err)
+		return [24]byte{}, fmt.Errorf("failed to create DES cipher with key3: %v", err)
 	}
 
 	// Encrypt the challenge with each cipher
 	result1 := make([]byte, 8)
 	result2 := make([]byte, 8)
 	result3 := make([]byte, 8)
-	cipher1.Encrypt(result1, n.ServerChallenge)
-	cipher2.Encrypt(result2, n.ServerChallenge)
-	cipher3.Encrypt(result3, n.ServerChallenge)
+	cipher1.Encrypt(result1, n.ServerChallenge[:])
+	cipher2.Encrypt(result2, n.ServerChallenge[:])
+	cipher3.Encrypt(result3, n.ServerChallenge[:])
 
 	// Concatenate the results
 	lmResponse := append(result1, result2...)
 	lmResponse = append(lmResponse, result3...)
 
-	return lmResponse, nil
+	return [24]byte(lmResponse), nil
 }

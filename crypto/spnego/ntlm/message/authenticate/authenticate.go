@@ -103,7 +103,7 @@ func CreateAuthenticateMessage(challenge *challenge.ChallengeMessage, username, 
 			return nil, err
 		}
 
-		ntlmv2, err := ntlmv2.NewNTLMv2WithPassword(domain, username, password, challenge.ServerChallenge, clientChallenge)
+		ntlmv2, err := ntlmv2.NewNTLMv2CtxWithPassword(domain, username, password, challenge.ServerChallenge, clientChallenge)
 		if err != nil {
 			return nil, err
 		}
@@ -119,7 +119,7 @@ func CreateAuthenticateMessage(challenge *challenge.ChallengeMessage, username, 
 		}
 	} else {
 		// Use NTLMv1
-		ntlmv1Ctx, err := ntlmv1.NewNTLMv1CtxWithPassword(domain, username, password, challenge.ServerChallenge[:])
+		ntlmv1Ctx, err := ntlmv1.NewNTLMv1CtxWithPassword(domain, username, password, challenge.ServerChallenge)
 		if err != nil {
 			return nil, err
 		}

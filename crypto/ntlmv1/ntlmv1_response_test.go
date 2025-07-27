@@ -13,7 +13,7 @@ func TestNTLMv1ResponseServerChallenge(t *testing.T) {
 		0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28,
 		0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30}
 
-	resp := NewNTLMv1Response(serverChallenge, lmResponse, ntResponse)
+	resp := NewNTLMv1Response("user", "domain", serverChallenge, lmResponse, ntResponse)
 
 	got := resp.GetServerChallenge()
 	if got != serverChallenge {
@@ -37,7 +37,7 @@ func TestNTLMv1ResponseLMChallenge(t *testing.T) {
 		0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28,
 		0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30}
 
-	resp := NewNTLMv1Response(serverChallenge, lmResponse, ntResponse)
+	resp := NewNTLMv1Response("user", "domain", serverChallenge, lmResponse, ntResponse)
 
 	got := resp.GetLmChallengeResponse()
 	if got != lmResponse {
@@ -63,7 +63,7 @@ func TestNTLMv1ResponseNTChallenge(t *testing.T) {
 		0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28,
 		0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30}
 
-	resp := NewNTLMv1Response(serverChallenge, lmResponse, ntResponse)
+	resp := NewNTLMv1Response("user", "domain", serverChallenge, lmResponse, ntResponse)
 
 	got := resp.GetNtChallengeResponse()
 	if got != ntResponse {
@@ -89,10 +89,12 @@ func TestNTLMv1ResponseEqual(t *testing.T) {
 		0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28,
 		0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30}
 
-	resp := NewNTLMv1Response(serverChallenge, lmResponse, ntResponse)
+	resp := NewNTLMv1Response("user", "domain", serverChallenge, lmResponse, ntResponse)
 
 	// Test equal responses
 	other := NewNTLMv1Response(
+		resp.Username,
+		resp.Domain,
 		resp.GetServerChallenge(),
 		resp.GetLmChallengeResponse(),
 		resp.GetNtChallengeResponse(),

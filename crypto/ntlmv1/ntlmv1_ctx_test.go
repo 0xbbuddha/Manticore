@@ -6,12 +6,12 @@ import (
 )
 
 func TestNTLMv1HashFromPassword(t *testing.T) {
-	serverChallenge := []byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88}
+	serverChallenge := [8]byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88}
 	tests := []struct {
 		domain             string
 		username           string
 		password           string
-		challenge          []byte
+		challenge          [8]byte
 		expectedNTResponse string
 		expectedLMResponse string
 	}{

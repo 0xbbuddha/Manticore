@@ -13,7 +13,7 @@ import (
 // 3. Create two DES keys from each 7-byte half (convert 7 bytes to 8 bytes adding parity bits)
 // 4. DES encrypt the constant "KGS!@#$%" with each key
 // 5. Concatenate the two DES outputs
-func LMHash(password string) []byte {
+func LMHash(password string) [16]byte {
 	// Convert to uppercase and pad/truncate to 14 bytes
 	password = strings.ToUpper(password)
 	if len(password) > 14 {
@@ -67,7 +67,7 @@ func LMHash(password string) []byte {
 	finalHash := append(result1, result2...)
 
 	// Convert to lowercase hex string
-	return finalHash
+	return [16]byte(finalHash)
 }
 
 // LMHashToHex converts the LM hash to a lowercase hex string
@@ -76,11 +76,12 @@ func LMHash(password string) []byte {
 //
 // Returns the lowercase hex string representation of the LM hash
 func LMHashToHex(password string) string {
-	return strings.ToLower(hex.EncodeToString(LMHash(password)))
+	lmHash := LMHash(password)
+	return strings.ToLower(hex.EncodeToString(lmHash[:]))
 }
 
 // LMOWFv1, this is the same as LMHash
 // Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-nlmp/464551a8-9fc4-428e-b3d3-bc5bfb2e73a5
-func LMOWFv1(Passwd, User, UserDom string) []byte {
+func LMOWFv1(Passwd, User, UserDom string) [16]byte {
 	return LMHash(Passwd)
 }

@@ -39,3 +39,32 @@ func DecodeUTF16LE(b []byte) string {
 	}
 	return string(utf16.Decode(utf16le))
 }
+
+// IsUTF16LE checks if a byte slice is valid UTF-16LE encoded data
+//
+// This function takes a byte slice and checks if it represents valid UTF-16LE encoded data.
+// It verifies that:
+// 1. The length is even (UTF-16 uses 2 bytes per code unit)
+// 2. Each code unit has 0x00 in the high byte, indicating ASCII range characters
+//
+// Note: This is a simplified check that only validates ASCII range characters.
+// For full UTF-16LE validation, surrogate pairs and non-ASCII characters would need to be handled.
+//
+// Returns:
+//   - true if the byte slice appears to be valid UTF-16LE ASCII text
+//   - false otherwise
+func IsUTF16LE(b []byte) bool {
+	// Check length is even
+	if len(b)%2 != 0 {
+		return false
+	}
+
+	// Check that every other byte is 0x00
+	for i := 1; i < len(b); i += 2 {
+		if b[i] != 0x00 {
+			return false
+		}
+	}
+
+	return true
+}
