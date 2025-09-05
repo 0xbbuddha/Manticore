@@ -15,6 +15,7 @@ import (
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/types"
 	"github.com/TheManticoreProject/Manticore/utils/encoding/utf16"
 	"github.com/TheManticoreProject/Manticore/windows/credentials"
+	"github.com/TheManticoreProject/Manticore/windows/nt_status"
 )
 
 // Session represents an established session between the client and server
@@ -270,7 +271,11 @@ func (s *Session) SessionSetup() error {
 	}
 
 	if response_msg_step4.Header.Status != 0x00 {
-		return fmt.Errorf("session setup failed: %d", response_msg_step4.Header.Status)
+		if _, ok := nt_status.NTStatusToStringName[nt_status.NT_STATUS(response_msg_step4.Header.Status)]; ok {
+			return fmt.Errorf("session setup failed: %s (0x%08x)", nt_status.NTStatusToStringName[nt_status.NT_STATUS(response_msg_step4.Header.Status)], response_msg_step4.Header.Status)
+		} else {
+			return fmt.Errorf("session setup failed: 0x%08x", response_msg_step4.Header.Status)
+		}
 	}
 
 	return nil
