@@ -1,0 +1,107 @@
+package spnego
+
+import (
+	"errors"
+	"fmt"
+
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/authenticate"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/challenge"
+)
+
+// CreateAuthenticateTokenFromChallengeToken processes the server's challenge token and creates an authenticate token
+// Parameters:
+//   - challengeToken: The SPNEGO token containing the server's challenge
+//
+// Returns:
+//   - []byte: The SPNEGO token containing the authenticate message
+//   - error: An error if token processing fails
+func (ctx *AuthContext) CreateAuthenticateTokenFromChallengeToken(challengeToken []byte) ([]byte, error) {
+
+	// First, unpack the security blob
+	securityBlob := &SecurityBlob{}
+	_, err := securityBlob.Unmarshal(challengeToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse SPNEGO token: %v", err)
+	}
+
+	// Then, unpack the NegTokenResp
+	resp := NegTokenResp{}
+	_, err = resp.Unmarshal(securityBlob.Data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse SPNEGO token: %v", err)
+	}
+
+	// Check if the server accepted our mechanism
+	if resp.NegState == NegStateReject {
+		return nil, errors.New("server rejected authentication")
+	}
+
+	if resp.SupportedMech.Equal(NtlmOID) {
+		return ctx.processChallengeInnerTokenNTLM(resp.ResponseToken)
+	} else if resp.SupportedMech.Equal(KerberosOID) {
+		return ctx.processChallengeInnerTokenKerberos(resp.ResponseToken)
+	} else {
+		return nil, fmt.Errorf("unsupported authentication type: %v", resp.SupportedMech)
+	}
+}
+
+// processChallengeInnerTokenNTLM processes the NTLM challenge token and creates an NTLM authenticate token
+// Parameters:
+//   - innerToken: The inner NTLM challenge token bytes
+//
+// Returns:
+//   - []byte: The SPNEGO token containing the NTLM authenticate message
+//   - error: An error if token processing fails
+func (ctx *AuthContext) processChallengeInnerTokenNTLM(innerToken []byte) ([]byte, error) {
+	// Parse the NTLM CHALLENGE message
+	challenge := &challenge.ChallengeMessage{}
+	_, err := challenge.Unmarshal(innerToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse NTLM CHALLENGE message: %v", err)
+	}
+
+	// Store the challenge for later use
+	ctx.NTLMChallenge = challenge
+
+	// Create NTLM AUTHENTICATE message
+	ntlmAuth, err := authenticate.CreateAuthenticateMessage(challenge, ctx.Username, ctx.Password, ctx.Domain, ctx.Workstation)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create NTLM AUTHENTICATE message: %v", err)
+	}
+
+	ntlmAuthBytes, err := ntlmAuth.Marshal()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal NTLM AUTHENTICATE message: %v", err)
+	}
+
+	negTokenResp := NegTokenResp{}
+	negTokenResp.NegState = NegStateAcceptCompleted
+	negTokenResp.SetMechTokenNTLM(ntlmAuthBytes)
+
+	marshalledNegTokenResp, err := negTokenResp.Marshal()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal NegTokenResp: %v", err)
+	}
+
+	securityBlob := SecurityBlob{}
+	securityBlob.Data = marshalledNegTokenResp
+
+	marshalledSecurityBlob, err := securityBlob.Marshal()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal SecurityBlob: %v", err)
+	}
+
+	return marshalledSecurityBlob, nil
+}
+
+// processChallengeInnerTokenKerberos processes the Kerberos challenge token and creates a Kerberos authenticate token
+// Parameters:
+//   - innerToken: The inner Kerberos challenge token bytes
+//
+// Returns:
+//   - []byte: The SPNEGO token containing the Kerberos authenticate message
+//   - error: An error if token processing fails
+func (ctx *AuthContext) processChallengeInnerTokenKerberos(innerToken []byte) ([]byte, error) {
+	// TODO: Implement kerberos authentication
+	return nil, errors.New("kerberos authentication is not yet implemented")
+}

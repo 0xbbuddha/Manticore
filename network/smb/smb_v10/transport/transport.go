@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/TheManticoreProject/Manticore/network/netbios/nbt"
+	"github.com/TheManticoreProject/Manticore/network/tcp"
 )
 
 type Transport interface {
@@ -21,6 +22,8 @@ type Transport interface {
 
 func NewTransport(transportType string) Transport {
 	switch strings.ToLower(transportType) {
+	case "tcp":
+		return tcp.NewTCPTransport()
 	case "nbt":
 		return nbt.NewNBTTransport()
 	}

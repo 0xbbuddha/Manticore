@@ -10,10 +10,12 @@ import (
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message/data"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message/parameters"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/types"
+	"github.com/TheManticoreProject/Manticore/utils"
 )
 
 // SessionSetupAndxResponse
 // Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/e7514918-a0f6-4932-9f00-ced094445537
+// SMBv1.0 extension: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb/e5a467bc-cd36-4afa-825e-3f2a7bfd6189
 type SessionSetupAndxResponse struct {
 	command_interface.Command
 
@@ -22,36 +24,36 @@ type SessionSetupAndxResponse struct {
 	// Action (2 bytes): A 16-bit field. The two lowest-order bits have been defined:
 	Action types.USHORT
 
+	// SecurityBlobLength (2 bytes): This value MUST specify the length, in bytes, of
+	// the variable-length SecurityBlob that is contained within the response.
+	SecurityBlobLength types.USHORT
+
 	// Data
+
+	// SecurityBlob (variable): This value MUST contain the authentication token being
+	// returned to the client, as specified in section 3.3.5.3 and [RFC2743].
+	SecurityBlob []types.UCHAR
 
 	// Pad (variable): Padding bytes. If Unicode support has been enabled, this field
 	// MUST contain zero or one null padding byte as needed to ensure that the NativeOS
 	// field, which follows, is aligned on a 16-bit boundary.
 	Pad []types.UCHAR
 
-	// NativeOS (variable): A string that represents the native operating system of the
-	// server. If SMB_FLAGS2_UNICODE is set in the Flags2 field of the SMB header of
-	// the response, the string MUST be a null-terminated array of 16-bit Unicode
-	// characters. Otherwise, the string MUST be a null-terminated array of OEM
-	// characters. If the string consists of Unicode characters, this field MUST be
-	// aligned to start on a 2-byte boundary from the start of the SMB header.
-	NativeOS types.SMB_STRING
+	// NativeOS (variable): A string that represents the native operating system of the server.
+	// If SMB_FLAGS2_UNICODE is set in the Flags2 field of the SMB header of the response, then
+	// the string MUST be a NULL-terminated array of 16-bit Unicode characters. Otherwise, the
+	// string MUST be a NULL-terminated array of OEM characters. If the name string consists of
+	// Unicode characters, then this field MUST be aligned to start on a 2-byte boundary from
+	// the start of the SMB header.
+	NativeOS []types.UCHAR
 
-	// NativeLanMan (variable): A string that represents the native LAN Manager type
-	// of the server. If SMB_FLAGS2_UNICODE is set in the Flags2 field of the SMB header
-	// of the response, the string MUST be a null-terminated array of 16-bit Unicode
-	// characters. Otherwise, the string MUST be a null-terminated array of OEM characters.
-	// If the string consists of Unicode characters, this field MUST be aligned to start
-	// on a 2-byte boundary from the start of the SMB header.
-	NativeLanMan types.SMB_STRING
-
-	// PrimaryDomain (variable): A string representing the primary domain or workgroup
-	// name of the server. If SMB_FLAGS2_UNICODE is set in the Flags2 field of the SMB header
-	// of the response, the string MUST be a null-terminated array of 16-bit Unicode characters.
-	// Otherwise, the string MUST be a null-terminated array of OEM characters. If the string
-	// consists of Unicode characters, this field MUST be aligned to start on a 2-byte boundary
-	// from the start of the SMB header.
-	PrimaryDomain types.SMB_STRING
+	// NativeLanMan (variable): A string that represents the native LAN Manager type of the
+	// server. If SMB_FLAGS2_UNICODE is set in the Flags2 field of the SMB header of the response,
+	// then the string MUST be a NULL-terminated array of 16-bit Unicode characters. Otherwise,
+	// the string MUST be a NULL-terminated array of OEM characters. If the name string consists
+	// of Unicode characters, then this field MUST be aligned to start on a 2-byte boundary from
+	// the start of the SMB header.
+	NativeLanMan []types.UCHAR
 }
 
 // NewSessionSetupAndxResponse creates a new SessionSetupAndxResponse structure
@@ -64,10 +66,10 @@ func NewSessionSetupAndxResponse() *SessionSetupAndxResponse {
 		Action: types.USHORT(0),
 
 		// Data
-		Pad:           []types.UCHAR{},
-		NativeOS:      types.SMB_STRING{},
-		NativeLanMan:  types.SMB_STRING{},
-		PrimaryDomain: types.SMB_STRING{},
+		SecurityBlob: []types.UCHAR{},
+		Pad:          []types.UCHAR{},
+		NativeOS:     []types.UCHAR{},
+		NativeLanMan: []types.UCHAR{},
 	}
 
 	c.Command.SetCommandCode(codes.SMB_COM_SESSION_SETUP_ANDX)
@@ -114,39 +116,30 @@ func (c *SessionSetupAndxResponse) Marshal() ([]byte, error) {
 	// the data will be stored in the parameters
 	rawDataContent := []byte{}
 
+	// Marshalling data SecurityBlob
+	rawDataContent = append(rawDataContent, c.SecurityBlob...)
+	c.SecurityBlobLength = types.USHORT(len(c.SecurityBlob))
+
 	// Marshalling data Pad
 	rawDataContent = append(rawDataContent, c.Pad...)
 
 	// Marshalling data NativeOS
-	c.NativeOS.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_VARIABLE_BLOCK_16BIT)
-	bytesStream, err := c.NativeOS.Marshal()
-	if err != nil {
-		return nil, err
-	}
-	rawDataContent = append(rawDataContent, bytesStream...)
+	rawDataContent = append(rawDataContent, c.NativeOS...)
 
 	// Marshalling data NativeLanMan
-	c.NativeLanMan.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_VARIABLE_BLOCK_16BIT)
-	bytesStream, err = c.NativeLanMan.Marshal()
-	if err != nil {
-		return nil, err
-	}
-	rawDataContent = append(rawDataContent, bytesStream...)
-
-	// Marshalling data PrimaryDomain
-	c.PrimaryDomain.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_VARIABLE_BLOCK_16BIT)
-	bytesStream, err = c.PrimaryDomain.Marshal()
-	if err != nil {
-		return nil, err
-	}
-	rawDataContent = append(rawDataContent, bytesStream...)
+	rawDataContent = append(rawDataContent, c.NativeLanMan...)
 
 	// Then marshal the parameters
 	rawParametersContent := []byte{}
 
 	// Marshalling parameter Action
 	buf2 := make([]byte, 2)
-	binary.BigEndian.PutUint16(buf2, uint16(c.Action))
+	binary.LittleEndian.PutUint16(buf2, uint16(c.Action))
+	rawParametersContent = append(rawParametersContent, buf2...)
+
+	// Marshalling parameter SecurityBlobLength
+	buf2 = make([]byte, 2)
+	binary.LittleEndian.PutUint16(buf2, uint16(c.SecurityBlobLength))
 	rawParametersContent = append(rawParametersContent, buf2...)
 
 	// Marshalling parameters
@@ -196,56 +189,71 @@ func (c *SessionSetupAndxResponse) Unmarshal(data []byte) (int, error) {
 		return 0, nil
 	}
 
-	// If the parameters and data are empty, this is a response containing an error code in
-	// the SMB Header Status field
-	if len(rawParametersContent) == 0 && len(rawDataContent) == 0 {
-		return 0, nil
-	}
-
 	// First unmarshal the parameters
 	offset = 0
+	if c.IsAndX() {
+		offset += 4
+	}
 
 	// Unmarshalling parameter Action
 	if len(rawParametersContent) < offset+2 {
 		return offset, fmt.Errorf("rawParametersContent too short for Action")
 	}
-	c.Action = types.USHORT(binary.BigEndian.Uint16(rawParametersContent[offset : offset+2]))
+	c.Action = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
+	offset += 2
+
+	// Unmarshalling parameter SecurityBlobLength
+	if len(rawParametersContent) < offset+2 {
+		return offset, fmt.Errorf("rawParametersContent too short for SecurityBlobLength")
+	}
+	c.SecurityBlobLength = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
 	offset += 2
 
 	// Then unmarshal the data
 	offset = 0
 
+	// Unmarshalling data SecurityBlob
+	if len(rawDataContent) < offset+int(c.SecurityBlobLength) {
+		return offset, fmt.Errorf("rawDataContent too short for SecurityBlob")
+	}
+	c.SecurityBlob = rawDataContent[offset : offset+int(c.SecurityBlobLength)]
+	offset += int(c.SecurityBlobLength)
+
 	// Unmarshalling data Pad
-	padLen := 0
-	if (len(rawParametersContent)+3)%2 == 1 {
-		padLen = 1
-	}
-	if len(rawDataContent) < offset+padLen {
-		return offset, fmt.Errorf("rawParametersContent too short for Pad")
-	}
-	c.Pad = rawDataContent[offset : offset+padLen]
-	offset += padLen
+	// padLen := 0
+	// if (len(rawParametersContent)+3)%2 == 1 {
+	// 	padLen = 1
+	// }
+	// if len(rawDataContent) < offset+padLen {
+	// 	return offset, fmt.Errorf("rawParametersContent too short for Pad")
+	// }
+	// c.Pad = rawDataContent[offset : offset+padLen]
+	// offset += padLen
+
+	// TODO: Get the information from the SMB header
+	useUnicode := true
 
 	// Unmarshalling data NativeOS
-	bytesRead, err = c.NativeOS.Unmarshal(rawDataContent[offset:])
-	if err != nil {
-		return offset, err
+	if useUnicode {
+		nativeOSData, nativeOSLength := utils.ReadUntilNullTerminatorUTF16(rawDataContent[offset:])
+		c.NativeOS = nativeOSData
+		offset += nativeOSLength
+	} else {
+		nativeOSData, nativeOSLength := utils.ReadUntilNullTerminator(rawDataContent[offset:])
+		c.NativeOS = nativeOSData
+		offset += nativeOSLength
 	}
-	offset += bytesRead
 
 	// Unmarshalling data NativeLanMan
-	bytesRead, err = c.NativeLanMan.Unmarshal(rawDataContent[offset:])
-	if err != nil {
-		return offset, err
+	if useUnicode {
+		nativeLanManData, nativeLanManLength := utils.ReadUntilNullTerminatorUTF16(rawDataContent[offset:])
+		c.NativeLanMan = nativeLanManData
+		offset += nativeLanManLength
+	} else {
+		nativeLanManData, nativeLanManLength := utils.ReadUntilNullTerminator(rawDataContent[offset:])
+		c.NativeLanMan = nativeLanManData
+		offset += nativeLanManLength
 	}
-	offset += bytesRead
-
-	// Unmarshalling data PrimaryDomain
-	bytesRead, err = c.PrimaryDomain.Unmarshal(rawDataContent[offset:])
-	if err != nil {
-		return offset, err
-	}
-	offset += bytesRead
 
 	return offset, nil
 }

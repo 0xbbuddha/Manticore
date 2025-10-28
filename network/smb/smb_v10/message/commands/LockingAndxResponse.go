@@ -111,6 +111,9 @@ func (c *LockingAndxResponse) Unmarshal(data []byte) (int, error) {
 
 	// First unmarshal the parameters
 	offset = 0
+	if c.IsAndX() {
+		offset += 4
+	}
 	// No parameters are sent by this message.
 
 	// Then unmarshal the data

@@ -45,3 +45,24 @@ func TestDecodeUTF16LE(t *testing.T) {
 		}
 	}
 }
+
+func TestIsUTF16LE(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"0065006c006c006f0068", false},
+		{"680065006c006c006f00", true},
+	}
+
+	for _, test := range tests {
+		rawUTF16LE, err := hex.DecodeString(test.input)
+		if err != nil {
+			t.Errorf("Could not decode hex string: %q", test.input)
+		}
+		result := IsUTF16LE(rawUTF16LE)
+		if result != test.expected {
+			t.Errorf("IsUTF16LE(%q) = %v; expected %v", test.input, result, test.expected)
+		}
+	}
+}

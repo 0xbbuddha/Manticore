@@ -52,3 +52,44 @@ func TestSizeInBytes(t *testing.T) {
 		})
 	}
 }
+
+func TestEndsWithNullTerminator(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"hello\x00", true},
+		{"world", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := utils.EndsWithNullTerminator(tt.input)
+			if result != tt.expected {
+				t.Errorf("EndsWithNullTerminator(%q) = %v; want %v", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestEndsWithNullTerminatorUTF16(t *testing.T) {
+	tests := []struct {
+		testName string
+		input    []byte
+		expected bool
+	}{
+		{"UTF16-LE hello with null terminator", []byte("h\x00e\x00l\x00l\x00o\x00\x00\x00"), true},
+		{"UTF16-LE hello without null terminator", []byte("h\x00e\x00l\x00l\x00o\x00"), false},
+		{"UTF16-LE world with null terminator", []byte("\x00w\x00o\x00r\x00l\x00d\x00\x00"), true},
+		{"UTF16-LE world without null terminator", []byte("\x00w\x00o\x00r\x00l\x00d"), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testName, func(t *testing.T) {
+			result := utils.EndsWithNullTerminatorUTF16(tt.input)
+			if result != tt.expected {
+				t.Errorf("EndsWithNullTerminatorUTF16(%q) = %v; want %v", tt.input, result, tt.expected)
+			}
+		})
+	}
+}

@@ -11,10 +11,14 @@ import (
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message/data"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message/parameters"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/types"
+	"github.com/TheManticoreProject/Manticore/utils"
+
+	"github.com/TheManticoreProject/Manticore/utils/encoding/utf16"
 )
 
 // SessionSetupAndxRequest
-// Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/81e15dee-8fb6-4102-8644-7eaa7ded63f7
+// Source for CIFS base: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/81e15dee-8fb6-4102-8644-7eaa7ded63f7
+// SMBv1.0 extension: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb/a00d0361-3544-4845-96ab-309b4bb7705d
 type SessionSetupAndxRequest struct {
 	command_interface.Command
 
@@ -42,6 +46,9 @@ type SessionSetupAndxRequest struct {
 	// SessionKey field in the SMB_COM_NEGOTIATE Response for this SMB connection.
 	SessionKey types.ULONG
 
+	// When extended security is not being used, the following fields (OEMPasswordLen,
+	// UnicodePasswordLen) are used to authenticate the user:
+
 	// If SMB_FLAGS2_UNICODE is set (1), the value of OEMPasswordLen MUST be 0x0000 and
 	// the password MUST be encoded using UTF-16LE Unicode. Padding MUST NOT be added
 	// to align this plaintext Unicode string to a word boundary.
@@ -51,6 +58,13 @@ type SessionSetupAndxRequest struct {
 	// 0x0000, and the password MUST be encoded using the 8-bit OEM character set
 	// (extended ASCII).
 	UnicodePasswordLen types.USHORT
+
+	// When extended security is being used, the following field (SecurityBlobLength)
+	// is used to authenticate the user:
+
+	// SecurityBlobLength (2 bytes): This value MUST specify the length in bytes
+	// of the variable-length SecurityBlob field that is contained within the request.
+	SecurityBlobLength types.USHORT
 
 	// Reserved (4 bytes): Reserved. This field MUST be 0x00000000. The server MUST
 	// ignore the contents of this field.
@@ -62,6 +76,10 @@ type SessionSetupAndxRequest struct {
 	Capabilities capabilities.Capabilities
 
 	// Data
+
+	// When extended security is not being used, the following fields (OEMPassword,
+	// UnicodePassword, Pad, AccountName, PrimaryDomain) are used to authenticate the
+	// user:
 
 	// The OEMPassword value is an array of bytes, not a null-terminated string.
 	OEMPassword []types.UCHAR
@@ -109,13 +127,21 @@ type SessionSetupAndxRequest struct {
 	// MUST be aligned to start on a 2-byte boundary from the start of the SMB header.
 	PrimaryDomain types.SMB_STRING
 
+	// When extended security is being used, the following field (SecurityBlob)
+	// is used to authenticate the user:
+
+	// SecurityBlob (variable): This field MUST be the authentication token sent to the
+	// server, as specified in section 3.2.4.2.4 and in [RFC2743]. This field MUST be
+	// aligned to start on a 2-byte boundary from the start of the SMB header.
+	SecurityBlob []types.UCHAR
+
 	// NativeOS (variable): A string representing the native operating system of the
 	// CIFS client. If SMB_FLAGS2_UNICODE is set in the Flags2 field of the SMB header
 	// of the request, this string MUST be a null-terminated array of 16-bit Unicode
 	// characters. Otherwise, this string MUST be a null-terminated array of OEM
 	// characters. If this string consists of Unicode characters, this field MUST be
 	// aligned to start on a 2-byte boundary from the start of the SMB header.
-	NativeOS types.SMB_STRING
+	NativeOS string
 
 	// NativeLanMan (variable): A string that represents the native LAN manager type
 	// of the client. If SMB_FLAGS2_UNICODE is set in the Flags2 field of the SMB header
@@ -123,7 +149,7 @@ type SessionSetupAndxRequest struct {
 	// characters. Otherwise, this string MUST be a null-terminated array of OEM
 	// characters. If this string consists of Unicode characters, this field MUST be
 	// aligned to start on a 2-byte boundary from the start of the SMB header.
-	NativeLanMan types.SMB_STRING
+	NativeLanMan string
 }
 
 // NewSessionSetupAndxRequest creates a new SessionSetupAndxRequest structure
@@ -143,13 +169,20 @@ func NewSessionSetupAndxRequest() *SessionSetupAndxRequest {
 		Capabilities:       capabilities.Capabilities(0),
 
 		// Data
+		// When extended security is not being used, the following fields (OEMPassword,
+		// UnicodePassword, Pad, AccountName, PrimaryDomain) are used to authenticate the
+		// user:
 		OEMPassword:     []types.UCHAR{},
 		UnicodePassword: []types.UCHAR{},
 		Pad:             []types.UCHAR{},
 		AccountName:     types.SMB_STRING{},
 		PrimaryDomain:   types.SMB_STRING{},
-		NativeOS:        types.SMB_STRING{},
-		NativeLanMan:    types.SMB_STRING{},
+		// When extended security is being used, the following field (SecurityBlob)
+		// is used to authenticate the user:
+		SecurityBlob: []types.UCHAR{},
+		// Other data fields
+		NativeOS:     "",
+		NativeLanMan: "",
 	}
 
 	c.Command.SetCommandCode(codes.SMB_COM_SESSION_SETUP_ANDX)
@@ -169,6 +202,8 @@ func (c *SessionSetupAndxRequest) IsAndX() bool {
 // - An error if the marshaling fails
 func (c *SessionSetupAndxRequest) Marshal() ([]byte, error) {
 	marshalledCommand := []byte{}
+
+	var err error
 
 	// Create the Parameters structure if it is nil
 	if c.GetParameters() == nil {
@@ -196,88 +231,135 @@ func (c *SessionSetupAndxRequest) Marshal() ([]byte, error) {
 	// the data will be stored in the parameters
 	rawDataContent := []byte{}
 
-	// Marshalling data OEMPassword
-	rawDataContent = append(rawDataContent, c.OEMPassword...)
+	if c.Capabilities.HasCapability(capabilities.CAP_EXTENDED_SECURITY) {
+		// Marshalling data SecurityBlob
+		rawDataContent = append(rawDataContent, c.SecurityBlob...)
+		c.SecurityBlobLength = types.USHORT(len(c.SecurityBlob))
 
-	// Marshalling data UnicodePassword
-	rawDataContent = append(rawDataContent, c.UnicodePassword...)
+		// Marshalling data NativeOS
+		if c.Capabilities.HasCapability(capabilities.CAP_UNICODE) {
+			rawDataContent = append(rawDataContent, utf16.EncodeUTF16LE(c.NativeOS)...)
+			rawDataContent = append(rawDataContent, []byte{0, 0}...)
+		} else {
+			rawDataContent = append(rawDataContent, c.NativeOS...)
+			rawDataContent = append(rawDataContent, []byte{0}...)
+		}
 
-	// Marshalling data Pad
-	rawDataContent = append(rawDataContent, c.Pad...)
+		// Marshalling data NativeLanMan
+		if c.Capabilities.HasCapability(capabilities.CAP_UNICODE) {
+			rawDataContent = append(rawDataContent, utf16.EncodeUTF16LE(c.NativeLanMan)...)
+			rawDataContent = append(rawDataContent, []byte{0, 0}...)
+		} else {
+			rawDataContent = append(rawDataContent, c.NativeLanMan...)
+			rawDataContent = append(rawDataContent, []byte{0}...)
+		}
+	} else {
+		// Marshalling data OEMPassword
+		rawDataContent = append(rawDataContent, c.OEMPassword...)
+		c.OEMPasswordLen = types.USHORT(len(c.OEMPassword))
 
-	// Marshalling data AccountName
-	c.AccountName.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_NULL_TERMINATED_ASCII_STRING)
-	bytesStream, err := c.AccountName.Marshal()
-	if err != nil {
-		return nil, err
+		// Marshalling data UnicodePassword
+		rawDataContent = append(rawDataContent, c.UnicodePassword...)
+		c.UnicodePasswordLen = types.USHORT(len(c.UnicodePassword))
+
+		// Marshalling data Pad
+		rawDataContent = append(rawDataContent, c.Pad...)
+
+		// Marshalling data AccountName
+		c.AccountName.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_NULL_TERMINATED_ASCII_STRING)
+		bytesStream, err := c.AccountName.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		rawDataContent = append(rawDataContent, bytesStream...)
+
+		// Marshalling data PrimaryDomain
+		c.PrimaryDomain.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_VARIABLE_BLOCK_16BIT)
+		bytesStream, err = c.PrimaryDomain.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		rawDataContent = append(rawDataContent, bytesStream...)
+
+		// Marshalling data NativeOS
+		nativeOSSmbString := types.SMB_STRING{}
+		if c.Capabilities.HasCapability(capabilities.CAP_UNICODE) {
+			nativeOSSmbString.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_NULL_TERMINATED_OEM_STRING_16BIT)
+			nativeOSSmbString.SetString(string(utf16.EncodeUTF16LE(c.NativeOS)))
+		} else {
+			nativeOSSmbString.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_NULL_TERMINATED_OEM_STRING)
+			nativeOSSmbString.SetString(c.NativeOS)
+		}
+		bytesStream, err = nativeOSSmbString.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		rawDataContent = append(rawDataContent, bytesStream...)
+
+		// Marshalling data NativeLanMan
+		nativeLanManSmbString := types.SMB_STRING{}
+		if c.Capabilities.HasCapability(capabilities.CAP_UNICODE) {
+			nativeLanManSmbString.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_NULL_TERMINATED_OEM_STRING_16BIT)
+			nativeLanManSmbString.SetString(string(utf16.EncodeUTF16LE(c.NativeLanMan)))
+		} else {
+			nativeLanManSmbString.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_NULL_TERMINATED_OEM_STRING)
+			nativeLanManSmbString.SetString(c.NativeLanMan)
+		}
+		bytesStream, err = nativeLanManSmbString.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		rawDataContent = append(rawDataContent, bytesStream...)
 	}
-	rawDataContent = append(rawDataContent, bytesStream...)
-
-	// Marshalling data PrimaryDomain
-	c.PrimaryDomain.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_VARIABLE_BLOCK_16BIT)
-	bytesStream, err = c.PrimaryDomain.Marshal()
-	if err != nil {
-		return nil, err
-	}
-	rawDataContent = append(rawDataContent, bytesStream...)
-
-	// Marshalling data NativeOS
-	c.NativeOS.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_VARIABLE_BLOCK_16BIT)
-	bytesStream, err = c.NativeOS.Marshal()
-	if err != nil {
-		return nil, err
-	}
-	rawDataContent = append(rawDataContent, bytesStream...)
-
-	// Marshalling data NativeLanMan
-	c.NativeLanMan.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_VARIABLE_BLOCK_16BIT)
-	bytesStream, err = c.NativeLanMan.Marshal()
-	if err != nil {
-		return nil, err
-	}
-	rawDataContent = append(rawDataContent, bytesStream...)
 
 	// Then marshal the parameters
 	rawParametersContent := []byte{}
 
 	// Marshalling parameter MaxBufferSize
 	buf2 := make([]byte, 2)
-	binary.BigEndian.PutUint16(buf2, uint16(c.MaxBufferSize))
+	binary.LittleEndian.PutUint16(buf2, uint16(c.MaxBufferSize))
 	rawParametersContent = append(rawParametersContent, buf2...)
 
 	// Marshalling parameter MaxMpxCount
 	buf2 = make([]byte, 2)
-	binary.BigEndian.PutUint16(buf2, uint16(c.MaxMpxCount))
+	binary.LittleEndian.PutUint16(buf2, uint16(c.MaxMpxCount))
 	rawParametersContent = append(rawParametersContent, buf2...)
 
 	// Marshalling parameter VcNumber
 	buf2 = make([]byte, 2)
-	binary.BigEndian.PutUint16(buf2, uint16(c.VcNumber))
+	binary.LittleEndian.PutUint16(buf2, uint16(c.VcNumber))
 	rawParametersContent = append(rawParametersContent, buf2...)
 
 	// Marshalling parameter SessionKey
 	buf4 := make([]byte, 4)
-	binary.BigEndian.PutUint32(buf4, uint32(c.SessionKey))
+	binary.LittleEndian.PutUint32(buf4, uint32(c.SessionKey))
 	rawParametersContent = append(rawParametersContent, buf4...)
 
-	// Marshalling parameter OEMPasswordLen
-	buf2 = make([]byte, 2)
-	binary.BigEndian.PutUint16(buf2, uint16(c.OEMPasswordLen))
-	rawParametersContent = append(rawParametersContent, buf2...)
+	if c.Capabilities.HasCapability(capabilities.CAP_EXTENDED_SECURITY) {
+		// Marshalling parameter SecurityBlobLength
+		buf2 = make([]byte, 2)
+		binary.LittleEndian.PutUint16(buf2, uint16(c.SecurityBlobLength))
+		rawParametersContent = append(rawParametersContent, buf2...)
+	} else {
+		// Marshalling parameter OEMPasswordLen
+		buf2 = make([]byte, 2)
+		binary.LittleEndian.PutUint16(buf2, uint16(c.OEMPasswordLen))
+		rawParametersContent = append(rawParametersContent, buf2...)
 
-	// Marshalling parameter UnicodePasswordLen
-	buf2 = make([]byte, 2)
-	binary.BigEndian.PutUint16(buf2, uint16(c.UnicodePasswordLen))
-	rawParametersContent = append(rawParametersContent, buf2...)
+		// Marshalling parameter UnicodePasswordLen
+		buf2 = make([]byte, 2)
+		binary.LittleEndian.PutUint16(buf2, uint16(c.UnicodePasswordLen))
+		rawParametersContent = append(rawParametersContent, buf2...)
+	}
 
 	// Marshalling parameter Reserved
 	buf4 = make([]byte, 4)
-	binary.BigEndian.PutUint32(buf4, uint32(c.Reserved))
+	binary.LittleEndian.PutUint32(buf4, uint32(c.Reserved))
 	rawParametersContent = append(rawParametersContent, buf4...)
 
 	// Marshalling parameter Capabilities
 	buf4 = make([]byte, 4)
-	binary.BigEndian.PutUint32(buf4, uint32(c.Capabilities))
+	binary.LittleEndian.PutUint32(buf4, uint32(c.Capabilities))
 	rawParametersContent = append(rawParametersContent, buf4...)
 
 	// Marshalling parameters
@@ -329,118 +411,155 @@ func (c *SessionSetupAndxRequest) Unmarshal(data []byte) (int, error) {
 
 	// First unmarshal the parameters
 	offset = 0
+	if c.IsAndX() {
+		offset += 4
+	}
 
 	// Unmarshalling parameter MaxBufferSize
 	if len(rawParametersContent) < offset+2 {
 		return offset, fmt.Errorf("rawParametersContent too short for MaxBufferSize")
 	}
-	c.MaxBufferSize = types.USHORT(binary.BigEndian.Uint16(rawParametersContent[offset : offset+2]))
+	c.MaxBufferSize = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
 	offset += 2
 
 	// Unmarshalling parameter MaxMpxCount
 	if len(rawParametersContent) < offset+2 {
 		return offset, fmt.Errorf("rawParametersContent too short for MaxMpxCount")
 	}
-	c.MaxMpxCount = types.USHORT(binary.BigEndian.Uint16(rawParametersContent[offset : offset+2]))
+	c.MaxMpxCount = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
 	offset += 2
 
 	// Unmarshalling parameter VcNumber
 	if len(rawParametersContent) < offset+2 {
 		return offset, fmt.Errorf("rawParametersContent too short for VcNumber")
 	}
-	c.VcNumber = types.USHORT(binary.BigEndian.Uint16(rawParametersContent[offset : offset+2]))
+	c.VcNumber = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
 	offset += 2
 
 	// Unmarshalling parameter SessionKey
 	if len(rawParametersContent) < offset+4 {
 		return offset, fmt.Errorf("rawParametersContent too short for SessionKey")
 	}
-	c.SessionKey = types.ULONG(binary.BigEndian.Uint32(rawParametersContent[offset : offset+4]))
+	c.SessionKey = types.ULONG(binary.LittleEndian.Uint32(rawParametersContent[offset : offset+4]))
 	offset += 4
 
-	// Unmarshalling parameter OEMPasswordLen
-	if len(rawParametersContent) < offset+2 {
-		return offset, fmt.Errorf("rawParametersContent too short for OEMPasswordLen")
-	}
-	c.OEMPasswordLen = types.USHORT(binary.BigEndian.Uint16(rawParametersContent[offset : offset+2]))
-	offset += 2
+	if c.Capabilities.HasCapability(capabilities.CAP_EXTENDED_SECURITY) {
+		// Unmarshalling parameter SecurityBlobLength
+		if len(rawParametersContent) < offset+2 {
+			return offset, fmt.Errorf("rawParametersContent too short for SecurityBlobLength")
+		}
+		c.SecurityBlobLength = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
+		offset += 2
+	} else {
+		// Unmarshalling parameter OEMPasswordLen
+		if len(rawParametersContent) < offset+2 {
+			return offset, fmt.Errorf("rawParametersContent too short for OEMPasswordLen")
+		}
+		c.OEMPasswordLen = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
+		offset += 2
 
-	// Unmarshalling parameter UnicodePasswordLen
-	if len(rawParametersContent) < offset+2 {
-		return offset, fmt.Errorf("rawParametersContent too short for UnicodePasswordLen")
+		// Unmarshalling parameter UnicodePasswordLen
+		if len(rawParametersContent) < offset+2 {
+			return offset, fmt.Errorf("rawParametersContent too short for UnicodePasswordLen")
+		}
+		c.UnicodePasswordLen = types.USHORT(binary.LittleEndian.Uint16(rawParametersContent[offset : offset+2]))
+		offset += 2
 	}
-	c.UnicodePasswordLen = types.USHORT(binary.BigEndian.Uint16(rawParametersContent[offset : offset+2]))
-	offset += 2
 
 	// Unmarshalling parameter Reserved
 	if len(rawParametersContent) < offset+4 {
 		return offset, fmt.Errorf("rawParametersContent too short for Reserved")
 	}
-	c.Reserved = types.ULONG(binary.BigEndian.Uint32(rawParametersContent[offset : offset+4]))
+	c.Reserved = types.ULONG(binary.LittleEndian.Uint32(rawParametersContent[offset : offset+4]))
 	offset += 4
 
 	// Unmarshalling parameter Capabilities
 	if len(rawParametersContent) < offset+4 {
 		return offset, fmt.Errorf("rawParametersContent too short for Capabilities")
 	}
-	c.Capabilities = capabilities.Capabilities(binary.BigEndian.Uint32(rawParametersContent[offset : offset+4]))
+	c.Capabilities = capabilities.Capabilities(binary.LittleEndian.Uint32(rawParametersContent[offset : offset+4]))
 	offset += 4
 
 	// Then unmarshal the data
 	offset = 0
 
-	// Unmarshalling data OEMPassword
-	if len(rawDataContent) < offset+1 {
-		return offset, fmt.Errorf("rawParametersContent too short for OEMPassword")
-	}
-	c.OEMPassword = rawDataContent[offset : offset+int(c.OEMPasswordLen)]
-	offset += int(c.OEMPasswordLen)
+	if c.Capabilities.HasCapability(capabilities.CAP_EXTENDED_SECURITY) {
+		// Unmarshalling data SecurityBlob
+		if len(rawDataContent) < offset+2 {
+			return offset, fmt.Errorf("rawDataContent too short for SecurityBlobLength")
+		}
+		c.SecurityBlobLength = types.USHORT(binary.LittleEndian.Uint16(rawDataContent[offset : offset+2]))
+		offset += 2
 
-	// Unmarshalling data UnicodePassword
-	if len(rawDataContent) < offset+1 {
-		return offset, fmt.Errorf("rawParametersContent too short for UnicodePassword")
-	}
-	c.UnicodePassword = rawDataContent[offset : offset+int(c.UnicodePasswordLen)]
-	offset += int(c.UnicodePasswordLen)
+		// Unmarshalling data NativeOS
+		nativeOSdata, bytesRead := utils.ReadUntilNullTerminator(rawDataContent[offset:])
+		offset += bytesRead
+		c.NativeOS = string(nativeOSdata)
 
-	// Unmarshalling data Pad
-	padLen := int(c.UnicodePasswordLen)
-	if padLen%2 == 1 {
-		padLen++
-	}
-	if len(rawDataContent) < offset+padLen {
-		return offset, fmt.Errorf("rawParametersContent too short for Pad")
-	}
-	c.Pad = rawDataContent[offset : offset+padLen]
-	offset += padLen
+		// Unmarshalling data NativeLanMan
+		nativeLanMandata, bytesRead := utils.ReadUntilNullTerminator(rawDataContent[offset:])
+		offset += bytesRead
+		c.NativeLanMan = string(nativeLanMandata)
+	} else {
+		// Unmarshalling data OEMPassword
+		if len(rawDataContent) < offset+1 {
+			return offset, fmt.Errorf("rawParametersContent too short for OEMPassword")
+		}
+		c.OEMPassword = rawDataContent[offset : offset+int(c.OEMPasswordLen)]
+		offset += int(c.OEMPasswordLen)
 
-	// Unmarshalling data AccountName
-	bytesRead, err = c.AccountName.Unmarshal(rawDataContent[offset:])
-	if err != nil {
-		return offset, err
-	}
-	offset += bytesRead
+		// Unmarshalling data UnicodePassword
+		if len(rawDataContent) < offset+1 {
+			return offset, fmt.Errorf("rawParametersContent too short for UnicodePassword")
+		}
+		c.UnicodePassword = rawDataContent[offset : offset+int(c.UnicodePasswordLen)]
+		offset += int(c.UnicodePasswordLen)
 
-	// Unmarshalling data PrimaryDomain
-	bytesRead, err = c.PrimaryDomain.Unmarshal(rawDataContent[offset:])
-	if err != nil {
-		return offset, err
-	}
-	offset += bytesRead
+		// Unmarshalling data Pad
+		padLen := int(c.UnicodePasswordLen)
+		if padLen%2 == 1 {
+			padLen++
+		}
+		if len(rawDataContent) < offset+padLen {
+			return offset, fmt.Errorf("rawParametersContent too short for Pad")
+		}
+		c.Pad = rawDataContent[offset : offset+padLen]
+		offset += padLen
 
-	// Unmarshalling data NativeOS
-	bytesRead, err = c.NativeOS.Unmarshal(rawDataContent[offset:])
-	if err != nil {
-		return offset, err
-	}
-	offset += bytesRead
+		// Unmarshalling data AccountName
+		bytesRead, err = c.AccountName.Unmarshal(rawDataContent[offset:])
+		if err != nil {
+			return offset, err
+		}
+		offset += bytesRead
 
-	// Unmarshalling data NativeLanMan
-	bytesRead, err = c.NativeLanMan.Unmarshal(rawDataContent[offset:])
-	if err != nil {
-		return offset, err
+		// Unmarshalling data PrimaryDomain
+		bytesRead, err = c.PrimaryDomain.Unmarshal(rawDataContent[offset:])
+		if err != nil {
+			return offset, err
+		}
+		offset += bytesRead
+
+		// Unmarshalling NativeOS
+		nativeOSSmbString := types.SMB_STRING{}
+		nativeOSSmbString.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_NULL_TERMINATED_OEM_STRING)
+		nativeOSSmbString.SetString(c.NativeOS)
+		bytesRead, err = nativeOSSmbString.Unmarshal(rawDataContent[offset:])
+		if err != nil {
+			return offset, err
+		}
+		offset += bytesRead
+
+		// Unmarshalling NativeLanMan
+		nativeLanManSmbString := types.SMB_STRING{}
+		nativeLanManSmbString.SetBufferFormat(types.SMB_STRING_BUFFER_FORMAT_NULL_TERMINATED_OEM_STRING)
+		nativeLanManSmbString.SetString(c.NativeLanMan)
+		bytesRead, err = nativeLanManSmbString.Unmarshal(rawDataContent[offset:])
+		if err != nil {
+			return offset, err
+		}
+		offset += bytesRead
 	}
-	offset += bytesRead
 
 	return offset, nil
 }

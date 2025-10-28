@@ -30,7 +30,7 @@ func TestCapabilitiesString(t *testing.T) {
 		{
 			name:     "Multiple capabilities",
 			caps:     capabilities.CAP_RAW_MODE | capabilities.CAP_UNICODE | capabilities.CAP_LARGE_FILES,
-			expected: "CAP_LARGE_FILES|CAP_RAW_MODE|CAP_UNICODE",
+			expected: "CAP_RAW_MODE|CAP_UNICODE|CAP_LARGE_FILES",
 		},
 		{
 			name: "All capabilities",
@@ -38,7 +38,7 @@ func TestCapabilitiesString(t *testing.T) {
 				capabilities.CAP_LARGE_FILES | capabilities.CAP_NT_SMBS | capabilities.CAP_RPC_REMOTE_APIS |
 				capabilities.CAP_STATUS32 | capabilities.CAP_LEVEL_II_OPLOCKS | capabilities.CAP_LOCK_AND_READ |
 				capabilities.CAP_NT_FIND | capabilities.CAP_DFS | capabilities.CAP_LARGE_READX,
-			expected: "CAP_DFS|CAP_LARGE_FILES|CAP_LARGE_READX|CAP_LEVEL_II_OPLOCKS|CAP_LOCK_AND_READ|CAP_MPX_MODE|CAP_NT_FIND|CAP_NT_SMBS|CAP_RAW_MODE|CAP_RPC_REMOTE_APIS|CAP_STATUS32|CAP_UNICODE",
+			expected: "CAP_RAW_MODE|CAP_MPX_MODE|CAP_UNICODE|CAP_LARGE_FILES|CAP_NT_SMBS|CAP_RPC_REMOTE_APIS|CAP_NT_STATUS|CAP_LEVEL_II_OPLOCKS|CAP_LOCK_AND_READ|CAP_NT_FIND|CAP_DFS|CAP_LARGE_READX",
 		},
 	}
 
@@ -46,7 +46,7 @@ func TestCapabilitiesString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.caps.String()
 			if result != tt.expected {
-				t.Errorf("Capabilities.String() = %v, want %v", result, tt.expected)
+				t.Errorf("Capabilities.String()\n | got  %v, \n | want %v", result, tt.expected)
 			}
 		})
 	}

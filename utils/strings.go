@@ -89,3 +89,25 @@ func SizeInBytes(size uint64) string {
 		return fmt.Sprintf("%d bytes", size)
 	}
 }
+
+// EndsWithNullTerminator checks if the input string ends with a null terminator
+//
+// Parameters:
+// - input: The input string to check.
+//
+// Returns:
+// - A boolean indicating if the input string ends with a null terminator.
+func EndsWithNullTerminator(input string) bool {
+	return input[len(input)-1] == 0x00
+}
+
+// EndsWithNullTerminatorUTF16 checks if the input byte slice ends with a null terminator
+//
+// Parameters:
+// - input: The input string to check.
+//
+// Returns:
+// - A boolean indicating if the input string ends with a null terminator.
+func EndsWithNullTerminatorUTF16(input []byte) bool {
+	return input[len(input)-2] == 0x00 && input[len(input)-1] == 0x00
+}

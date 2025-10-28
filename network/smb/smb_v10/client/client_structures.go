@@ -7,6 +7,7 @@ import (
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/securitymode"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/transport"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/types"
+	"github.com/TheManticoreProject/Manticore/windows/guid"
 )
 
 // Client represents an SMB v1.0 client
@@ -14,14 +15,20 @@ type Client struct {
 	// Transport is the transport layer for the client
 	Transport transport.Transport
 
-	// TreeConnect is the tree connect for the client
-	TreeConnect *TreeConnect
-
 	// Session is the session for the client
 	Session *Session
 
 	// Connection is the connection for the client
 	Connection *Connection
+
+	// NativeOS is the native operating system of the client
+	NativeOS string
+
+	// NativeLanMan is the native LAN Manager of the client
+	NativeLanMan string
+
+	// Workstation is the workstation name of the client
+	Workstation string
 }
 
 // Connection represents an established SMB connection between the client and server
@@ -114,4 +121,7 @@ type Server struct {
 
 	// DomainName is the domain name of the server
 	DomainName string
+
+	// ServerGUID is the GUID of the server
+	ServerGUID guid.GUID
 }

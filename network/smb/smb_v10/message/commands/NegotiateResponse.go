@@ -14,6 +14,7 @@ import (
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/message/parameters"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/securitymode"
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/types"
+	"github.com/TheManticoreProject/Manticore/windows/guid"
 )
 
 // NegotiateResponse
@@ -23,59 +24,76 @@ type NegotiateResponse struct {
 
 	// Parameters
 
-	// The index of the dialect selected by the server from the list presented in the request. Dialect entries are numbered
-	// starting with 0x0000, so a DialectIndex value of 0x0000 indicates the first entry in the list. If the server does not
+	// The index of the dialect selected by the server from the list presented in the
+	// request. Dialect entries are numbered starting with 0x0000, so a DialectIndex
+	// value of 0x0000 indicates the first entry in the list. If the server does not
 	// support any of the listed dialects, it MUST return a DialectIndex of 0xFFFF.
 	DialectIndex types.USHORT
 
-	// An 8-bit field indicating the security modes supported or required by the server, as follows:
+	// An 8-bit field indicating the security modes supported or required by the server
 	SecurityMode securitymode.SecurityMode
 
-	// The maximum number of outstanding SMB operations that the server supports. This value includes existing OpLocks,
-	// the NT_TRANSACT_NOTIFY_CHANGE subcommand, and any other commands that are pending on the server. If the negotiated
-	// MaxMpxCount is 0x0001, then OpLock support MUST be disabled for this session. The MaxMpxCount MUST be greater than 0x0000.
-	// This parameter has no specific relationship to the SMB_COM_READ_MPX and SMB_COM_WRITE_MPX commands.
+	// The maximum number of outstanding SMB operations that the server supports.
+	// This value includes existing OpLocks, the NT_TRANSACT_NOTIFY_CHANGE subcommand,
+	// and any other commands that are pending on the server. If the negotiated
+	// MaxMpxCount is 0x0001, then OpLock support MUST be disabled for this session.
+	// The MaxMpxCount MUST be greater than 0x0000. This parameter has no specific
+	// relationship to the SMB_COM_READ_MPX and SMB_COM_WRITE_MPX commands.
 	MaxMpxCount types.USHORT
 
-	// The maximum number of virtual circuits that can be established between the client and the server as part of the same SMB session.
+	// The maximum number of virtual circuits that can be established between the
+	// client and the server as part of the same SMB session.
 	MaxNumberVcs types.USHORT
 
-	// The maximum size, in bytes, of the largest SMB message that the server can receive. This is the size of the largest SMB message
-	// that the client can send to the server. SMB message size includes the size of the SMB header, parameter, and data blocks. This size
-	// does not include any transport-layer framing or other transport-layer data. The server SHOULD provide a MaxBufferSize of 4356 bytes,
-	// and MUST be a multiple of 4 bytes. If CAP_RAW_MODE is negotiated, the SMB_COM_WRITE_RAW command can bypass the MaxBufferSize limit.
-	// Otherwise, SMB messages sent to the server MUST have a total size less than or equal to the MaxBufferSize value. This includes AndX
-	// chained messages.
+	// The maximum size, in bytes, of the largest SMB message that the server can
+	// receive. This is the size of the largest SMB message that the client can send
+	// to the server. SMB message size includes the size of the SMB header, parameter,
+	// and data blocks. This size
+	// does not include any transport-layer framing or other transport-layer data.
+	// The server SHOULD provide a MaxBufferSize of 4356 bytes, and MUST be a
+	// multiple of 4 bytes. If CAP_RAW_MODE is negotiated, the SMB_COM_WRITE_RAW
+	// command can bypass the MaxBufferSize limit. Otherwise, SMB messages sent to
+	// the server MUST have a total size less than or equal to the MaxBufferSize
+	// value. This includes AndX chained messages.
 	MaxBufferSize types.ULONG
 
-	// This value specifies the maximum message size when the client sends an SMB_COM_WRITE_RAW Request (section 2.2.4.25.1), and the maximum
-	// message size that the server MUST NOT exceed when sending an SMB_COM_READ_RAW Response (section 2.2.4.22.2). This value is significant only
-	// if CAP_RAW_MODE is negotiated.
+	// This value specifies the maximum message size when the client sends an
+	// SMB_COM_WRITE_RAW Request (section 2.2.4.25.1), and the maximum message size
+	// that the server MUST NOT exceed when sending an SMB_COM_READ_RAW Response
+	// (section 2.2.4.22.2). This value is significant only if CAP_RAW_MODE is
+	// negotiated.
 	MaxRawSize types.ULONG
 
-	// The server SHOULD set the value to a token generated for the connection, as specified in SessionKey Generation (section 2.2.1.6.6).
+	// The server SHOULD set the value to a token generated for the connection, as
+	// specified in SessionKey Generation (section 2.2.1.6.6).
 	SessionKey types.ULONG
 
-	// A 32-bit field providing a set of server capability indicators. This bit field is used to indicate to the client which features are supported
-	// by the server. Any value not listed in the following table is unused. The server MUST set the unused bits to 0 in a response, and the client MUST
-	// ignore these bits.
+	// A 32-bit field providing a set of server capability indicators. This bit field
+	// is used to indicate to the client which features are supported by the server.
+	// Any value not listed in the following table is unused. The server MUST set the
+	// unused bits to 0 in a response, and the client MUST ignore these bits.
 	Capabilities capabilities.Capabilities
 
-	// The number of 100-nanosecond intervals that have elapsed since January 1, 1601, in Coordinated Universal Time (UTC) format.
+	// The number of 100-nanosecond intervals that have elapsed since January 1, 1601,
+	// in Coordinated Universal Time (UTC) format.
 	SystemTime types.FILETIME
 
-	// A signed 16-bit signed integer that represents the server's time zone, in minutes, from UTC. The time zone of the server MUST be expressed
-	// in minutes, plus or minus, from UTC.
+	// A signed 16-bit signed integer that represents the server's time zone, in
+	// minutes, from UTC. The time zone of the server MUST be expressed in minutes,
+	// plus or minus, from UTC.
 	ServerTimeZone types.SHORT
 
-	// This field MUST be 0x00 or 0x08. The length of the random challenge used in challenge/response authentication. If the server does not support
-	// challenge/response authentication, this field MUST be 0x00. This field is often referred to in older documentation as EncryptionKeyLength.
+	// This field MUST be 0x00 or 0x08. The length of the random challenge used in
+	// challenge/response authentication. If the server does not support
+	// challenge/response authentication, this field MUST be 0x00. This field is
+	// often referred to in older documentation as EncryptionKeyLength.
 	ChallengeLength types.UCHAR
 
-	// Data
+	// Data in case of Non Extended Security Response
 
-	// An array of unsigned bytes that MUST be ChallengeLength bytes long and MUST represent the server challenge.
-	// This array MUST NOT be null-terminated. This field is often referred to in older documentation as EncryptionKey.
+	// An array of unsigned bytes that MUST be ChallengeLength bytes long and MUST
+	// represent the server challenge. This array MUST NOT be null-terminated. This
+	// field is
 	Challenge []types.UCHAR
 
 	// The null-terminated name of the NT domain or workgroup to which the server belongs.
@@ -83,6 +101,23 @@ type NegotiateResponse struct {
 
 	// The null-terminated name of the server.
 	ServerName []types.UCHAR
+
+	// Data in case of Extended Security Response
+	// Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb/d883d0a5-5a0a-4626-8e3e-87b0b66b79aa
+
+	// This field MUST be a GUID generated by the server to uniquely id	entify this
+	// server. This field SHOULD NOT be used by a client as a secure method of
+	// identifying a server because it can be forged. A client SHOULD use this
+	// information to detect whether connections to different textual names resolve to
+	// the same target server when direct TCP is used. This knowledge can then be
+	// used to set the SMB_Parameters.Words.VcNumber field in the
+	// SMB_COM_SESSION_SETUP_ANDX request (see [MS-CIFS] section 2.2.4.53.1).
+	ServerGUID guid.GUID
+
+	// A security binary large object (BLOB) that SHOULD contain an authentication
+	// token as produced by the GSS protocol (as specified in section 3.2.4.2.4 and
+	// [RFC2743]).
+	SecurityBlob []types.UCHAR
 }
 
 // NewNegotiateResponse creates a new NegotiateResponse structure
@@ -104,10 +139,16 @@ func NewNegotiateResponse() *NegotiateResponse {
 		ServerTimeZone:  types.SHORT(0),
 		ChallengeLength: types.UCHAR(0),
 
-		// Data
+		// Data in case of Non Extended Security Response
+		// Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb/a8f7396e-6251-47b2-9d31-8a83cc230d21
 		Challenge:  []types.UCHAR{},
 		DomainName: []types.UCHAR{},
 		ServerName: []types.UCHAR{},
+
+		// Data in case of Extended Security Response
+		// Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb/d883d0a5-5a0a-4626-8e3e-87b0b66b79aa
+		ServerGUID:   guid.GUID{},
+		SecurityBlob: []types.UCHAR{},
 	}
 
 	c.Command.SetCommandCode(codes.SMB_COM_NEGOTIATE)
@@ -164,11 +205,18 @@ func (c *NegotiateResponse) Marshal() ([]byte, error) {
 	// This is because some parameters are dependent on the data, for example the size of some fields within
 	// the data will be stored in the parameters
 	rawDataContent := []byte{}
-	// Marshalling data Challenge
-	c.ChallengeLength = types.UCHAR(len(c.Challenge))
-	rawDataContent = append(rawDataContent, c.Challenge...)
-	// Marshalling data DomainName
-	rawDataContent = append(rawDataContent, c.DomainName...)
+	if c.SecurityMode.SupportsChallengeResponseAuth() {
+		// Marshalling data Challenge
+		c.ChallengeLength = types.UCHAR(len(c.Challenge))
+		rawDataContent = append(rawDataContent, c.Challenge...)
+		// Marshalling data DomainName
+		rawDataContent = append(rawDataContent, c.DomainName...)
+	} else {
+		// Marshalling data ServerGUID
+		rawDataContent = append(rawDataContent, c.ServerGUID.ToBytes()...)
+		// Marshalling data SecurityBlob
+		rawDataContent = append(rawDataContent, c.SecurityBlob...)
+	}
 
 	// Then marshal the parameters
 	rawParametersContent := []byte{}
@@ -344,23 +392,32 @@ func (c *NegotiateResponse) Unmarshal(marshalledData []byte) (int, error) {
 
 	// Then unmarshal the data
 	offset = 0
-	// Unmarshalling data Challenge
-	if len(rawDataContent) < offset+int(c.ChallengeLength) {
-		return offset, fmt.Errorf("rawDataContent too short for Challenge")
+	if c.SecurityMode.SupportsChallengeResponseAuth() {
+		// Unmarshalling data ServerGUID
+		c.ServerGUID.FromRawBytes(rawDataContent[offset : offset+16])
+		offset += 16
+
+		// Unmarshalling data SecurityBlob
+		c.SecurityBlob = rawDataContent[offset:]
+	} else {
+		// Unmarshalling data Challenge
+		if len(rawDataContent) < offset+int(c.ChallengeLength) {
+			return offset, fmt.Errorf("rawDataContent too short for Challenge")
+		}
+		c.Challenge = rawDataContent[offset : offset+int(c.ChallengeLength)]
+		offset += int(c.ChallengeLength)
+		rawDataContent = rawDataContent[offset:]
+
+		// Unmarshalling data DomainName
+		domainName, offset := utils.GetNullTerminatedUnicodeString(rawDataContent)
+		c.DomainName = []types.UCHAR(domainName)
+		rawDataContent = rawDataContent[offset:]
+
+		// Unmarshalling data ServerName
+		serverName, offset := utils.GetNullTerminatedUnicodeString(rawDataContent)
+		c.ServerName = []types.UCHAR(serverName)
+		// rawDataContent = rawDataContent[offset:]
 	}
-	c.Challenge = rawDataContent[offset : offset+int(c.ChallengeLength)]
-	offset += int(c.ChallengeLength)
-	rawDataContent = rawDataContent[offset:]
-
-	// Unmarshalling data DomainName
-	domainName, offset := utils.GetNullTerminatedUnicodeString(rawDataContent)
-	c.DomainName = []types.UCHAR(domainName)
-	rawDataContent = rawDataContent[offset:]
-
-	// Unmarshalling data ServerName
-	serverName, offset := utils.GetNullTerminatedUnicodeString(rawDataContent)
-	c.ServerName = []types.UCHAR(serverName)
-	// rawDataContent = rawDataContent[offset:]
 
 	return offset, nil
 }
