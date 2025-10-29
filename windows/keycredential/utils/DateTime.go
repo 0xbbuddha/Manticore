@@ -24,7 +24,9 @@ type DateTime struct {
 	ticks uint64
 }
 
-// NewDateTime initializes a new DateTime instance.
+const ticksBetween1601AndUnix uint64 = 116444736000000000 // (Unix(1970)-1601) in 100ns ticks
+
+// NewDateTimeFromTicks initializes a new DateTime instance from a number of ticks.
 //
 // Parameters:
 //   - ticks: A uint64 value representing the number of 100-nanosecond intervals that have elapsed since 1601-01-01 00:00:00 UTC.
@@ -37,15 +39,36 @@ type DateTime struct {
 // The function calculates the number of nanoseconds between 1601-01-01 and the UNIX epoch (1970-01-01) to convert ticks to a time.Time object.
 // If ticks is 0, the function sets the current time and calculates the ticks from 1601 to the current time.
 // Otherwise, it sets the time based on the provided ticks.
-func NewDateTime(ticks uint64) DateTime {
+func NewDateTimeFromTicks(ticks uint64) DateTime {
 	dt := DateTime{}
 
 	if ticks == 0 {
-		dt.SetTime(time.Now())
+		// Capture current time without truncation to avoid returning a value
+		// that can be before a caller-captured timestamp taken immediately
+		// before invoking this function (due to 100ns truncation flooring).
+		now := time.Now().UTC()
+		epoch1601 := time.Date(1601, 1, 1, 0, 0, 0, 0, time.UTC)
+		// Use signed arithmetic to correctly support times before 1970.
+		nsSince1601 := now.UnixNano() - epoch1601.UnixNano()
+		dt.time = now
+		dt.ticks = uint64(nsSince1601 / 100)
 	} else {
 		dt.SetTicks(ticks)
 	}
 
+	return dt
+}
+
+// NewDateTimeFromTime initializes a new DateTime instance from a time.Time object.
+//
+// Parameters:
+// - t: A time.Time value to create the DateTime instance from.
+//
+// Returns:
+// - A DateTime object initialized with the provided time.Time value.
+func NewDateTimeFromTime(t time.Time) DateTime {
+	dt := DateTime{}
+	dt.SetTime(t)
 	return dt
 }
 
@@ -68,14 +91,17 @@ func (dt DateTime) ToUniversalTime() time.Time {
 // Note:
 // This function updates both the Ticks field and recalculates the corresponding Time field based on the provided ticks.
 func (dt *DateTime) SetTicks(ticks uint64) {
-	epoch1601 := time.Date(1601, 1, 1, 0, 0, 0, 0, time.UTC)
-	unixEpoch := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
-	nanosecondsBetween1601AndEpoch := uint64(unixEpoch.UnixNano() - epoch1601.UnixNano())
-
 	dt.ticks = ticks
-	ticksInNs := uint64(ticks * 100)
-	nanoSecondsFromUnixEpoch := uint64(ticksInNs - nanosecondsBetween1601AndEpoch)
-	dt.time = time.Unix(0, int64(nanoSecondsFromUnixEpoch))
+	var nsFromUnixEpoch int64
+	if ticks >= ticksBetween1601AndUnix {
+		diffTicks := ticks - ticksBetween1601AndUnix
+		// diffTicks represents duration since Unix epoch in 100ns units; safe to scale to ns for time.Unix
+		nsFromUnixEpoch = int64(diffTicks) * 100
+	} else {
+		diffTicks := ticksBetween1601AndUnix - ticks
+		nsFromUnixEpoch = -int64(diffTicks) * 100
+	}
+	dt.time = time.Unix(0, nsFromUnixEpoch)
 }
 
 // GetTicks returns the number of 100-nanosecond intervals (ticks) stored in the DateTime instance.
@@ -95,11 +121,21 @@ func (dt *DateTime) GetTicks() uint64 {
 // This function updates both the Time field and recalculates the corresponding Ticks field based on the provided time.
 func (dt *DateTime) SetTime(t time.Time) {
 	epoch1601 := time.Date(1601, 1, 1, 0, 0, 0, 0, time.UTC)
-	unixEpoch := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
-	nanosecondsBetween1601AndEpoch := uint64(unixEpoch.UnixNano() - epoch1601.UnixNano())
+	if t.UTC().Equal(epoch1601) {
+		dt.time = epoch1601
+		dt.ticks = 0
+		return
+	}
 
-	dt.time = t.Truncate(100 * time.Nanosecond)
-	dt.ticks = (nanosecondsBetween1601AndEpoch + uint64(t.UnixNano())) / 100
+	truncated := t.UTC().Truncate(100 * time.Nanosecond)
+	dt.time = truncated
+	nanos := truncated.UnixNano()
+	if nanos >= 0 {
+		dt.ticks = ticksBetween1601AndUnix + uint64(nanos/100)
+	} else {
+		// Truncated ensures nanos is divisible by 100
+		dt.ticks = ticksBetween1601AndUnix - uint64((-nanos)/100)
+	}
 }
 
 // GetTime returns the time.Time value stored in the DateTime instance.

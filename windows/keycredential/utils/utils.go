@@ -92,20 +92,20 @@ func ConvertFromBinaryTime(rawBinaryTime []byte, ksrc source.KeySource, kcv vers
 
 	switch kcv.Value {
 	case version.KeyCredentialVersion_0, version.KeyCredentialVersion_1:
-		return NewDateTime(uint64(timeStamp))
+		return NewDateTimeFromTicks(uint64(timeStamp))
 	case version.KeyCredentialVersion_2:
 		if ksrc.Value == source.KeySource_AD {
-			return NewDateTime(uint64(timeStamp))
+			return NewDateTimeFromTicks(uint64(timeStamp))
 		} else {
 			// This is not fully supported right now, you may encounter issues.
-			return NewDateTime(uint64(timeStamp))
+			return NewDateTimeFromTicks(uint64(timeStamp))
 		}
 	default:
 		if ksrc.Value == source.KeySource_AD {
-			return NewDateTime(uint64(timeStamp))
+			return NewDateTimeFromTicks(uint64(timeStamp))
 		} else {
 			// This is not fully supported right now, you may encounter issues.
-			return NewDateTime(uint64(timeStamp))
+			return NewDateTimeFromTicks(uint64(timeStamp))
 		}
 	}
 }

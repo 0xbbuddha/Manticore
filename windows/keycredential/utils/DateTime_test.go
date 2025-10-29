@@ -7,10 +7,22 @@ import (
 	"github.com/TheManticoreProject/Manticore/windows/keycredential/utils"
 )
 
+// ticksFromTime computes 100ns ticks since 1601-01-01 UTC without relying on
+// time.Time values outside the int64 nanosecond range (avoids overflow).
+func ticksFromTime(t time.Time) uint64 {
+	const ticksBetween1601AndUnix uint64 = 116444736000000000
+	trunc := t.UTC().Truncate(100 * time.Nanosecond)
+	nanos := trunc.UnixNano()
+	if nanos >= 0 {
+		return ticksBetween1601AndUnix + uint64(nanos/100)
+	}
+	return ticksBetween1601AndUnix - uint64((-nanos)/100)
+}
+
 func TestNewDateTime(t *testing.T) {
 	t.Run("with zero ticks should set current time", func(t *testing.T) {
 		before := time.Now()
-		dt := utils.NewDateTime(0)
+		dt := utils.NewDateTimeFromTicks(0)
 		after := time.Now()
 
 		if !(dt.GetTime().After(before) || dt.GetTime().Equal(before)) {
@@ -26,7 +38,7 @@ func TestNewDateTime(t *testing.T) {
 
 	t.Run("with specific ticks should set correct time", func(t *testing.T) {
 		// 132918192030000000 ticks = 2022-03-15 12:00:03 UTC
-		dt := utils.NewDateTime(uint64(132918192030000000))
+		dt := utils.NewDateTimeFromTicks(uint64(132918192030000000))
 
 		expected := time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC)
 		if !dt.GetTime().UTC().Equal(expected) {
@@ -39,7 +51,7 @@ func TestNewDateTime(t *testing.T) {
 }
 
 func TestDateTime_ToUniversalTime(t *testing.T) {
-	dt := utils.NewDateTime(uint64(132918192030000000)) // 2022-03-15 12:00:03 UTC
+	dt := utils.NewDateTimeFromTicks(uint64(132918192030000000)) // 2022-03-15 12:00:03 UTC
 	utc := dt.ToUniversalTime()
 
 	expected := time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC)
@@ -50,7 +62,7 @@ func TestDateTime_ToUniversalTime(t *testing.T) {
 
 func TestDateTime_ToTicks(t *testing.T) {
 	ticks := uint64(132918192030000000)
-	dt := utils.NewDateTime(ticks)
+	dt := utils.NewDateTimeFromTicks(ticks)
 
 	if dt.ToTicks() != ticks {
 		t.Errorf("Expected ticks %d, got %d", ticks, dt.ToTicks())
@@ -58,7 +70,7 @@ func TestDateTime_ToTicks(t *testing.T) {
 }
 
 func TestDateTime_String(t *testing.T) {
-	dt := utils.NewDateTime(uint64(132918192030000000)) // 2022-03-15 12:00:03 UTC
+	dt := utils.NewDateTimeFromTicks(uint64(132918192030000000)) // 2022-03-15 12:00:03 UTC
 	expected := time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC)
 
 	// Compare the actual time values instead of string representations to avoid timezone issues
@@ -68,7 +80,7 @@ func TestDateTime_String(t *testing.T) {
 }
 
 func TestDateTime_Marshal(t *testing.T) {
-	dt := utils.NewDateTime(uint64(132918192030000000))
+	dt := utils.NewDateTimeFromTicks(uint64(132918192030000000))
 	data, err := dt.Marshal()
 
 	if err != nil {
@@ -141,7 +153,7 @@ func TestDateTime_GetTime_SetTime(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			dt := utils.NewDateTime(0)
+			dt := utils.NewDateTimeFromTicks(0)
 			dt.SetTime(tc.setTime)
 			result := dt.GetTime()
 
@@ -177,7 +189,7 @@ func TestDateTime_GetTicks_SetTicks(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			dt := utils.NewDateTime(0)
+			dt := utils.NewDateTimeFromTicks(0)
 			dt.SetTicks(tc.setTicks)
 			result := dt.GetTicks()
 
@@ -186,10 +198,75 @@ func TestDateTime_GetTicks_SetTicks(t *testing.T) {
 			}
 
 			// Verify that the time representation is consistent
-			dt2 := utils.NewDateTime(tc.setTicks)
+			dt2 := utils.NewDateTimeFromTicks(tc.setTicks)
 			if dt2.GetTicks() != result {
 				t.Errorf("Tick values not consistent after recreation: expected %d, got %d",
 					result, dt2.GetTicks())
+			}
+		})
+	}
+}
+
+func TestNewDateTimeFromTime(t *testing.T) {
+	epoch1601 := time.Date(1601, 1, 1, 0, 0, 0, 0, time.UTC)
+	unixEpoch := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+	// nanosecondsBetween1601AndEpoch is used for calculating expected ticks from time.Time
+	// and is consistent with the definition of ticks in DateTime.go
+	// (number of 100-nanosecond intervals since 1601-01-01 00:00:00 UTC)
+	// Note: The current implementation of NewDateTimeFromTime might not correctly use this epoch for tick calculation,
+	// leading to test failures which would indicate a bug.
+	nanosecondsBetween1601AndEpoch := uint64(unixEpoch.UnixNano() - epoch1601.UnixNano())
+
+	testCases := []struct {
+		name          string
+		inputTime     time.Time
+		expectedTime  time.Time // Expected time after truncation to 100ns
+		expectedTicks uint64    // Expected ticks based on 1601-01-01 UTC epoch
+	}{
+		{
+			name:          "Current time with nanosecond precision",
+			inputTime:     time.Date(2023, 10, 27, 10, 30, 45, 123456789, time.UTC),
+			expectedTime:  time.Date(2023, 10, 27, 10, 30, 45, 123456700, time.UTC), // Truncated to 100ns
+			expectedTicks: ticksFromTime(time.Date(2023, 10, 27, 10, 30, 45, 123456700, time.UTC)),
+		},
+		{
+			name:          "Time with exact 100-nanosecond precision",
+			inputTime:     time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC), // Corresponds to 132918192030000000 ticks
+			expectedTime:  time.Date(2022, 3, 15, 12, 0, 3, 0, time.UTC),
+			expectedTicks: uint64(132918192030000000),
+		},
+		{
+			name:          "Unix epoch time (1970-01-01 00:00:00 UTC)",
+			inputTime:     unixEpoch,
+			expectedTime:  unixEpoch,
+			expectedTicks: nanosecondsBetween1601AndEpoch / 100, // Ticks from 1601 to 1970
+		},
+		{
+			name:          "Time before Unix epoch (e.g., 1800-01-01 00:00:00 UTC)",
+			inputTime:     time.Date(1800, 1, 1, 0, 0, 0, 0, time.UTC),
+			expectedTime:  time.Date(1800, 1, 1, 0, 0, 0, 0, time.UTC),
+			expectedTicks: ticksFromTime(time.Date(1800, 1, 1, 0, 0, 0, 0, time.UTC)),
+		},
+		{
+			name:          "1601 epoch time (1601-01-01 00:00:00 UTC)",
+			inputTime:     epoch1601,
+			expectedTime:  epoch1601,
+			expectedTicks: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dt := utils.NewDateTimeFromTime(tc.inputTime)
+
+			// Verify that the time component is correctly set and truncated
+			if !dt.GetTime().UTC().Equal(tc.expectedTime) {
+				t.Errorf("Expected time %v, got %v", tc.expectedTime, dt.GetTime().UTC())
+			}
+
+			// Verify that the ticks component is correctly calculated based on 1601 epoch
+			if dt.GetTicks() != tc.expectedTicks {
+				t.Errorf("Expected ticks %d, got %d", tc.expectedTicks, dt.GetTicks())
 			}
 		})
 	}
