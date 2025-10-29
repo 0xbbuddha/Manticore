@@ -200,8 +200,7 @@ func TestBinaryTimeInvolution(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Convert time to binary
-			dt := utils.NewDateTime(0)
-			dt.SetTime(tc.time)
+			dt := utils.NewDateTimeFromTime(tc.time)
 			binary, err := dt.Marshal()
 			if err != nil {
 				t.Fatalf("Failed to marshal time: %v", err)
