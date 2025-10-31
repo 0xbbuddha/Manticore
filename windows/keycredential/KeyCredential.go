@@ -181,32 +181,53 @@ func (kc *KeyCredential) ParseDNWithBinary(dnWithBinary ldap.DNWithBinary) error
 func (kc *KeyCredential) Unmarshal(data []byte) (int, error) {
 	kc.RawBytes = data
 	remainder := data
-	kc.RawBytesSize = 0
+	bytesRead := 0 // This will track the total number of bytes successfully parsed and returned.
 
-	_, err := kc.Version.Unmarshal(kc.RawBytes)
+	// Unmarshal the KeyCredential version.
+	// The version structure is responsible for parsing its own data and reporting its size.
+	versionBytesRead, err := kc.Version.Unmarshal(remainder)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to unmarshal KeyCredential version: %w", err)
 	}
-	kc.RawBytesSize += kc.Version.RawBytesSize
-	remainder = remainder[kc.Version.RawBytesSize:]
+	bytesRead += versionBytesRead
+	remainder = remainder[versionBytesRead:]
 
-	// Read all entries corresponding to the KEYCREDENTIALLINK_ENTRY structure:
-	for len(remainder) > 3 {
-		// A 16-bit unsigned integer that specifies the length of the Value field.
-		length := binary.LittleEndian.Uint16(remainder[:2])
-
-		entryType := KeyCredentialEntryType{}
-		_, err := entryType.Unmarshal(remainder)
-		if err != nil {
-			return 0, err
+	// Iterate through the remaining data to parse all entries.
+	// Each entry is structured as: [2 bytes: ValueLength] [1 byte: EntryType] [ValueLength bytes: ValueData].
+	for len(remainder) > 0 {
+		// Ensure there are enough bytes for the entry header (2 bytes for length + 1 byte for type).
+		if len(remainder) < 3 {
+			// If there are remaining bytes but not enough for a full header, the data is malformed.
+			return bytesRead, fmt.Errorf("malformed KeyCredential: insufficient bytes for entry header (expected at least 3, got %d remaining)", len(remainder))
 		}
 
-		remainder = remainder[3:]
+		// Read the 16-bit little-endian length of the ValueData field.
+		valueLength := binary.LittleEndian.Uint16(remainder[:2])
 
-		// An 8-bit unsigned integer that specifies the type of data that is stored in the Value field.
-		entryData := remainder[:length]
-		remainder = remainder[length:]
+		// Extract the 1-byte EntryType. It is located at index 2 after the 2-byte length field.
+		entryType := KeyCredentialEntryType{}
+		// Assuming KeyCredentialEntryType.Unmarshal expects a 1-byte slice containing the type value.
+		// The original code's `entryType.Unmarshal(remainder)` was likely incorrect as it would
+		// attempt to parse the 2-byte length field as the entry type.
+		_, err = entryType.Unmarshal(remainder[2:3])
+		if err != nil {
+			return bytesRead, fmt.Errorf("malformed KeyCredential: failed to unmarshal entry type: %w", err)
+		}
 
+		// Calculate the total size of the current entry:
+		// 2 bytes (for valueLength) + 1 byte (for entryType) + valueLength bytes (for ValueData).
+		totalEntrySize := 3 + int(valueLength)
+
+		// Check if there are enough bytes in 'remainder' for the entire entry (header + value data).
+		if len(remainder) < totalEntrySize {
+			// This is the critical check to prevent "slice bounds out of range" panic.
+			return bytesRead, fmt.Errorf("malformed KeyCredential: insufficient bytes for entry value data (expected %d bytes, got %d remaining)", totalEntrySize, len(remainder))
+		}
+
+		// Extract the ValueData field. It starts after the 2-byte length and 1-byte type.
+		entryData := remainder[3:totalEntrySize]
+
+		// Process the entry data based on its type.
 		switch entryType.Value {
 		case KeyCredentialEntryType_KeyID:
 			kc.Identifier = utils.ConvertFromBinaryIdentifier(entryData, kc.Version)
@@ -216,35 +237,41 @@ func (kc *KeyCredential) Unmarshal(data []byte) (int, error) {
 			kc.RawKeyMaterial.FromBytes(entryData)
 		case KeyCredentialEntryType_KeyUsage:
 			if len(entryData) == 1 {
-				// This is apparently a V2 structure
+				// This is apparently a V2 structure (single byte enum).
 				_, err := kc.Usage.Unmarshal(entryData)
 				if err != nil {
-					return 0, err
+					return bytesRead, fmt.Errorf("failed to unmarshal KeyCredential usage: %w", err)
 				}
 			} else {
-				// This is a legacy structure that contains a string-encoded key usage instead of enum.
+				// This is a legacy structure that contains a string-encoded key usage.
 				kc.LegacyUsage = string(entryData)
 			}
 		case KeyCredentialEntryType_KeySource:
 			_, err := kc.Source.Unmarshal(entryData)
 			if err != nil {
-				return 0, err
+				return bytesRead, fmt.Errorf("failed to unmarshal KeyCredential source: %w", err)
 			}
 		case KeyCredentialEntryType_DeviceId:
 			kc.DeviceId.FromRawBytes(entryData)
 		case KeyCredentialEntryType_CustomKeyInformation:
 			_, err := kc.CustomKeyInfo.Unmarshal(entryData, kc.Version)
 			if err != nil {
-				return 0, err
+				return bytesRead, fmt.Errorf("failed to unmarshal KeyCredential custom key information: %w", err)
 			}
 		case KeyCredentialEntryType_KeyApproximateLastLogonTimeStamp:
 			kc.LastLogonTime = utils.ConvertFromBinaryTime(entryData, kc.Source, kc.Version)
 		case KeyCredentialEntryType_KeyCreationTime:
 			kc.CreationTime = utils.ConvertFromBinaryTime(entryData, kc.Source, kc.Version)
 		}
+
+		// Advance 'remainder' past the current entry and update 'bytesRead'.
+		remainder = remainder[totalEntrySize:]
+		bytesRead += totalEntrySize
 	}
 
-	return 0, nil
+	// Update RawBytesSize with the total bytes successfully parsed.
+	kc.RawBytesSize = uint32(bytesRead)
+	return bytesRead, nil
 }
 
 // CheckIntegrity checks the integrity of the key credential.
