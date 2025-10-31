@@ -29,25 +29,27 @@ const (
 	SecretEncryptionType_DatabaseAES int = 0x13
 )
 
-// FromBytes parses the SecretEncryptionType from a byte array.
+// Unmarshal parses the SecretEncryptionType from a byte array.
 //
 // Parameters:
 // - value: A byte array containing the SecretEncryptionType to be parsed.
-func (set *SecretEncryptionType) FromBytes(value []byte) {
+func (set *SecretEncryptionType) Unmarshal(value []byte) (int, error) {
 	set.RawBytes = value[:4]
 	set.RawBytesSize = 4
+	bytesRead := 4
 
 	set.Value = int(binary.LittleEndian.Uint32(value[:4]))
+	return bytesRead, nil
 }
 
-// ToBytes returns the raw bytes of the SecretEncryptionType.
+// Marshal returns the raw bytes of the SecretEncryptionType.
 //
 // Returns:
 // - A byte array containing the raw bytes of the SecretEncryptionType.
-func (set *SecretEncryptionType) ToBytes() []byte {
+func (set *SecretEncryptionType) Marshal() ([]byte, error) {
 	blob := make([]byte, 4)
 	binary.LittleEndian.PutUint32(blob, uint32(set.Value))
-	return blob
+	return blob, nil
 }
 
 // String returns the string representation of the SecretEncryptionType.

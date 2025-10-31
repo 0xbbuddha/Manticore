@@ -234,7 +234,10 @@ func (kc *KeyCredential) Unmarshal(data []byte) (int, error) {
 		case KeyCredentialEntryType_KeyHash:
 			kc.KeyHash = entryData
 		case KeyCredentialEntryType_KeyMaterial:
-			kc.RawKeyMaterial.FromBytes(entryData)
+			_, err := kc.RawKeyMaterial.Unmarshal(entryData)
+			if err != nil {
+				return bytesRead, fmt.Errorf("failed to unmarshal KeyCredential key material: %w", err)
+			}
 		case KeyCredentialEntryType_KeyUsage:
 			if len(entryData) == 1 {
 				// This is apparently a V2 structure (single byte enum).
@@ -374,7 +377,11 @@ func (kc *KeyCredential) Marshal() ([]byte, error) {
 
 	// kc.RawKeyMaterial
 	entryType := KeyCredentialEntryType{Value: KeyCredentialEntryType_KeyMaterial}
-	WriteEntry(buffer, entryType, kc.RawKeyMaterial.ToBytes())
+	data, err := kc.RawKeyMaterial.Marshal()
+	if err != nil {
+		return nil, err
+	}
+	WriteEntry(buffer, entryType, data)
 
 	// kc.Usage
 	entryType = KeyCredentialEntryType{Value: KeyCredentialEntryType_KeyUsage}
@@ -389,7 +396,7 @@ func (kc *KeyCredential) Marshal() ([]byte, error) {
 
 	// kc.Source
 	entryType = KeyCredentialEntryType{Value: KeyCredentialEntryType_KeySource}
-	data, err := kc.Source.Marshal()
+	data, err = kc.Source.Marshal()
 	if err != nil {
 		return nil, err
 	}

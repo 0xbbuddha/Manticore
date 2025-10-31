@@ -37,12 +37,13 @@ type RSAKeyMaterial struct {
 	RawBytesSize uint32
 }
 
-// Parse parses the provided byte slice into the RSAKeyMaterial structure.
+// Unmarshal parses the provided byte slice into the RSAKeyMaterial structure.
 //
 // Parameters:
 // - value: A byte slice containing the raw RSA key material to be parsed.
 //
 // Returns:
+// - The number of bytes read from the byte slice.
 // - An error if the parsing fails, otherwise nil.
 //
 // Note:
@@ -56,46 +57,58 @@ type RSAKeyMaterial struct {
 // 3. Extracts the key size, exponent size, modulus size, prime1 size, and prime2 size from the header.
 // 4. Parses the exponent, modulus, prime1, and prime2 values from the body of the byte slice based on the extracted sizes.
 // 5. Stores the parsed values in the corresponding fields of the RSAKeyMaterial structure.
-func (rk *RSAKeyMaterial) FromBytes(value []byte) error {
+func (rk *RSAKeyMaterial) Unmarshal(value []byte) (int, error) {
 	rk.RawBytes = value
 	rk.RawBytesSize = uint32(len(value))
+
+	bytesRead := 0
 
 	// Parsing header
 	blobType := value[:4]
 	if string(blobType) != "RSA1" {
-		return fmt.Errorf("invalid blob type: %s", string(blobType))
+		return bytesRead, fmt.Errorf("invalid blob type: %s", string(blobType))
 	}
+	bytesRead += 4
 
 	rk.KeySize = binary.LittleEndian.Uint32(value[4:8])
-	exponentSize := binary.LittleEndian.Uint32(value[8:12])
-	modulusSize := binary.LittleEndian.Uint32(value[12:16])
-	prime1Size := binary.LittleEndian.Uint32(value[16:20])
-	prime2Size := binary.LittleEndian.Uint32(value[20:24])
+	bytesRead += 4
 
-	// Parsing body
-	offset := 24
+	exponentSize := binary.LittleEndian.Uint32(value[8:12])
+	bytesRead += 4
+
+	modulusSize := binary.LittleEndian.Uint32(value[12:16])
+	bytesRead += 4
+
+	prime1Size := binary.LittleEndian.Uint32(value[16:20])
+	bytesRead += 4
+
+	prime2Size := binary.LittleEndian.Uint32(value[20:24])
+	bytesRead += 4
+
+	// Parsing data section
+
 	// For some reason, the exponent is stored in big-endian format.
 	rk.Exponent = 0
 	for i := 0; i < int(exponentSize); i++ {
-		rk.Exponent = (rk.Exponent << 8) | uint32(value[offset+i])
+		rk.Exponent = (rk.Exponent << 8) | uint32(value[bytesRead+i])
 	}
+	bytesRead += int(exponentSize)
 
-	offset += int(exponentSize)
-	rk.Modulus = value[offset : offset+int(modulusSize)]
-	offset += int(modulusSize)
-	rk.Prime1 = value[offset : offset+int(prime1Size)]
-	offset += int(prime1Size)
-	rk.Prime2 = value[offset : offset+int(prime2Size)]
-	offset += int(prime2Size)
+	rk.Modulus = value[bytesRead : bytesRead+int(modulusSize)]
+	bytesRead += int(modulusSize)
+	rk.Prime1 = value[bytesRead : bytesRead+int(prime1Size)]
+	bytesRead += int(prime1Size)
+	rk.Prime2 = value[bytesRead : bytesRead+int(prime2Size)]
+	bytesRead += int(prime2Size)
 
-	return nil
+	return bytesRead, nil
 }
 
-// ToBytes returns the raw bytes of the RSAKeyMaterial structure.
+// Marshal returns the raw bytes of the RSAKeyMaterial structure.
 //
 // Returns:
 // - A byte slice representing the raw bytes of the RSAKeyMaterial structure.
-func (rk *RSAKeyMaterial) ToBytes() []byte {
+func (rk *RSAKeyMaterial) Marshal() ([]byte, error) {
 	b_blobType := []byte("RSA1")
 	b_keySize := make([]byte, 4)
 	binary.LittleEndian.PutUint32(b_keySize, rk.KeySize)
@@ -145,7 +158,7 @@ func (rk *RSAKeyMaterial) ToBytes() []byte {
 		data = append(data, b_prime2...)
 	}
 
-	return data
+	return data, nil
 }
 
 // Describe prints a detailed description of the RSAKeyMaterial instance.
