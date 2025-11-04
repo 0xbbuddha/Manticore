@@ -133,22 +133,12 @@ func (u *UUIDv1) FromString(uuidStr string) error {
 		return fmt.Errorf("invalid UUID format: %v", err)
 	}
 
-	return u.FromBytes(uuidBytes)
-}
-
-// FromBytes creates a UUIDv1 from a 16-byte array
-//
-// Parameters:
-//   - data: A byte slice containing the UUID's 16 bytes
-//
-// Returns:
-//   - An error if the UUID is invalid or the conversion fails
-func (u *UUIDv1) FromBytes(data []byte) error {
-	if len(data) != 16 {
-		return fmt.Errorf("invalid UUID length: got %d bytes, want 16", len(data))
+	_, err = u.Unmarshal(uuidBytes)
+	if err != nil {
+		return fmt.Errorf("invalid UUID format: %v", err)
 	}
-	_, err := u.Unmarshal(data)
-	return err
+
+	return nil
 }
 
 // GetTime returns the time of the UUIDv1 structure

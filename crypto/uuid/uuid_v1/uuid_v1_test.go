@@ -53,27 +53,6 @@ func TestUUIDv1FromString(t *testing.T) {
 	}
 }
 
-func TestUUIDv1FromBytes(t *testing.T) {
-	tests := []struct {
-		name    string
-		data    []byte
-		wantErr bool
-	}{
-		{"ValidData", []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x17, 0x08, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80}, false},
-		{"InvalidLength", []byte{0x01, 0x02}, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var u uuid_v1.UUIDv1
-			err := u.FromBytes(tt.data)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("FromBytes() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
 func TestUUIDv1RoundTrip(t *testing.T) {
 	tests := []struct {
 		name    string
