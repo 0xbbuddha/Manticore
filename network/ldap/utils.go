@@ -57,25 +57,29 @@ func GetDomainFromDistinguishedName(distinguishedName string) string {
 // Returns:
 //
 //	int64: The converted Unix timestamp.
+//	error: An error object if the conversion fails, otherwise nil.
 //
 // Example:
 //
 //	ldapTimestamp := "132537600000000000"
-//	unixTimestamp := ConvertLDAPTimeStampToUnixTimeStamp(ldapTimestamp)
+//	unixTimestamp, err := ConvertLDAPTimeStampToUnixTimeStamp(ldapTimestamp)
+//	if err != nil {
+//		logger.Warn(fmt.Sprintf("Error converting LDAP timestamp to Unix timestamp: %s", err))
+//		return
+//	}
 //	// unixTimestamp will be 1640995200 (corresponding to January 1, 2022)
 //
 // Note:
 //
-//	If the LDAP timestamp is invalid or cannot be converted, the function returns 0.
-func ConvertLDAPTimeStampToUnixTimeStamp(value string) int64 {
+//	If the LDAP timestamp is invalid or cannot be converted, the function returns 0 and an error.
+func ConvertLDAPTimeStampToUnixTimeStamp(value string) (int64, error) {
 	convertedValue := int64(0)
 
 	if len(value) != 0 {
 		valueInt, err := strconv.ParseInt(value, 10, 64)
 
 		if err != nil {
-			fmt.Printf("[!] Error converting value to int64: %s\n", err)
-			return convertedValue
+			return convertedValue, fmt.Errorf("error converting value to int64: %w", err)
 		}
 
 		if valueInt < UnixTimestampStart {
@@ -87,7 +91,7 @@ func ConvertLDAPTimeStampToUnixTimeStamp(value string) int64 {
 		}
 	}
 
-	return convertedValue
+	return convertedValue, nil
 }
 
 // ConvertLDAPDurationToSeconds converts an LDAP duration to seconds.
@@ -100,24 +104,28 @@ func ConvertLDAPTimeStampToUnixTimeStamp(value string) int64 {
 // Returns:
 //
 //	int64: The converted duration in seconds.
+//	error: An error object if the conversion fails, otherwise nil.
 //
 // Example:
 //
 //	ldapDuration := "864000000000"
-//	seconds := ConvertLDAPDurationToSeconds(ldapDuration)
+//	seconds, err := ConvertLDAPDurationToSeconds(ldapDuration)
+//	if err != nil {
+//		logger.Warn(fmt.Sprintf("Error converting LDAP duration to seconds: %s", err))
+//		return
+//	}
 //	// seconds will be 86400 (corresponding to 1 day)
 //
 // Note:
 //
-//	If the LDAP duration is invalid or cannot be converted, the function returns 0.
-func ConvertLDAPDurationToSeconds(value string) int64 {
+//	If the LDAP duration is invalid or cannot be converted, the function returns 0 and an error.
+func ConvertLDAPDurationToSeconds(value string) (int64, error) {
 	convertedValue := int64(0)
 
 	if len(value) != 0 {
 		valueInt, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			fmt.Printf("[!] Error converting value to int64: %s\n", err)
-			return convertedValue
+			return convertedValue, fmt.Errorf("error converting LDAP duration to seconds: %w", err)
 		}
 
 		if valueInt < 0 {
@@ -128,7 +136,7 @@ func ConvertLDAPDurationToSeconds(value string) int64 {
 		convertedValue = valueInt / int64(1e7)
 	}
 
-	return convertedValue
+	return convertedValue, nil
 }
 
 // ConvertSecondsToLDAPDuration converts a duration in seconds to an LDAP duration.
@@ -146,6 +154,10 @@ func ConvertLDAPDurationToSeconds(value string) int64 {
 //
 //	seconds := int64(86400) // 1 day
 //	ldapDuration := ConvertSecondsToLDAPDuration(seconds)
+//	if err != nil {
+//		logger.Warn(fmt.Sprintf("Error converting seconds to LDAP duration: %s", err))
+//		return
+//	}
 //	// ldapDuration will be "864000000000" (corresponding to 1 day)
 //
 // Note:
