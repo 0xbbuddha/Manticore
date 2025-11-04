@@ -49,39 +49,34 @@ type Session struct {
 	usekerberos bool
 }
 
-// InitSession initializes the LDAP session with the provided configuration and credentials.
+// NewSession creates a new LDAP session with the provided configuration and credentials.
 //
 // Parameters:
 //
 //	host (string): The hostname or IP address of the LDAP server.
 //	port (int): The port number to connect to on the LDAP server. Must be in the range 1-65535.
+//	credentials (*credentials.Credentials): The credentials to use for authentication.
 //	useldaps (bool): A flag indicating whether to use LDAPS (LDAP over SSL).
 //	usekerberos (bool): A flag indicating whether to use Kerberos for authentication.
-//	domain (string): The domain name for the LDAP server.
-//	username (string): The username for authentication.
-//	password (string): The password for authentication.
-//	debug (bool): A flag indicating whether to enable debug mode.
 //
 // Returns:
 //
-//	error: An error object if the initialization fails, otherwise nil.
+//	*Session: A new LDAP session object.
+//	error: An error object if the creation fails, otherwise nil.
 //
 // Example:
 //
-//	session := &Session{}
-//	err := session.InitSession("ldap.example.com", 389, false, true, "EXAMPLE", "user", "password", false)
+//	session, err := NewSession("ldap.example.com", 389, credentials, false, false)
 //	if err != nil {
-//		log.Fatalf("Failed to initialize session: %s", err)
+//		logger.Warn(fmt.Sprintf("Error creating LDAP session: %s", err))
+//		return
 //	}
-//
-// Note:
-//
-//	The function validates the provided port number to ensure it is within the valid range (1-65535).
-//	It then sets the network, credentials, and configuration fields of the Session struct accordingly.
-func (s *Session) InitSession(host string, port int, credentials *credentials.Credentials, useldaps bool, usekerberos bool) error {
+func NewSession(host string, port int, credentials *credentials.Credentials, useldaps bool, usekerberos bool) (*Session, error) {
+	s := &Session{}
+
 	// Check if TCP port is valid
 	if port < 1 || port > 65535 {
-		return fmt.Errorf("invalid port number. Port must be in the range 1-65535")
+		return nil, fmt.Errorf("invalid port number. Port must be in the range 1-65535")
 	}
 
 	// Network
@@ -95,7 +90,7 @@ func (s *Session) InitSession(host string, port int, credentials *credentials.Cr
 	s.useldaps = useldaps
 	s.usekerberos = usekerberos
 
-	return nil
+	return s, nil
 }
 
 // Connect establishes a connection to the LDAP server. It supports both regular LDAP and LDAPS connections,
@@ -107,24 +102,17 @@ func (s *Session) InitSession(host string, port int, credentials *credentials.Cr
 //
 // Example:
 //
-//	session := &Session{}
-//	err := session.InitSession("ldap.example.com", 389, false, true, "EXAMPLE", "user", "password", false)
+//	session, err := NewSession("ldap.example.com", 389, credentials, false, false)
 //	if err != nil {
-//		logger.Error(fmt.Sprintf("Failed to initialize session: %s", err))
+//		logger.Warn(fmt.Sprintf("Error creating LDAP session: %s", err))
 //		return
 //	}
 //	success := session.Connect()
 //	if success {
-//		logger.Info("Successfully connected to the LDAP server")
+//		logger.Info(fmt.Sprintf("Successfully connected to LDAP server: %s", s.host))
 //	} else {
-//		logger.Warn("Failed to connect to the LDAP server")
+//		logger.Warn(fmt.Sprintf("Error connecting to LDAP server: %s", err))
 //	}
-//
-// Note:
-//
-//	The function uses the configuration set in the Session struct to determine the connection parameters.
-//	If useldaps is true, it will attempt to establish an LDAPS connection. If usekerberos is true, it will
-//	use Kerberos for authentication.
 func (s *Session) Connect() (bool, error) {
 	// Set up LDAP connection
 	var ldapConnection *ldap.Conn

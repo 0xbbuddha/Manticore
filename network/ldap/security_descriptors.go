@@ -84,16 +84,7 @@ func (s *Session) GetNtSecurityDescriptorOf(distinguishedName string) (string, e
 		return "", fmt.Errorf("error searching for nTSecurityDescriptor: %w", err)
 	}
 
-	fmt.Printf("len(searchResult.Entries): %d\n", len(searchResult.Entries))
-
 	ntsd := searchResult.Entries[0].GetEqualFoldRawAttributeValue("nTSecurityDescriptor")
-
-	fmt.Printf("GetAttributeValue: %s\n", searchResult.Entries[0].GetAttributeValue("nTSecurityDescriptor"))
-	fmt.Printf("GetAttributeValues: %s\n", searchResult.Entries[0].GetAttributeValues("nTSecurityDescriptor"))
-	fmt.Printf("GetRawAttributeValue: %s\n", searchResult.Entries[0].GetRawAttributeValue("nTSecurityDescriptor"))
-	fmt.Printf("GetRawAttributeValues: %s\n", searchResult.Entries[0].GetRawAttributeValues("nTSecurityDescriptor"))
-	fmt.Printf("GetEqualFoldRawAttributeValue: %s\n", searchResult.Entries[0].GetEqualFoldRawAttributeValue("nTSecurityDescriptor"))
-	fmt.Printf("GetEqualFoldRawAttributeValues: %s\n", searchResult.Entries[0].GetEqualFoldRawAttributeValues("nTSecurityDescriptor"))
 
 	return string(ntsd), nil
 }

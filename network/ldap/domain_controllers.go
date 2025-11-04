@@ -28,7 +28,6 @@ func (ldapSession *Session) GetDomainDNSServers() ([]string, error) {
 
 	for distinguishedName := range domainControllersMap {
 		for _, hostname := range domainControllersMap[distinguishedName] {
-			fmt.Printf("hostname = %s\n", hostname)
 			// Try to connect to
 			conn, err := net.Dial("tcp", hostname+":53")
 			if err == nil {
@@ -52,7 +51,6 @@ func (ldapSession *Session) GetDomainDNSServers() ([]string, error) {
 
 	for distinguishedName := range readOnlyDomainControllersMap {
 		for _, hostname := range readOnlyDomainControllersMap[distinguishedName] {
-			fmt.Printf("hostname = %s\n", hostname)
 			// Try to connect to
 			conn, err := net.Dial("tcp", hostname+":53")
 			if err == nil {
