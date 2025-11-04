@@ -5,6 +5,7 @@ import (
 
 	"github.com/TheManticoreProject/Manticore/logger"
 	"github.com/TheManticoreProject/Manticore/network/ldap/ldap_attributes"
+	"github.com/TheManticoreProject/winacl/sid"
 )
 
 // FindObjectSIDByRID searches for an LDAP object based on the provided domain and RID (Relative Identifier).
@@ -64,7 +65,11 @@ func (ldapSession *Session) FindObjectSIDByRID(domain string, RID int) (string, 
 		} else {
 			if len(results) == 1 {
 				// One result found
-				objectSID = ParseSIDFromBytes(results[0].GetRawAttributeValue("objectSid"))
+				s := &sid.SID{}
+				if _, err := s.Unmarshal(results[0].GetRawAttributeValue("objectSid")); err != nil {
+					return "", fmt.Errorf("failed to parse objectSid: %w", err)
+				}
+				objectSID = s.String()
 			}
 		}
 	}

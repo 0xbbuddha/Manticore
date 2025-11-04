@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/TheManticoreProject/Manticore/network/ldap/objects"
+	"github.com/TheManticoreProject/winacl/sid"
 )
 
 // GetAllDomains retrieves all domain objects from the LDAP directory.
@@ -34,11 +35,16 @@ func (ldapSession *Session) GetAllDomains() (map[string]*objects.Domain, error) 
 
 			NetBIOSName := strings.ToUpper(entry.GetAttributeValue("dc"))
 
+			s := &sid.SID{}
+			if _, err := s.Unmarshal(entry.GetRawAttributeValue("objectSid")); err != nil {
+				return nil, fmt.Errorf("failed to parse domain objectSid: %w", err)
+			}
+
 			domain := &objects.Domain{
 				DistinguishedName: entry.GetAttributeValue("distinguishedName"),
 				NetBIOSName:       NetBIOSName,
 				DNSName:           DNSName,
-				SID:               ParseSIDFromBytes(entry.GetRawAttributeValue("objectSid")),
+				SID:               s.String(),
 			}
 
 			domainsMap[DNSName] = domain
@@ -77,13 +83,17 @@ func (ldapSession *Session) GetDomain(domain string) (*objects.Domain, error) {
 			NetBIOSName := strings.ToUpper(entry.GetAttributeValue("dc"))
 
 			if DNSName == strings.ToUpper(domain) {
+				var s sid.SID
+				if _, err := s.Unmarshal(entry.GetRawAttributeValue("objectSid")); err != nil {
+					return nil, fmt.Errorf("failed to parse domain objectSid: %w", err)
+				}
 				return &objects.Domain{
 					LdapSession: ldapSession,
 
 					DistinguishedName: entry.GetAttributeValue("distinguishedName"),
 					NetBIOSName:       NetBIOSName,
 					DNSName:           DNSName,
-					SID:               ParseSIDFromBytes(entry.GetRawAttributeValue("objectSid")),
+					SID:               s.String(),
 				}, nil
 			}
 		}
@@ -96,13 +106,17 @@ func (ldapSession *Session) GetDomain(domain string) (*objects.Domain, error) {
 			NetBIOSName := strings.ToUpper(entry.GetAttributeValue("dc"))
 
 			if NetBIOSName == strings.ToUpper(domain) {
+				var s sid.SID
+				if _, err := s.Unmarshal(entry.GetRawAttributeValue("objectSid")); err != nil {
+					return nil, fmt.Errorf("failed to parse domain objectSid: %w", err)
+				}
 				return &objects.Domain{
 					LdapSession: ldapSession,
 
 					DistinguishedName: entry.GetAttributeValue("distinguishedName"),
 					NetBIOSName:       NetBIOSName,
 					DNSName:           DNSName,
-					SID:               ParseSIDFromBytes(entry.GetRawAttributeValue("objectSid")),
+					SID:               s.String(),
 				}, nil
 			}
 		}
