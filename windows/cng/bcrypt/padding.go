@@ -1,0 +1,9 @@
+package bcrypt
+
+// Source: bcrypt.h
+const (
+	BCRYPT_PAD_NONE  = 0x00000001
+	BCRYPT_PAD_PKCS1 = 0x00000002
+	BCRYPT_PAD_OAEP  = 0x00000004
+	BCRYPT_PAD_PSS   = 0x00000008
+)
