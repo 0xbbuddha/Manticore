@@ -57,7 +57,7 @@ type BCRYPT_RSAKEY_BLOB struct {
 // 5. Stores the parsed values in the corresponding fields of the BCRYPT_RSAKEY_BLOB structure.
 func (rk *BCRYPT_RSAKEY_BLOB) Unmarshal(value []byte) (int, error) {
 	if len(value) < 24 {
-		return 0, errors.New("buffer too small for BCRYPT_RSAKEY_BLOB header")
+		return 0, errors.New("buffer too small for BCRYPT_RSAKEY_BLOB, header too short (at least 24 bytes are required)")
 	}
 
 	rk.Magic = binary.BigEndian.Uint32(value[:4])
