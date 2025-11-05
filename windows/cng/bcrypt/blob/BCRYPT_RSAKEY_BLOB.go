@@ -130,3 +130,22 @@ func (rk *BCRYPT_RSAKEY_BLOB) Describe(indent int) {
 	fmt.Printf("%s │ \x1b[93mPrime2 (Q)  \x1b[0m: 0x%x\n", indentPrompt, rk.CbPrime2)
 	fmt.Printf("%s └───\n", indentPrompt)
 }
+
+// Equal checks if two BCRYPT_RSAKEY_BLOB structures are equal.
+//
+// Parameters:
+// - other: The BCRYPT_RSAKEY_BLOB structure to compare to.
+//
+// Returns:
+// - True if the two BCRYPT_RSAKEY_BLOB structures are equal, false otherwise.
+func (rk *BCRYPT_RSAKEY_BLOB) Equal(other *BCRYPT_RSAKEY_BLOB) bool {
+	return rk.Magic == other.Magic && rk.BitLength == other.BitLength && rk.CbPublicExp == other.CbPublicExp && rk.CbModulus == other.CbModulus && rk.CbPrime1 == other.CbPrime1 && rk.CbPrime2 == other.CbPrime2
+}
+
+// String returns a string representation of the BCRYPT_RSAKEY_BLOB structure.
+//
+// Returns:
+// - A string representing the BCRYPT_RSAKEY_BLOB structure.
+func (rk *BCRYPT_RSAKEY_BLOB) String() string {
+	return fmt.Sprintf("BCRYPT_RSAKEY_BLOB(Magic: 0x%08x, BitLength: %d, CbPublicExp: %d, CbModulus: %d, CbPrime1: %d, CbPrime2: %d)", rk.Magic, rk.BitLength, rk.CbPublicExp, rk.CbModulus, rk.CbPrime1, rk.CbPrime2)
+}
