@@ -1,7 +1,10 @@
 package blob
 
 import (
+	"encoding/hex"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/headers"
 )
@@ -92,4 +95,18 @@ func (b *BCRYPT_RSAPRIVATE_BLOB) Marshal() ([]byte, error) {
 	marshalledData = append(marshalledData, b.Prime2...)
 
 	return marshalledData, nil
+}
+
+// Describe prints the BCRYPT_RSAPRIVATE_BLOB structure to the console.
+//
+// Parameters:
+// - indent: The number of spaces to indent the output.
+func (b *BCRYPT_RSAPRIVATE_BLOB) Describe(indent int) {
+	indentPrompt := strings.Repeat(" │ ", indent)
+	fmt.Printf("%s<\x1b[93mBCRYPT_RSAPRIVATE_BLOB\x1b[0m>\n", indentPrompt)
+	fmt.Printf("%s │ \x1b[93mPublicExponent\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(b.PublicExponent))
+	fmt.Printf("%s │ \x1b[93mModulus\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(b.Modulus))
+	fmt.Printf("%s │ \x1b[93mPrime1\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(b.Prime1))
+	fmt.Printf("%s │ \x1b[93mPrime2\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(b.Prime2))
+	fmt.Printf("%s └───\n", indentPrompt)
 }
