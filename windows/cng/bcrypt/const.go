@@ -1,0 +1,39 @@
+package bcrypt
+
+// Source: bcrypt.h
+const (
+	BCRYPT_ALGORITHM_NAME       = "AlgorithmName"
+	BCRYPT_AUTH_TAG_LENGTH      = "AuthTagLength"
+	BCRYPT_BLOCK_LENGTH         = "BlockLength"
+	BCRYPT_BLOCK_SIZE_LIST      = "BlockSizeList"
+	BCRYPT_CHAINING_MODE        = "ChainingMode"
+	BCRYPT_EFFECTIVE_KEY_LENGTH = "EffectiveKeyLength"
+	BCRYPT_HASH_BLOCK_LENGTH    = "HashBlockLength"
+	BCRYPT_HASH_LENGTH          = "HashDigestLength"
+	BCRYPT_HASH_OID_LIST        = "HashOIDList"
+	BCRYPT_KEY_LENGTH           = "KeyLength"
+	BCRYPT_KEY_LENGTHS          = "KeyLengths"
+	BCRYPT_KEY_OBJECT_LENGTH    = "KeyObjectLength"
+	BCRYPT_KEY_STRENGTH         = "KeyStrength"
+	BCRYPT_OBJECT_LENGTH        = "ObjectLength"
+	BCRYPT_PADDING_SCHEMES      = "PaddingSchemes"
+	BCRYPT_PROVIDER_HANDLE      = "ProviderHandle"
+	BCRYPT_SIGNATURE_LENGTH     = "SignatureLength"
+
+	MS_PRIMITIVE_PROVIDER       = "Microsoft Primitive Provider"
+	MS_PLATFORM_CRYPTO_PROVIDER = "Microsoft Platform Crypto Provider"
+
+	BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO_VERSION = 1
+
+	BCRYPT_AUTH_MODE_CHAIN_CALLS_FLAG = 0x00000001
+
+	BCRYPT_AUTH_MODE_IN_PROGRESS_FLAG = 0x00000002
+
+	BCRYPT_KEY_DATA_BLOB_VERSION1 = 1
+
+	BCRYPT_RNG_USE_ENTROPY_IN_BUFFER = 0x00000001
+
+	BCRYPT_USE_SYSTEM_PREFERRED_RNG = 0x00000002
+
+	BCRYPT_ALG_HANDLE_HMAC_FLAG = 0x00000008
+)
