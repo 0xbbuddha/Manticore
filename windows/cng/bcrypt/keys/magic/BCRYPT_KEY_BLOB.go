@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // BCRYPT_KEY_BLOB structure is used as a header for a key BLOB in memory.
@@ -65,4 +66,15 @@ func (b *BCRYPT_KEY_BLOB) String() string {
 // - True if the BCRYPT_KEY_BLOB structure is equal to the other BCRYPT_KEY_BLOB structure, otherwise false.
 func (b *BCRYPT_KEY_BLOB) Equal(other *BCRYPT_KEY_BLOB) bool {
 	return b.Magic == other.Magic
+}
+
+// Describe prints the BCRYPT_KEY_BLOB structure to the console.
+//
+// Parameters:
+// - indent: The number of spaces to indent the output.
+func (b *BCRYPT_KEY_BLOB) Describe(indent int) {
+	indentPrompt := strings.Repeat(" │ ", indent)
+	fmt.Printf("%s<\x1b[93mBCRYPT_KEY_BLOB\x1b[0m>\n", indentPrompt)
+	fmt.Printf("%s │ \x1b[93mMagic\x1b[0m: 0x%08x\n", indentPrompt, b.Magic)
+	fmt.Printf("%s └───\n", indentPrompt)
 }
