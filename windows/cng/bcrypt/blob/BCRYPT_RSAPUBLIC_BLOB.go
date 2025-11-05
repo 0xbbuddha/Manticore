@@ -1,7 +1,5 @@
 package blob
 
-import "errors"
-
 // BCRYPT_RSAPUBLIC_BLOB represents the structure used as a header for an RSA public key BLOB in memory.
 //
 // The layout of a BCRYPT_RSAPUBLIC_BLOB in memory is as follows:
@@ -13,12 +11,14 @@ import "errors"
 // The fields following this structure (PublicExponent and Modulus) are stored in big-endian format.
 //
 // See:
-// https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/ns-bcrypt-bcrypt_rsapublic_blob
+// https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/ns-bcrypt-bcrypt_rsakey_blob
 type BCRYPT_RSAPUBLIC_BLOB struct {
 	Header BCRYPT_RSAKEY_BLOB
 
+	// PublicExponent is the public exponent of the RSA key.
 	PublicExponent []byte // Big-endian.
 
+	// Modulus is the modulus of the RSA key.
 	Modulus []byte // Big-endian.
 }
 
@@ -35,11 +35,7 @@ type BCRYPT_RSAPUBLIC_BLOB struct {
 // The function expects the byte slice to follow the RSA public key BLOB format, starting with the BCRYPT_RSAKEY_BLOB header.
 // It extracts the public exponent and modulus from the byte slice and stores them in the BCRYPT_RSAPUBLIC_BLOB structure.
 func (b *BCRYPT_RSAPUBLIC_BLOB) Unmarshal(value []byte) (int, error) {
-	if len(value) < 24 {
-		return 0, errors.New("buffer too small for BCRYPT_RSAPUBLIC_BLOB")
-	}
-
-	bytesRead, err := b.Header.Unmarshal(value[:24])
+	bytesRead, err := b.Header.Unmarshal(value)
 	if err != nil {
 		return 0, err
 	}
