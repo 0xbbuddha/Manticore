@@ -3,6 +3,8 @@ package headers
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
+	"strings"
 )
 
 // BCRYPT_ECCKEY_BLOB structure is used as a header for an elliptic curve key BLOB in memory.
@@ -62,4 +64,15 @@ func (b *BCRYPT_ECCKEY_BLOB) Marshal() ([]byte, error) {
 	buf := make([]byte, 4)
 	binary.LittleEndian.PutUint32(buf[:4], b.KeySize)
 	return buf, nil
+}
+
+// Describe prints the BCRYPT_ECCKEY_BLOB structure to the console.
+//
+// Parameters:
+// - indent: The number of spaces to indent the output.
+func (b *BCRYPT_ECCKEY_BLOB) Describe(indent int) {
+	indentPrompt := strings.Repeat(" │ ", indent)
+	fmt.Printf("%s<\x1b[93mBCRYPT_ECCKEY_BLOB (header)\x1b[0m>\n", indentPrompt)
+	fmt.Printf("%s │ \x1b[93mKey Size\x1b[0m: %d\n", indentPrompt, b.KeySize)
+	fmt.Printf("%s └───\n", indentPrompt)
 }

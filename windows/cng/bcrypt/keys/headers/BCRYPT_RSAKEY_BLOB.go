@@ -50,20 +50,20 @@ type BCRYPT_RSAKEY_BLOB struct {
 // 3. Extracts the key size, exponent size, modulus size, prime1 size, and prime2 size from the header.
 // 4. Parses the exponent, modulus, prime1, and prime2 values from the body of the byte slice based on the extracted sizes.
 // 5. Stores the parsed values in the corresponding fields of the BCRYPT_RSAKEY_BLOB structure.
-func (rk *BCRYPT_RSAKEY_BLOB) Unmarshal(value []byte) (int, error) {
+func (k *BCRYPT_RSAKEY_BLOB) Unmarshal(value []byte) (int, error) {
 	if len(value) < 24 {
 		return 0, errors.New("buffer too small for BCRYPT_RSAKEY_BLOB, header too short (at least 24 bytes are required)")
 	}
 
-	rk.BitLength = binary.BigEndian.Uint32(value[4:8])
+	k.BitLength = binary.BigEndian.Uint32(value[4:8])
 
-	rk.CbPublicExp = binary.BigEndian.Uint32(value[8:12])
+	k.CbPublicExp = binary.BigEndian.Uint32(value[8:12])
 
-	rk.CbModulus = binary.BigEndian.Uint32(value[12:16])
+	k.CbModulus = binary.BigEndian.Uint32(value[12:16])
 
-	rk.CbPrime1 = binary.BigEndian.Uint32(value[16:20])
+	k.CbPrime1 = binary.BigEndian.Uint32(value[16:20])
 
-	rk.CbPrime2 = binary.BigEndian.Uint32(value[20:24])
+	k.CbPrime2 = binary.BigEndian.Uint32(value[20:24])
 
 	return 24, nil
 }
@@ -72,18 +72,18 @@ func (rk *BCRYPT_RSAKEY_BLOB) Unmarshal(value []byte) (int, error) {
 //
 // Returns:
 // - A byte slice representing the raw bytes of the BCRYPT_RSAKEY_BLOB structure.
-func (rk *BCRYPT_RSAKEY_BLOB) Marshal() ([]byte, error) {
+func (k *BCRYPT_RSAKEY_BLOB) Marshal() ([]byte, error) {
 	buf := make([]byte, 24)
 
-	binary.BigEndian.PutUint32(buf[4:8], rk.BitLength)
+	binary.BigEndian.PutUint32(buf[4:8], k.BitLength)
 
-	binary.BigEndian.PutUint32(buf[8:12], rk.CbPublicExp)
+	binary.BigEndian.PutUint32(buf[8:12], k.CbPublicExp)
 
-	binary.BigEndian.PutUint32(buf[12:16], rk.CbModulus)
+	binary.BigEndian.PutUint32(buf[12:16], k.CbModulus)
 
-	binary.BigEndian.PutUint32(buf[16:20], rk.CbPrime1)
+	binary.BigEndian.PutUint32(buf[16:20], k.CbPrime1)
 
-	binary.BigEndian.PutUint32(buf[20:24], rk.CbPrime2)
+	binary.BigEndian.PutUint32(buf[20:24], k.CbPrime2)
 
 	return buf, nil
 }
@@ -97,13 +97,13 @@ func (rk *BCRYPT_RSAKEY_BLOB) Marshal() ([]byte, error) {
 // This function prints the Exponent, Modulus, Prime1, and Prime2 values of the BCRYPT_RSAKEY_BLOB instance.
 // The output is formatted with the specified indentation level to improve readability.
 // If Prime1 or Prime2 is not set, the function prints "None" for the respective value.
-func (rk *BCRYPT_RSAKEY_BLOB) Describe(indent int) {
+func (k *BCRYPT_RSAKEY_BLOB) Describe(indent int) {
 	indentPrompt := strings.Repeat(" │ ", indent)
 	fmt.Printf("%s<\x1b[93mBCRYPT_RSAKEY_BLOB (header)\x1b[0m>\n", indentPrompt)
-	fmt.Printf("%s │ \x1b[93mExponent (E)\x1b[0m: %d\n", indentPrompt, rk.CbPublicExp)
-	fmt.Printf("%s │ \x1b[93mModulus (N) \x1b[0m: 0x%x\n", indentPrompt, rk.CbModulus)
-	fmt.Printf("%s │ \x1b[93mPrime1 (P)  \x1b[0m: 0x%x\n", indentPrompt, rk.CbPrime1)
-	fmt.Printf("%s │ \x1b[93mPrime2 (Q)  \x1b[0m: 0x%x\n", indentPrompt, rk.CbPrime2)
+	fmt.Printf("%s │ \x1b[93mExponent (E)\x1b[0m: %d\n", indentPrompt, k.CbPublicExp)
+	fmt.Printf("%s │ \x1b[93mModulus (N) \x1b[0m: 0x%x\n", indentPrompt, k.CbModulus)
+	fmt.Printf("%s │ \x1b[93mPrime1 (P)  \x1b[0m: 0x%x\n", indentPrompt, k.CbPrime1)
+	fmt.Printf("%s │ \x1b[93mPrime2 (Q)  \x1b[0m: 0x%x\n", indentPrompt, k.CbPrime2)
 	fmt.Printf("%s └───\n", indentPrompt)
 }
 
@@ -114,14 +114,14 @@ func (rk *BCRYPT_RSAKEY_BLOB) Describe(indent int) {
 //
 // Returns:
 // - True if the two BCRYPT_RSAKEY_BLOB structures are equal, false otherwise.
-func (rk *BCRYPT_RSAKEY_BLOB) Equal(other *BCRYPT_RSAKEY_BLOB) bool {
-	return rk.BitLength == other.BitLength && rk.CbPublicExp == other.CbPublicExp && rk.CbModulus == other.CbModulus && rk.CbPrime1 == other.CbPrime1 && rk.CbPrime2 == other.CbPrime2
+func (k *BCRYPT_RSAKEY_BLOB) Equal(other *BCRYPT_RSAKEY_BLOB) bool {
+	return k.BitLength == other.BitLength && k.CbPublicExp == other.CbPublicExp && k.CbModulus == other.CbModulus && k.CbPrime1 == other.CbPrime1 && k.CbPrime2 == other.CbPrime2
 }
 
 // String returns a string representation of the BCRYPT_RSAKEY_BLOB structure.
 //
 // Returns:
 // - A string representing the BCRYPT_RSAKEY_BLOB structure.
-func (rk *BCRYPT_RSAKEY_BLOB) String() string {
-	return fmt.Sprintf("BCRYPT_RSAKEY_BLOB(BitLength: %d, CbPublicExp: %d, CbModulus: %d, CbPrime1: %d, CbPrime2: %d)", rk.BitLength, rk.CbPublicExp, rk.CbModulus, rk.CbPrime1, rk.CbPrime2)
+func (k *BCRYPT_RSAKEY_BLOB) String() string {
+	return fmt.Sprintf("BCRYPT_RSAKEY_BLOB(BitLength: %d, CbPublicExp: %d, CbModulus: %d, CbPrime1: %d, CbPrime2: %d)", k.BitLength, k.CbPublicExp, k.CbModulus, k.CbPrime1, k.CbPrime2)
 }
