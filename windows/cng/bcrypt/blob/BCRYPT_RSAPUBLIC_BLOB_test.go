@@ -63,8 +63,9 @@ func TestBCRYPT_RSAPUBLIC_BLOB_Unmarshal_ShortInput(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error on short buffer, got nil")
 	}
-	if !errors.Is(err, errors.New("buffer too small for BCRYPT_RSAPUBLIC_BLOB")) && err.Error() != "buffer too small for BCRYPT_RSAPUBLIC_BLOB" {
-		t.Errorf("Unexpected error for short buffer: %v", err)
+	wantError := errors.New("buffer too small for BCRYPT_RSAPUBLIC_BLOB, header too short (at least 24 bytes are required)")
+	if err.Error() != wantError.Error() {
+		t.Errorf("Unexpected error for short buffer: %v, want: %v", err, wantError)
 	}
 }
 
