@@ -3,7 +3,7 @@ package magic_test
 import (
 	"testing"
 
-	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/magic"
+	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/magic"
 )
 
 func TestBCRYPT_KEY_BLOB_UnmarshalMarshal(t *testing.T) {
