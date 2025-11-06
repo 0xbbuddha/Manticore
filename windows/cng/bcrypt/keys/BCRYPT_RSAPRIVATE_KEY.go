@@ -41,26 +41,28 @@ func (k *BCRYPT_RSAPRIVATE_KEY) Unmarshal(value []byte) (int, error) {
 	bytesRead := 0
 
 	// Unmarshalling magic
-	bytesRead, err := k.Magic.Unmarshal(value[:4])
+	bytesReadMagic, err := k.Magic.Unmarshal(value[:4])
 	if err != nil {
 		return 0, err
 	}
 	if k.Magic.Magic != magic.BCRYPT_RSAPRIVATE_MAGIC {
 		return 0, fmt.Errorf("invalid RSA private key magic: 0x%08x", k.Magic.Magic)
 	}
+	bytesRead += bytesReadMagic
 
 	// Unmarshalling header
-	bytesRead, err = k.Header.Unmarshal(value[bytesRead:])
+	bytesReadHeader, err := k.Header.Unmarshal(value[bytesRead:])
 	if err != nil {
 		return 0, err
 	}
-	bytesRead += int(k.Header.BitLength)
+	bytesRead += bytesReadHeader
 
 	// Unmarshalling content
-	bytesRead, err = k.Content.Unmarshal(k.Header, value[bytesRead:])
+	bytesReadContent, err := k.Content.Unmarshal(k.Header, value[bytesRead:])
 	if err != nil {
 		return 0, err
 	}
+	bytesRead += bytesReadContent
 
 	return bytesRead, nil
 }
