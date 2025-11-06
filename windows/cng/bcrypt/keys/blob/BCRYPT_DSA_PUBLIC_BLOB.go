@@ -9,20 +9,20 @@ import (
 	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/headers"
 )
 
-// BCRYPT_DSA_PRIVATE_BLOB represents the structure used for a DSA private key BLOB in memory.
+// BCRYPT_DSA_PUBLIC_BLOB represents the structure used for a DSA public key BLOB in memory.
 //
-// The layout of a BCRYPT_DSA_PRIVATE_BLOB in memory is as follows:
+// The layout of a BCRYPT_DSA_PUBLIC_BLOB in memory is as follows:
 //
-//	BCRYPT_DSA_KEY_BLOB
-//	Modulus[cbKey]         // Big-endian
-//	Generator[cbKey]       // Big-endian
-//	Public[cbKey]          // Big-endian
-//	PrivateExponent[20]    // Big-endian
+//	BCRYPT_DSA_PUBLIC_BLOB
+//	Modulus[cbKey]    // Big-endian
+//	Generator[cbKey]  // Big-endian
+//	Public[cbKey]     // Big-endian
 //
-// The numbers are stored in big-endian format.
+// The fields following this structure are stored in big-endian format.
+//
 // See:
 // https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/ns-bcrypt-bcrypt_dsa_key_blob
-type BCRYPT_DSA_PRIVATE_BLOB struct {
+type BCRYPT_DSA_PUBLIC_BLOB struct {
 	// Modulus is the Modulus (P) parameter of the DSA key.
 	Modulus []byte // Big-endian.
 
@@ -31,12 +31,9 @@ type BCRYPT_DSA_PRIVATE_BLOB struct {
 
 	// Public is the public value (Y) of the DSA key.
 	Public []byte // Big-endian.
-
-	// PrivateExponent is the private value (X) of the DSA key; always 20 bytes.
-	PrivateExponent [20]byte // Big-endian.
 }
 
-// Unmarshal parses the provided byte slice into the BCRYPT_DSA_PRIVATE_BLOB structure.
+// Unmarshal parses the provided byte slice into the BCRYPT_DSA_PUBLIC_BLOB structure.
 //
 // Parameters:
 // - value: A byte slice containing the raw DSA key BLOB to be parsed.
@@ -45,63 +42,54 @@ type BCRYPT_DSA_PRIVATE_BLOB struct {
 // Returns:
 // - The number of bytes read from the byte slice.
 // - An error if the parsing fails, otherwise nil.
-func (b *BCRYPT_DSA_PRIVATE_BLOB) Unmarshal(keyHeader headers.BCRYPT_DSA_KEY_BLOB, value []byte) (int, error) {
+func (b *BCRYPT_DSA_PUBLIC_BLOB) Unmarshal(keyHeader headers.BCRYPT_DSA_KEY_BLOB, value []byte) (int, error) {
 	bytesRead := 0
 	keyLen := int(keyHeader.CbKey)
 
 	if keyLen > len(value)-bytesRead {
-		return 0, errors.New("buffer too small for BCRYPT_DSA_PRIVATE_BLOB, not enough bytes for unmarshalling modulus")
+		return 0, errors.New("buffer too small for BCRYPT_DSA_PUBLIC_BLOB, not enough bytes for unmarshalling modulus")
 	}
 	b.Modulus = value[bytesRead : bytesRead+keyLen]
 	bytesRead += keyLen
 
 	if keyLen > len(value)-bytesRead {
-		return 0, errors.New("buffer too small for BCRYPT_DSA_PRIVATE_BLOB, not enough bytes for unmarshalling generator")
+		return 0, errors.New("buffer too small for BCRYPT_DSA_PUBLIC_BLOB, not enough bytes for unmarshalling generator")
 	}
 	b.Generator = value[bytesRead : bytesRead+keyLen]
 	bytesRead += keyLen
 
 	if keyLen > len(value)-bytesRead {
-		return 0, errors.New("buffer too small for BCRYPT_DSA_PRIVATE_BLOB, not enough bytes for unmarshalling public value")
+		return 0, errors.New("buffer too small for BCRYPT_DSA_PUBLIC_BLOB, not enough bytes for unmarshalling public value")
 	}
 	b.Public = value[bytesRead : bytesRead+keyLen]
 	bytesRead += keyLen
 
-	// PrivateExponent must be 20 bytes
-	if 20 > len(value)-bytesRead {
-		return 0, errors.New("buffer too small for BCRYPT_DSA_PRIVATE_BLOB, not enough bytes for unmarshalling private exponent")
-	}
-	copy(b.PrivateExponent[:], value[bytesRead:bytesRead+20])
-	bytesRead += 20
-
 	return bytesRead, nil
 }
 
-// Marshal returns the raw bytes of the BCRYPT_DSA_PRIVATE_BLOB structure.
+// Marshal returns the raw bytes of the BCRYPT_DSA_PUBLIC_BLOB structure.
 //
 // Returns:
-// - A byte slice representing the raw bytes of the BCRYPT_DSA_PRIVATE_BLOB structure.
-func (b *BCRYPT_DSA_PRIVATE_BLOB) Marshal() ([]byte, error) {
+// - A byte slice representing the raw bytes of the BCRYPT_DSA_PUBLIC_BLOB structure.
+func (b *BCRYPT_DSA_PUBLIC_BLOB) Marshal() ([]byte, error) {
 	marshalledData := []byte{}
 
 	marshalledData = append(marshalledData, b.Modulus...)
 	marshalledData = append(marshalledData, b.Generator...)
 	marshalledData = append(marshalledData, b.Public...)
-	marshalledData = append(marshalledData, b.PrivateExponent[:]...)
 
 	return marshalledData, nil
 }
 
-// Describe prints the BCRYPT_DSA_PRIVATE_BLOB structure to the console.
+// Describe prints the BCRYPT_DSA_PUBLIC_BLOB structure to the console.
 //
 // Parameters:
 // - indent: The number of spaces to indent the output.
-func (b *BCRYPT_DSA_PRIVATE_BLOB) Describe(indent int) {
+func (b *BCRYPT_DSA_PUBLIC_BLOB) Describe(indent int) {
 	indentPrompt := strings.Repeat(" │ ", indent)
 	fmt.Printf("%s<\x1b[93mBCRYPT_DSA_PRIVATE_BLOB\x1b[0m>\n", indentPrompt)
 	fmt.Printf("%s │ \x1b[93mModulus\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(b.Modulus))
 	fmt.Printf("%s │ \x1b[93mGenerator\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(b.Generator))
 	fmt.Printf("%s │ \x1b[93mPublic\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(b.Public))
-	fmt.Printf("%s │ \x1b[93mPrivateExponent\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(b.PrivateExponent[:]))
 	fmt.Printf("%s └───\n", indentPrompt)
 }
