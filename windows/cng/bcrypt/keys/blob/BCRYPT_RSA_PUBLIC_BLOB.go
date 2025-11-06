@@ -9,11 +9,11 @@ import (
 	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/headers"
 )
 
-// BCRYPT_RSAPUBLIC_BLOB represents the structure used as a header for an RSA public key BLOB in memory.
+// BCRYPT_RSA_PUBLIC_BLOB represents the structure used as a header for an RSA public key BLOB in memory.
 //
-// The layout of a BCRYPT_RSAPUBLIC_BLOB in memory is as follows:
+// The layout of a BCRYPT_RSA_PUBLIC_BLOB in memory is as follows:
 //
-//	BCRYPT_RSAPUBLIC_BLOB
+//	BCRYPT_RSA_PUBLIC_BLOB
 //	PublicExponent[cbPublicExp] // Big-endian
 //	Modulus[cbModulus]         // Big-endian
 //
@@ -21,7 +21,7 @@ import (
 //
 // See:
 // https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/ns-bcrypt-bcrypt_rsakey_blob
-type BCRYPT_RSAPUBLIC_BLOB struct {
+type BCRYPT_RSA_PUBLIC_BLOB struct {
 	// PublicExponent is the public exponent of the RSA key.
 	// Stored in big-endian format.
 	PublicExponent []byte
@@ -31,7 +31,7 @@ type BCRYPT_RSAPUBLIC_BLOB struct {
 	Modulus []byte
 }
 
-// Unmarshal parses the provided byte slice into the BCRYPT_RSAPUBLIC_BLOB structure.
+// Unmarshal parses the provided byte slice into the BCRYPT_RSA_PUBLIC_BLOB structure.
 //
 // Parameters:
 // - value: A byte slice containing the raw RSA public key BLOB to be parsed.
@@ -41,19 +41,19 @@ type BCRYPT_RSAPUBLIC_BLOB struct {
 // - An error if the parsing fails, otherwise nil.
 //
 // Note:
-// The function expects the byte slice to follow the RSA public key BLOB format, starting with the BCRYPT_RSAKEY_BLOB header.
-// It extracts the public exponent and modulus from the byte slice and stores them in the BCRYPT_RSAPUBLIC_BLOB structure.
-func (b *BCRYPT_RSAPUBLIC_BLOB) Unmarshal(keyHeader headers.BCRYPT_RSAKEY_BLOB, value []byte) (int, error) {
+// The function expects the byte slice to follow the RSA public key BLOB format, starting with the BCRYPT_RSA_KEY_BLOB header.
+// It extracts the public exponent and modulus from the byte slice and stores them in the BCRYPT_RSA_PUBLIC_BLOB structure.
+func (b *BCRYPT_RSA_PUBLIC_BLOB) Unmarshal(keyHeader headers.BCRYPT_RSA_KEY_BLOB, value []byte) (int, error) {
 	bytesRead := 0
 
 	if int(keyHeader.CbPublicExp) > len(value)-bytesRead {
-		return 0, errors.New("buffer too small for BCRYPT_RSAPUBLIC_BLOB, not enough bytes for unmarshalling public exponent")
+		return 0, errors.New("buffer too small for BCRYPT_RSA_PUBLIC_BLOB, not enough bytes for unmarshalling public exponent")
 	}
 	b.PublicExponent = value[bytesRead : bytesRead+int(keyHeader.CbPublicExp)]
 	bytesRead += int(keyHeader.CbPublicExp)
 
 	if int(keyHeader.CbModulus) > len(value)-bytesRead {
-		return 0, errors.New("buffer too small for BCRYPT_RSAPUBLIC_BLOB, not enough bytes for unmarshalling modulus")
+		return 0, errors.New("buffer too small for BCRYPT_RSA_PUBLIC_BLOB, not enough bytes for unmarshalling modulus")
 	}
 	b.Modulus = value[bytesRead : bytesRead+int(keyHeader.CbModulus)]
 	bytesRead += int(keyHeader.CbModulus)
@@ -61,11 +61,11 @@ func (b *BCRYPT_RSAPUBLIC_BLOB) Unmarshal(keyHeader headers.BCRYPT_RSAKEY_BLOB, 
 	return bytesRead, nil
 }
 
-// Marshal returns the raw bytes of the BCRYPT_RSAPUBLIC_BLOB structure.
+// Marshal returns the raw bytes of the BCRYPT_RSA_PUBLIC_BLOB structure.
 //
 // Returns:
-// - A byte slice representing the raw bytes of the BCRYPT_RSAPUBLIC_BLOB structure.
-func (b *BCRYPT_RSAPUBLIC_BLOB) Marshal() ([]byte, error) {
+// - A byte slice representing the raw bytes of the BCRYPT_RSA_PUBLIC_BLOB structure.
+func (b *BCRYPT_RSA_PUBLIC_BLOB) Marshal() ([]byte, error) {
 	marshalledData := []byte{}
 
 	marshalledData = append(marshalledData, b.PublicExponent...)
@@ -75,13 +75,13 @@ func (b *BCRYPT_RSAPUBLIC_BLOB) Marshal() ([]byte, error) {
 	return marshalledData, nil
 }
 
-// Describe prints the BCRYPT_RSAPUBLIC_BLOB structure to the console.
+// Describe prints the BCRYPT_RSA_PUBLIC_BLOB structure to the console.
 //
 // Parameters:
 // - indent: The number of spaces to indent the output.
-func (b *BCRYPT_RSAPUBLIC_BLOB) Describe(indent int) {
+func (b *BCRYPT_RSA_PUBLIC_BLOB) Describe(indent int) {
 	indentPrompt := strings.Repeat(" │ ", indent)
-	fmt.Printf("%s<\x1b[93mBCRYPT_RSAPUBLIC_BLOB\x1b[0m>\n", indentPrompt)
+	fmt.Printf("%s<\x1b[93mBCRYPT_RSA_PUBLIC_BLOB\x1b[0m>\n", indentPrompt)
 	fmt.Printf("%s │ \x1b[93mPublicExponent\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(b.PublicExponent))
 	fmt.Printf("%s │ \x1b[93mModulus\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(b.Modulus))
 	fmt.Printf("%s └───\n", indentPrompt)

@@ -31,7 +31,7 @@ type BCRYPT_DSA_PRIVATE_KEY struct {
 // - An error if the parsing fails, otherwise nil.
 //
 // Note:
-// The function expects the byte slice to follow the RSA PRIVATE key format, starting with the BCRYPT_RSAKEY_BLOB header.
+// The function expects the byte slice to follow the RSA PRIVATE key format, starting with the BCRYPT_RSA_KEY_BLOB header.
 // It extracts the PRIVATE exponent and modulus from the byte slice and stores them in the BCRYPT_DSA_PRIVATE_KEY structure.
 func (k *BCRYPT_DSA_PRIVATE_KEY) Unmarshal(value []byte) (int, error) {
 	if len(value) < 24 {

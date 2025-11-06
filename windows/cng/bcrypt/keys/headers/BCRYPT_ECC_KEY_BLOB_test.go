@@ -6,16 +6,16 @@ import (
 	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/headers"
 )
 
-func TestBCRYPT_ECCKEY_BLOB_Unmarshal_Marshal(t *testing.T) {
+func TestBCRYPT_ECC_KEY_BLOB_Unmarshal_Marshal(t *testing.T) {
 	tests := []struct {
 		name            string
-		input           headers.BCRYPT_ECCKEY_BLOB
+		input           headers.BCRYPT_ECC_KEY_BLOB
 		wantError       bool
 		wantErrorString string
 	}{
 		{
 			name: "Valid ECC key material",
-			input: headers.BCRYPT_ECCKEY_BLOB{
+			input: headers.BCRYPT_ECC_KEY_BLOB{
 				KeySize: 256,
 			},
 			wantError: false,
@@ -24,7 +24,7 @@ func TestBCRYPT_ECCKEY_BLOB_Unmarshal_Marshal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rk := &headers.BCRYPT_ECCKEY_BLOB{}
+			rk := &headers.BCRYPT_ECC_KEY_BLOB{}
 			data, err := tt.input.Marshal()
 			if err != nil {
 				t.Errorf("Marshal() error = %v", err)
