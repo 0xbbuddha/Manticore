@@ -8,24 +8,24 @@ import (
 	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/headers"
 )
 
-func TestBCRYPT_RSAPRIVATE_BLOB_MarshalUnmarshal(t *testing.T) {
+func TestBCRYPT_RSA_PRIVATE_BLOB_MarshalUnmarshal(t *testing.T) {
 	tests := []struct {
 		name            string
-		header          headers.BCRYPT_RSAKEY_BLOB
-		input           blob.BCRYPT_RSAPRIVATE_BLOB
+		header          headers.BCRYPT_RSA_KEY_BLOB
+		input           blob.BCRYPT_RSA_PRIVATE_BLOB
 		wantError       bool
 		wantErrorString string
 	}{
 		{
 			name: "Valid RSA private key material",
-			header: headers.BCRYPT_RSAKEY_BLOB{
+			header: headers.BCRYPT_RSA_KEY_BLOB{
 				BitLength:   2048,
 				CbPublicExp: 3,
 				CbModulus:   256,
 				CbPrime1:    112,
 				CbPrime2:    156,
 			},
-			input: blob.BCRYPT_RSAPRIVATE_BLOB{
+			input: blob.BCRYPT_RSA_PRIVATE_BLOB{
 				PublicExponent: []byte{0x01, 0x00, 0x01},
 				Modulus:        make([]byte, 256),
 				Prime1:         make([]byte, 112),
@@ -38,7 +38,7 @@ func TestBCRYPT_RSAPRIVATE_BLOB_MarshalUnmarshal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rk := &blob.BCRYPT_RSAPRIVATE_BLOB{}
+			rk := &blob.BCRYPT_RSA_PRIVATE_BLOB{}
 			data, err := tt.input.Marshal()
 			if err != nil {
 				t.Errorf("Marshal() error = %v", err)

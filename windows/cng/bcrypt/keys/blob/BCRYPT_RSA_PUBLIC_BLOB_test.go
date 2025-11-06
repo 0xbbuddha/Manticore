@@ -9,16 +9,16 @@ import (
 	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/headers"
 )
 
-func TestBCRYPT_RSAPUBLIC_BLOB_MarshalUnmarshal(t *testing.T) {
+func TestBCRYPT_RSA_PUBLIC_BLOB_MarshalUnmarshal(t *testing.T) {
 	// Prepare source blob
-	blobSourceHeader := headers.BCRYPT_RSAKEY_BLOB{
+	blobSourceHeader := headers.BCRYPT_RSA_KEY_BLOB{
 		BitLength:   2048,
 		CbPublicExp: 3,
 		CbModulus:   256,
 		CbPrime1:    0,
 		CbPrime2:    0,
 	}
-	blobSource := &blob.BCRYPT_RSAPUBLIC_BLOB{
+	blobSource := &blob.BCRYPT_RSA_PUBLIC_BLOB{
 		PublicExponent: []byte{0x01, 0x00, 0x01},
 		Modulus:        make([]byte, blobSourceHeader.CbModulus),
 	}
@@ -36,7 +36,7 @@ func TestBCRYPT_RSAPUBLIC_BLOB_MarshalUnmarshal(t *testing.T) {
 	}
 
 	// Unmarshal source blob
-	parsed := blob.BCRYPT_RSAPUBLIC_BLOB{}
+	parsed := blob.BCRYPT_RSA_PUBLIC_BLOB{}
 	n, err := parsed.Unmarshal(blobSourceHeader, data)
 	if err != nil {
 		t.Fatalf("Unmarshal failed: %v", err)
@@ -52,9 +52,9 @@ func TestBCRYPT_RSAPUBLIC_BLOB_MarshalUnmarshal(t *testing.T) {
 	}
 }
 
-func TestBCRYPT_RSAPUBLIC_BLOB_Unmarshal_ShortInput(t *testing.T) {
-	var blob blob.BCRYPT_RSAPUBLIC_BLOB
-	_, err := blob.Unmarshal(headers.BCRYPT_RSAKEY_BLOB{
+func TestBCRYPT_RSA_PUBLIC_BLOB_Unmarshal_ShortInput(t *testing.T) {
+	var blob blob.BCRYPT_RSA_PUBLIC_BLOB
+	_, err := blob.Unmarshal(headers.BCRYPT_RSA_KEY_BLOB{
 		BitLength:   2048,
 		CbPublicExp: 3,
 		CbModulus:   256,
@@ -64,14 +64,14 @@ func TestBCRYPT_RSAPUBLIC_BLOB_Unmarshal_ShortInput(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error on short buffer, got nil")
 	}
-	wantError := errors.New("buffer too small for BCRYPT_RSAPUBLIC_BLOB, not enough bytes for unmarshalling modulus")
+	wantError := errors.New("buffer too small for BCRYPT_RSA_PUBLIC_BLOB, not enough bytes for unmarshalling modulus")
 	if err.Error() != wantError.Error() {
 		t.Errorf("Unexpected error for short buffer: %v, want: %v", err, wantError)
 	}
 }
 
-func TestBCRYPT_RSAPUBLIC_BLOB_Marshal_Unmarshal_Roundtrip(t *testing.T) {
-	header := headers.BCRYPT_RSAKEY_BLOB{
+func TestBCRYPT_RSA_PUBLIC_BLOB_Marshal_Unmarshal_Roundtrip(t *testing.T) {
+	header := headers.BCRYPT_RSA_KEY_BLOB{
 		BitLength:   1024,
 		CbPublicExp: 3,
 		CbModulus:   128,
@@ -83,7 +83,7 @@ func TestBCRYPT_RSAPUBLIC_BLOB_Marshal_Unmarshal_Roundtrip(t *testing.T) {
 	for i := 0; i < 128; i++ {
 		modulus[i] = byte(127 - i)
 	}
-	orig := blob.BCRYPT_RSAPUBLIC_BLOB{
+	orig := blob.BCRYPT_RSA_PUBLIC_BLOB{
 		PublicExponent: exponent,
 		Modulus:        modulus,
 	}
@@ -91,7 +91,7 @@ func TestBCRYPT_RSAPUBLIC_BLOB_Marshal_Unmarshal_Roundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal failed: %v", err)
 	}
-	var parsed blob.BCRYPT_RSAPUBLIC_BLOB
+	var parsed blob.BCRYPT_RSA_PUBLIC_BLOB
 	n, err := parsed.Unmarshal(header, raw)
 	if err != nil {
 		t.Fatalf("Unmarshal failed: %v", err)
