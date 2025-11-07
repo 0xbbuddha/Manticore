@@ -35,12 +35,12 @@ import (
 // - RawBytesSize: A uint32 value representing the size of the raw binary data.
 //
 // Methods:
-// - ParseDNWithBinary: Parses the provided DNWithBinary object into the KeyCredential structure.
+// - UnmarshalDNWithBinary: Parses the provided DNWithBinary object into the KeyCredential structure.
 //
 // Note:
 // The KeyCredential structure is used to store and manage key credentials, which are used for authentication and authorization purposes.
 // The structure includes fields for version, identifier, key hash, raw key material, usage, legacy usage, source, last logon time, creation time, owner, and raw binary data.
-// The ParseDNWithBinary method is used to parse a DNWithBinary object and populate the fields of the KeyCredential structure.
+// The UnmarshalDNWithBinary method is used to parse a DNWithBinary object and populate the fields of the KeyCredential structure.
 type KeyCredential struct {
 	Version        version.KeyCredentialVersion
 	Identifier     string
@@ -126,30 +126,30 @@ func NewKeyCredential(
 	return kc
 }
 
-// ParseDNWithBinary parses the provided DNWithBinary object into the KeyCredential structure.
+// UnmarshalDNWithBinary parses the provided binary DNWithBinary data and initializes the KeyCredential structure.
 //
 // Parameters:
-// - dnWithBinary: A DNWithBinary object containing the distinguished name and binary data to be parsed.
+// - dnWithBinaryData: The byte slice containing DNWithBinary data to be parsed.
 //
 // Returns:
-// - An error if the parsing fails, otherwise nil.
+// - The number of bytes read from the input, or an error if parsing fails.
 //
-// Note:
-// The function performs the following steps:
-// 1. Sets the RawBytes and RawBytesSize fields to the provided binary data and its length, respectively.
-// 2. Sets the Owner field to the distinguished name from the DNWithBinary object.
-// 3. Parses the version information from the binary data and updates the RawBytesSize and remainder accordingly.
-// 4. Iterates through the remaining binary data, parsing each entry based on its type and length.
-// 5. Updates the corresponding fields of the KeyCredential structure based on the parsed entry type and data.
-//
-// The function handles various entry types, including key identifier, key hash, key material, key usage, legacy usage, key source, last logon time, and creation time.
-// Unsupported entry types, such as device ID and custom key information, are commented out for future implementation.
-func (kc *KeyCredential) ParseDNWithBinary(dnWithBinary ldap.DNWithBinary) error {
-	_, err := kc.Unmarshal(dnWithBinary.BinaryData)
+// The function does the following:
+// 1. Unmarshals the DNWithBinary data to extract the DN and BinaryData fields.
+// 2. Passes the BinaryData field to KeyCredential.Unmarshal to decode and populate the KeyCredential struct fields.
+func (kc *KeyCredential) UnmarshalDNWithBinary(dnWithBinaryData []byte) (int, error) {
+	dnWithBinary := ldap.DNWithBinary{}
+	_, err := dnWithBinary.Unmarshal(dnWithBinaryData)
 	if err != nil {
-		return err
+		return 0, fmt.Errorf("failed to unmarshal DNWithBinary: %w", err)
 	}
-	return nil
+
+	bytesRead, err := kc.Unmarshal(dnWithBinary.BinaryData)
+	if err != nil {
+		return 0, fmt.Errorf("failed to unmarshal KeyCredential from DNWithBinary: %w", err)
+	}
+
+	return bytesRead, nil
 }
 
 // Unmarshal parses the provided binary data into the KeyCredential structure.
