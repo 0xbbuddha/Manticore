@@ -48,13 +48,13 @@ func (b *BCRYPT_RSA_PUBLIC_BLOB) Unmarshal(keyHeader headers.BCRYPT_RSA_KEY_BLOB
 	bytesRead := 0
 
 	if int(keyHeader.CbPublicExp) > len(value)-bytesRead {
-		return 0, fmt.Errorf("buffer too small for BCRYPT_RSA_PUBLIC_BLOB, not enough bytes for unmarshalling public exponent, exponent length: %d, remaining bytes: %d", keyHeader.CbPublicExp, len(value)-bytesRead)
+		return 0, fmt.Errorf("buffer too small for BCRYPT_RSA_PUBLIC_BLOB, not enough bytes for unmarshalling public exponent")
 	}
 	b.PublicExponent = value[bytesRead : bytesRead+int(keyHeader.CbPublicExp)]
 	bytesRead += int(keyHeader.CbPublicExp)
 
 	if int(keyHeader.CbModulus) > len(value)-bytesRead {
-		return 0, fmt.Errorf("buffer too small for BCRYPT_RSA_PUBLIC_BLOB, not enough bytes for unmarshalling modulus, modulus length: %d, remaining bytes: %d", keyHeader.CbModulus, len(value)-bytesRead)
+		return 0, fmt.Errorf("buffer too small for BCRYPT_RSA_PUBLIC_BLOB, not enough bytes for unmarshalling modulus")
 	}
 	b.Modulus = value[bytesRead : bytesRead+int(keyHeader.CbModulus)]
 	bytesRead += int(keyHeader.CbModulus)
