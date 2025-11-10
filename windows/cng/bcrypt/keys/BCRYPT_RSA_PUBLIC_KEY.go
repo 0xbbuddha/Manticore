@@ -10,7 +10,7 @@ import (
 	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/magic"
 )
 
-type BCRYPT_RSAPUBLIC_KEY struct {
+type BCRYPT_RSA_PUBLIC_KEY struct {
 	// Magic is the magic signature of the key.
 	Magic magic.BCRYPT_KEY_BLOB
 
@@ -21,7 +21,7 @@ type BCRYPT_RSAPUBLIC_KEY struct {
 	Content blob.BCRYPT_RSA_PUBLIC_BLOB
 }
 
-// Unmarshal parses the provided byte slice into the BCRYPT_RSAPUBLIC_KEY structure.
+// Unmarshal parses the provided byte slice into the BCRYPT_RSA_PUBLIC_KEY structure.
 //
 // Parameters:
 // - value: A byte slice containing the raw RSA public key to be parsed.
@@ -32,10 +32,10 @@ type BCRYPT_RSAPUBLIC_KEY struct {
 //
 // Note:
 // The function expects the byte slice to follow the RSA public key format, starting with the BCRYPT_RSA_KEY_BLOB header.
-// It extracts the public exponent and modulus from the byte slice and stores them in the BCRYPT_RSAPUBLIC_KEY structure.
-func (k *BCRYPT_RSAPUBLIC_KEY) Unmarshal(value []byte) (int, error) {
+// It extracts the public exponent and modulus from the byte slice and stores them in the BCRYPT_RSA_PUBLIC_KEY structure.
+func (k *BCRYPT_RSA_PUBLIC_KEY) Unmarshal(value []byte) (int, error) {
 	if len(value) < 24 {
-		return 0, errors.New("buffer too small for BCRYPT_RSAPUBLIC_KEY, header too short (at least 24 bytes are required)")
+		return 0, errors.New("buffer too small for BCRYPT_RSA_PUBLIC_KEY, header too short (at least 24 bytes are required)")
 	}
 
 	bytesRead := 0
@@ -67,11 +67,11 @@ func (k *BCRYPT_RSAPUBLIC_KEY) Unmarshal(value []byte) (int, error) {
 	return bytesRead, nil
 }
 
-// Marshal returns the raw bytes of the BCRYPT_RSAPUBLIC_KEY structure.
+// Marshal returns the raw bytes of the BCRYPT_RSA_PUBLIC_KEY structure.
 //
 // Returns:
-// - A byte slice representing the raw bytes of the BCRYPT_RSAPUBLIC_KEY structure.
-func (k *BCRYPT_RSAPUBLIC_KEY) Marshal() ([]byte, error) {
+// - A byte slice representing the raw bytes of the BCRYPT_RSA_PUBLIC_KEY structure.
+func (k *BCRYPT_RSA_PUBLIC_KEY) Marshal() ([]byte, error) {
 	marshalledData := []byte{}
 
 	// Marshalling magic
@@ -99,19 +99,30 @@ func (k *BCRYPT_RSAPUBLIC_KEY) Marshal() ([]byte, error) {
 	return marshalledData, nil
 }
 
-// Describe prints a detailed description of the BCRYPT_RSAPUBLIC_KEY structure.
+// Describe prints a detailed description of the BCRYPT_RSA_PUBLIC_KEY structure.
 //
 // Parameters:
 // - indent: An integer representing the indentation level for the printed output.
 //
 // Note:
-// The function prints the Header and Data of the BCRYPT_RSAPUBLIC_KEY structure.
+// The function prints the Header and Data of the BCRYPT_RSA_PUBLIC_KEY structure.
 // The output is formatted with the specified indentation level to improve readability.
-func (k *BCRYPT_RSAPUBLIC_KEY) Describe(indent int) {
+func (k *BCRYPT_RSA_PUBLIC_KEY) Describe(indent int) {
 	indentPrompt := strings.Repeat(" │ ", indent)
-	fmt.Printf("%s<\x1b[93mBCRYPT_RSAPUBLIC_KEY\x1b[0m>\n", indentPrompt)
+	fmt.Printf("%s<\x1b[93mBCRYPT_RSA_PUBLIC_KEY\x1b[0m>\n", indentPrompt)
 	k.Magic.Describe(indent + 1)
 	k.Header.Describe(indent + 1)
 	k.Content.Describe(indent + 1)
 	fmt.Printf("%s└───\n", indentPrompt)
+}
+
+// Equal checks if two BCRYPT_RSA_PUBLIC_KEY structures are equal.
+//
+// Parameters:
+// - other: The BCRYPT_RSA_PUBLIC_KEY structure to compare to.
+//
+// Returns:
+// - True if the two BCRYPT_RSA_PUBLIC_KEY structures are equal, false otherwise.
+func (k *BCRYPT_RSA_PUBLIC_KEY) Equal(other *BCRYPT_RSA_PUBLIC_KEY) bool {
+	return k.Magic.Equal(&other.Magic) && k.Header.Equal(&other.Header) && k.Content.Equal(&other.Content)
 }

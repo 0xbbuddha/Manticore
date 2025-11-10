@@ -10,7 +10,7 @@ import (
 	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/magic"
 )
 
-type BCRYPT_RSAPRIVATE_KEY struct {
+type BCRYPT_RSA_PRIVATE_KEY struct {
 	// Magic is the magic signature of the key.
 	Magic magic.BCRYPT_KEY_BLOB
 
@@ -21,7 +21,7 @@ type BCRYPT_RSAPRIVATE_KEY struct {
 	Content blob.BCRYPT_RSA_PRIVATE_BLOB
 }
 
-// Unmarshal parses the provided byte slice into the BCRYPT_RSAPRIVATE_KEY structure.
+// Unmarshal parses the provided byte slice into the BCRYPT_RSA_PRIVATE_KEY structure.
 //
 // Parameters:
 // - value: A byte slice containing the raw RSA private key to be parsed.
@@ -32,10 +32,10 @@ type BCRYPT_RSAPRIVATE_KEY struct {
 //
 // Note:
 // The function expects the byte slice to follow the RSA private key format, starting with the BCRYPT_RSA_KEY_BLOB header.
-// It extracts the public exponent, modulus, prime1, and prime2 from the byte slice and stores them in the BCRYPT_RSAPRIVATE_KEY structure.
-func (k *BCRYPT_RSAPRIVATE_KEY) Unmarshal(value []byte) (int, error) {
+// It extracts the public exponent, modulus, prime1, and prime2 from the byte slice and stores them in the BCRYPT_RSA_PRIVATE_KEY structure.
+func (k *BCRYPT_RSA_PRIVATE_KEY) Unmarshal(value []byte) (int, error) {
 	if len(value) < 24 {
-		return 0, errors.New("buffer too small for BCRYPT_RSAPRIVATE_KEY, header too short (at least 24 bytes are required)")
+		return 0, errors.New("buffer too small for BCRYPT_RSA_PRIVATE_KEY, header too short (at least 24 bytes are required)")
 	}
 
 	bytesRead := 0
@@ -67,11 +67,11 @@ func (k *BCRYPT_RSAPRIVATE_KEY) Unmarshal(value []byte) (int, error) {
 	return bytesRead, nil
 }
 
-// Marshal returns the raw bytes of the BCRYPT_RSAPRIVATE_KEY structure.
+// Marshal returns the raw bytes of the BCRYPT_RSA_PRIVATE_KEY structure.
 //
 // Returns:
-// - A byte slice representing the raw bytes of the BCRYPT_RSAPRIVATE_KEY structure.
-func (k *BCRYPT_RSAPRIVATE_KEY) Marshal() ([]byte, error) {
+// - A byte slice representing the raw bytes of the BCRYPT_RSA_PRIVATE_KEY structure.
+func (k *BCRYPT_RSA_PRIVATE_KEY) Marshal() ([]byte, error) {
 	marshalledData := []byte{}
 
 	// Marshalling magic
@@ -99,17 +99,17 @@ func (k *BCRYPT_RSAPRIVATE_KEY) Marshal() ([]byte, error) {
 	return marshalledData, nil
 }
 
-// Describe prints a detailed description of the BCRYPT_RSAPRIVATE_KEY structure.
+// Describe prints a detailed description of the BCRYPT_RSA_PRIVATE_KEY structure.
 //
 // Parameters:
 // - indent: An integer representing the indentation level for the printed output.
 //
 // Note:
-// The function prints the Header and Data of the BCRYPT_RSAPRIVATE_KEY structure.
+// The function prints the Header and Data of the BCRYPT_RSA_PRIVATE_KEY structure.
 // The output is formatted with the specified indentation level to improve readability.
-func (k *BCRYPT_RSAPRIVATE_KEY) Describe(indent int) {
+func (k *BCRYPT_RSA_PRIVATE_KEY) Describe(indent int) {
 	indentPrompt := strings.Repeat(" │ ", indent)
-	fmt.Printf("%s<\x1b[93mBCRYPT_RSAPRIVATE_KEY\x1b[0m>\n", indentPrompt)
+	fmt.Printf("%s<\x1b[93mBCRYPT_RSA_PRIVATE_KEY\x1b[0m>\n", indentPrompt)
 	k.Magic.Describe(indent + 1)
 	k.Header.Describe(indent + 1)
 	k.Content.Describe(indent + 1)

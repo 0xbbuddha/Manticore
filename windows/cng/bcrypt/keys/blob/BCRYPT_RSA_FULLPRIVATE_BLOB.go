@@ -1,6 +1,7 @@
 package blob
 
 import (
+	"bytes"
 	"errors"
 
 	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/headers"
@@ -158,4 +159,15 @@ func (b *BCRYPT_RSA_FULLPRIVATE_BLOB) Marshal() ([]byte, error) {
 	marshalledData = append(marshalledData, b.PrivateExponent...)
 
 	return marshalledData, nil
+}
+
+// Equal checks if two BCRYPT_RSA_FULLPRIVATE_BLOB structures are equal.
+//
+// Parameters:
+// - other: The BCRYPT_RSA_FULLPRIVATE_BLOB structure to compare to.
+//
+// Returns:
+// - True if the two BCRYPT_RSA_FULLPRIVATE_BLOB structures are equal, false otherwise.
+func (b *BCRYPT_RSA_FULLPRIVATE_BLOB) Equal(other *BCRYPT_RSA_FULLPRIVATE_BLOB) bool {
+	return bytes.Equal(b.PublicExponent, other.PublicExponent) && bytes.Equal(b.Modulus, other.Modulus) && bytes.Equal(b.Prime1, other.Prime1) && bytes.Equal(b.Prime2, other.Prime2) && bytes.Equal(b.Exponent1, other.Exponent1) && bytes.Equal(b.Exponent2, other.Exponent2) && bytes.Equal(b.Coefficient, other.Coefficient) && bytes.Equal(b.PrivateExponent, other.PrivateExponent)
 }
