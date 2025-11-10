@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/version"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/version"
 )
 
 func TestKeyCredentialVersion_Unmarshal(t *testing.T) {

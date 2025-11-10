@@ -1,13 +1,13 @@
-package keycredential
+package keycredentiallink
 
 import (
 	"github.com/TheManticoreProject/Manticore/network/ldap"
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/crypto"
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/customkeyinformation"
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/source"
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/usage"
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/utils"
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/version"
+	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/key/customkeyinformation"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/key/source"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/key/usage"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/utils"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/version"
 
 	"bytes"
 	"encoding/binary"
@@ -24,15 +24,12 @@ import (
 // - Version: A KeyCredentialVersion object representing the version of the key credential.
 // - Identifier: A string representing the unique identifier of the key credential.
 // - KeyHash: A byte slice containing the hash of the key material.
-// - RawKeyMaterial: An RSAKeyMaterial object representing the raw RSA key material.
+// - KeyMaterial: A KeyMaterial object representing the key material of the key credential.
 // - Usage: A KeyUsage object representing the usage of the key credential.
 // - LegacyUsage: A string representing the legacy usage of the key credential.
 // - Source: A KeySource object representing the source of the key credential.
 // - LastLogonTime: A DateTime object representing the last logon time associated with the key credential.
 // - CreationTime: A DateTime object representing the creation time of the key credential.
-// - Owner: A string representing the owner of the key credential.
-// - RawBytes: A byte slice containing the raw binary data of the key credential.
-// - RawBytesSize: A uint32 value representing the size of the raw binary data.
 //
 // Methods:
 // - ParseDNWithBinary: Parses the provided DNWithBinary object into the KeyCredential structure.
@@ -41,22 +38,31 @@ import (
 // The KeyCredential structure is used to store and manage key credentials, which are used for authentication and authorization purposes.
 // The structure includes fields for version, identifier, key hash, raw key material, usage, legacy usage, source, last logon time, creation time, owner, and raw binary data.
 // The ParseDNWithBinary method is used to parse a DNWithBinary object and populate the fields of the KeyCredential structure.
+//
+// Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/f3f01e95-6d0c-4fe6-8b43-d585167658fa
 type KeyCredential struct {
-	Version        version.KeyCredentialVersion
-	Identifier     string
-	KeyHash        []byte
-	RawKeyMaterial crypto.RSAKeyMaterial
-	Usage          usage.KeyUsage
-	LegacyUsage    string
-	Source         source.KeySource
-	CustomKeyInfo  customkeyinformation.CustomKeyInformation
-	DeviceId       guid.GUID
-	LastLogonTime  utils.DateTime
-	CreationTime   utils.DateTime
-
-	// Internal
-	RawBytes     []byte
-	RawBytesSize uint32
+	// A KeyCredentialVersion object representing the version of the key credential.
+	Version version.KeyCredentialVersion
+	// A string representing the unique identifier of the key credential.
+	Identifier string
+	// A byte slice containing the hash of the key material.
+	KeyHash []byte
+	// A KeyMaterial object representing the key material of the key credential.
+	KeyMaterial bcrypt.KeyMaterial
+	// A KeyUsage object representing the usage of the key credential.
+	Usage usage.KeyUsage
+	// A string representing the legacy usage of the key credential.
+	LegacyUsage string
+	// A KeySource object representing the source of the key credential.
+	Source source.KeySource
+	// A CustomKeyInformation object representing the custom key information of the key credential.
+	CustomKeyInfo customkeyinformation.CustomKeyInformation
+	// A GUID object representing the device ID of the key credential.
+	DeviceId guid.GUID
+	// A DateTime object representing the last logon time associated with the key credential.
+	LastLogonTime utils.DateTime
+	// A DateTime object representing the creation time of the key credential.
+	CreationTime utils.DateTime
 }
 
 // NewKeyCredential creates a new KeyCredential structure.
@@ -85,38 +91,34 @@ type KeyCredential struct {
 //
 // - CreationTime: A DateTime object representing the creation time of the key credential.
 //
-// - Owner: A string representing the owner of the key credential.
-//
 // Returns:
 //
 // - A pointer to a KeyCredential object.
 func NewKeyCredential(
-	Version version.KeyCredentialVersion,
-	Identifier string,
-	RawKeyMaterial crypto.RSAKeyMaterial,
-	DeviceId guid.GUID,
-	LastLogonTime utils.DateTime,
-	CreationTime utils.DateTime,
+	version version.KeyCredentialVersion,
+	identifier string,
+	keyMaterial bcrypt.KeyMaterial,
+	deviceId guid.GUID,
+	lastLogonTime utils.DateTime,
+	creationTime utils.DateTime,
 ) *KeyCredential {
 	kc := &KeyCredential{
-		Version:        Version,
-		Identifier:     Identifier,
-		KeyHash:        []byte{},
-		RawKeyMaterial: RawKeyMaterial,
-		Usage:          usage.KeyUsage{Value: usage.KeyUsage_NGC},
-		LegacyUsage:    "",
-		Source:         source.KeySource{},
+		Version:     version,
+		Identifier:  identifier,
+		KeyHash:     []byte{},
+		KeyMaterial: keyMaterial,
+		Usage:       usage.KeyUsage{Value: usage.KeyUsage_NGC},
+		LegacyUsage: "",
+		Source:      source.KeySource{},
 		CustomKeyInfo: customkeyinformation.CustomKeyInformation{
 			Version: 1,
 			Flags: customkeyinformation.CustomKeyInformationFlags{
 				Value: 0,
 			},
 		},
-		DeviceId:      DeviceId,
-		LastLogonTime: LastLogonTime,
-		CreationTime:  CreationTime,
-		RawBytes:      []byte{},
-		RawBytesSize:  0,
+		DeviceId:      deviceId,
+		LastLogonTime: lastLogonTime,
+		CreationTime:  creationTime,
 	}
 
 	kc.Source.Value = source.KeySource_AD
@@ -179,7 +181,6 @@ func (kc *KeyCredential) ParseDNWithBinary(dnWithBinary ldap.DNWithBinary) error
 // - Last logon timestamp
 // - Creation time
 func (kc *KeyCredential) Unmarshal(data []byte) (int, error) {
-	kc.RawBytes = data
 	remainder := data
 	bytesRead := 0 // This will track the total number of bytes successfully parsed and returned.
 
@@ -234,7 +235,7 @@ func (kc *KeyCredential) Unmarshal(data []byte) (int, error) {
 		case KeyCredentialEntryType_KeyHash:
 			kc.KeyHash = entryData
 		case KeyCredentialEntryType_KeyMaterial:
-			_, err := kc.RawKeyMaterial.Unmarshal(entryData)
+			_, err := kc.KeyMaterial.Unmarshal(entryData)
 			if err != nil {
 				return bytesRead, fmt.Errorf("failed to unmarshal KeyCredential key material: %w", err)
 			}
@@ -272,8 +273,6 @@ func (kc *KeyCredential) Unmarshal(data []byte) (int, error) {
 		bytesRead += totalEntrySize
 	}
 
-	// Update RawBytesSize with the total bytes successfully parsed.
-	kc.RawBytesSize = uint32(bytesRead)
 	return bytesRead, nil
 }
 
@@ -305,15 +304,12 @@ func (kc *KeyCredential) ComputeKeyHash() []byte {
 	// Src: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/a99409ea-4f72-b7ef-8596013a36c7
 	data := []byte{}
 
-	if len(kc.RawBytes) < 4 {
-		rawBytes, err := kc.Marshal()
-		if err != nil {
-			return nil
-		}
-		kc.RawBytes = rawBytes
+	rawBytes, err := kc.Marshal()
+	if err != nil {
+		return nil
 	}
 
-	remainder := kc.RawBytes[4:]
+	remainder := rawBytes[4:]
 
 	// Read all entries corresponding to the KEYCREDENTIALLINK_ENTRY structure:
 	for len(remainder) > 3 {
@@ -377,7 +373,7 @@ func (kc *KeyCredential) Marshal() ([]byte, error) {
 
 	// kc.RawKeyMaterial
 	entryType := KeyCredentialEntryType{Value: KeyCredentialEntryType_KeyMaterial}
-	data, err := kc.RawKeyMaterial.Marshal()
+	data, err := kc.KeyMaterial.Marshal()
 	if err != nil {
 		return nil, err
 	}
@@ -450,7 +446,7 @@ func (kc *KeyCredential) Describe(indent int) {
 	} else {
 		fmt.Printf("%s │ \x1b[93mKeyHash\x1b[0m: %s (\x1b[91minvalid\x1b[0m)\n", indentPrompt, hex.EncodeToString(kc.KeyHash))
 	}
-	kc.RawKeyMaterial.Describe(indent + 1)
+	kc.KeyMaterial.Describe(indent + 1)
 	fmt.Printf("%s │ \x1b[93mUsage\x1b[0m: %s\n", indentPrompt, kc.Usage.String())
 	if len(kc.LegacyUsage) != 0 {
 		fmt.Printf("%s │ \x1b[93mLegacyUsage\x1b[0m: %s\n", indentPrompt, kc.LegacyUsage)

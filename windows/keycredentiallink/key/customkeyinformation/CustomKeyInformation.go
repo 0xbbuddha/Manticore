@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/strength"
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/version"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/key/strength"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/version"
 )
 
 // CustomKeyInformation represents the CUSTOM_KEY_INFORMATION structure.

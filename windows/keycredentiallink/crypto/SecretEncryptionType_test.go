@@ -3,7 +3,7 @@ package crypto_test
 import (
 	"testing"
 
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/crypto"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/crypto"
 )
 
 func TestPrivateKeyEncryptionTypeString(t *testing.T) {

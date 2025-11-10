@@ -1,8 +1,8 @@
 package utils
 
 import (
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/source"
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/version"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/key/source"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/version"
 
 	"crypto/sha256"
 	"encoding/base64"

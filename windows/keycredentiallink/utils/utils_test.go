@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/source"
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/utils"
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/version"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/key/source"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/utils"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/version"
 )
 
 func TestConvertFromBinaryIdentifier(t *testing.T) {
