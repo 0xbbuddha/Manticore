@@ -3,7 +3,7 @@ package source_test
 import (
 	"testing"
 
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/source"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/key/source"
 )
 
 func TestKeySource_String(t *testing.T) {
