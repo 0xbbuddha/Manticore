@@ -111,3 +111,28 @@ func EndsWithNullTerminator(input string) bool {
 func EndsWithNullTerminatorUTF16(input []byte) bool {
 	return input[len(input)-2] == 0x00 && input[len(input)-1] == 0x00
 }
+
+// ReplaceNonPrintable replaces all non-printable characters in the input string with
+// the escape sequence "\xNN" (where NN is the byte value in hexadecimal), and keeps printable characters as is.
+//
+// Parameters:
+// - input: The input string to process.
+//
+// Returns:
+// - A new string with non-printable characters replaced by their escape sequences.
+func ReplaceNonPrintable(input string) string {
+	var out []rune
+	for _, r := range input {
+		// Printable ASCII: 0x20 (space) through 0x7E (~)
+		if r >= 0x20 && r <= 0x7E {
+			out = append(out, r)
+		} else if r <= 0xFF {
+			// Replace single-byte runes
+			out = append(out, []rune(fmt.Sprintf("\\x%02X", r))...)
+		} else {
+			// For multi-byte runes, print the Unicode escape
+			out = append(out, []rune(fmt.Sprintf("\\x%X", r))...)
+		}
+	}
+	return string(out)
+}

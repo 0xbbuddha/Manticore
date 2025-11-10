@@ -2,6 +2,7 @@ package headers
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -14,19 +15,20 @@ import (
 // https://docs.microsoft.com/en-us/archive/msdn-magazine/2007/july/images/cc163389.fig11.gif
 // https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/ns-bcrypt-bcrypt_rsakey_blob
 type BCRYPT_RSA_KEY_BLOB struct {
-	// BitLength is the size, in bits, of the RSA key.
+	// The size, in bits, of the key.
 	BitLength uint32
 
-	// CbPublicExp is the size, in bytes, of the public exponent.
+	// The size, in bytes, of the exponent of the key.
+	// As of Windows 10 version 1903, public exponents larger than (2^64 - 1) are no longer supported.
 	CbPublicExp uint32
 
-	// CbModulus is the size, in bytes, of the modulus.
+	// The size, in bytes, of the modulus of the key.
 	CbModulus uint32
 
-	// CbPrime1 is the size, in bytes, of the first prime (private only).
+	// The size, in bytes, of the first prime number of the key. This is only used for private key BLOBs.
 	CbPrime1 uint32
 
-	// CbPrime2 is the size, in bytes, of the second prime (private only).
+	// The size, in bytes, of the second prime number of the key. This is only used for private key BLOBs.
 	CbPrime2 uint32
 }
 
@@ -51,21 +53,30 @@ type BCRYPT_RSA_KEY_BLOB struct {
 // 4. Parses the exponent, modulus, prime1, and prime2 values from the body of the byte slice based on the extracted sizes.
 // 5. Stores the parsed values in the corresponding fields of the BCRYPT_RSA_KEY_BLOB structure.
 func (k *BCRYPT_RSA_KEY_BLOB) Unmarshal(value []byte) (int, error) {
-	if len(value) < 24 {
-		return 0, errors.New("buffer too small for BCRYPT_RSA_KEY_BLOB, header too short (at least 24 bytes are required)")
+	if len(value) < 20 {
+		return 0, errors.New("buffer too small for BCRYPT_RSA_KEY_BLOB, header too short (at least 20 bytes are required)")
 	}
 
-	k.BitLength = binary.BigEndian.Uint32(value[4:8])
+	fmt.Printf("[debug] Before unmarshalling BitLength value: %s\n\n", hex.EncodeToString(value))
 
-	k.CbPublicExp = binary.BigEndian.Uint32(value[8:12])
+	bytesRead := 0
 
-	k.CbModulus = binary.BigEndian.Uint32(value[12:16])
+	k.BitLength = binary.LittleEndian.Uint32(value[bytesRead : bytesRead+4])
+	bytesRead += 4
 
-	k.CbPrime1 = binary.BigEndian.Uint32(value[16:20])
+	k.CbPublicExp = binary.LittleEndian.Uint32(value[bytesRead : bytesRead+4])
+	bytesRead += 4
 
-	k.CbPrime2 = binary.BigEndian.Uint32(value[20:24])
+	k.CbModulus = binary.LittleEndian.Uint32(value[bytesRead : bytesRead+4])
+	bytesRead += 4
 
-	return 24, nil
+	k.CbPrime1 = binary.LittleEndian.Uint32(value[bytesRead : bytesRead+4])
+	bytesRead += 4
+
+	k.CbPrime2 = binary.LittleEndian.Uint32(value[bytesRead : bytesRead+4])
+	bytesRead += 4
+
+	return bytesRead, nil
 }
 
 // Marshal returns the raw bytes of the BCRYPT_RSA_KEY_BLOB structure.
@@ -73,17 +84,23 @@ func (k *BCRYPT_RSA_KEY_BLOB) Unmarshal(value []byte) (int, error) {
 // Returns:
 // - A byte slice representing the raw bytes of the BCRYPT_RSA_KEY_BLOB structure.
 func (k *BCRYPT_RSA_KEY_BLOB) Marshal() ([]byte, error) {
-	buf := make([]byte, 24)
+	buf := make([]byte, 20)
+	bytesWritten := 0
 
-	binary.BigEndian.PutUint32(buf[4:8], k.BitLength)
+	binary.LittleEndian.PutUint32(buf[bytesWritten:bytesWritten+4], k.BitLength)
+	bytesWritten += 4
 
-	binary.BigEndian.PutUint32(buf[8:12], k.CbPublicExp)
+	binary.LittleEndian.PutUint32(buf[bytesWritten:bytesWritten+4], k.CbPublicExp)
+	bytesWritten += 4
 
-	binary.BigEndian.PutUint32(buf[12:16], k.CbModulus)
+	binary.LittleEndian.PutUint32(buf[bytesWritten:bytesWritten+4], k.CbModulus)
+	bytesWritten += 4
 
-	binary.BigEndian.PutUint32(buf[16:20], k.CbPrime1)
+	binary.LittleEndian.PutUint32(buf[bytesWritten:bytesWritten+4], k.CbPrime1)
+	bytesWritten += 4
 
-	binary.BigEndian.PutUint32(buf[20:24], k.CbPrime2)
+	binary.LittleEndian.PutUint32(buf[bytesWritten:bytesWritten+4], k.CbPrime2)
+	bytesWritten += 4
 
 	return buf, nil
 }
@@ -100,10 +117,11 @@ func (k *BCRYPT_RSA_KEY_BLOB) Marshal() ([]byte, error) {
 func (k *BCRYPT_RSA_KEY_BLOB) Describe(indent int) {
 	indentPrompt := strings.Repeat(" │ ", indent)
 	fmt.Printf("%s<\x1b[93mBCRYPT_RSA_KEY_BLOB (header)\x1b[0m>\n", indentPrompt)
-	fmt.Printf("%s │ \x1b[93mExponent (E)\x1b[0m: %d\n", indentPrompt, k.CbPublicExp)
-	fmt.Printf("%s │ \x1b[93mModulus (N) \x1b[0m: 0x%x\n", indentPrompt, k.CbModulus)
-	fmt.Printf("%s │ \x1b[93mPrime1 (P)  \x1b[0m: 0x%x\n", indentPrompt, k.CbPrime1)
-	fmt.Printf("%s │ \x1b[93mPrime2 (Q)  \x1b[0m: 0x%x\n", indentPrompt, k.CbPrime2)
+	fmt.Printf("%s │ \x1b[93mBitLength\x1b[0m   : (0x%08x) %d bits \n", indentPrompt, k.BitLength, k.BitLength)
+	fmt.Printf("%s │ \x1b[93mCbPublicExp\x1b[0m : (0x%08x) %d bytes \n", indentPrompt, k.CbPublicExp, k.CbPublicExp)
+	fmt.Printf("%s │ \x1b[93mCbModulus\x1b[0m   : (0x%08x) %d bytes \n", indentPrompt, k.CbModulus, k.CbModulus)
+	fmt.Printf("%s │ \x1b[93mCbPrime1\x1b[0m    : (0x%08x) %d bytes \n", indentPrompt, k.CbPrime1, k.CbPrime1)
+	fmt.Printf("%s │ \x1b[93mCbPrime2\x1b[0m    : (0x%08x) %d bytes \n", indentPrompt, k.CbPrime2, k.CbPrime2)
 	fmt.Printf("%s └───\n", indentPrompt)
 }
 

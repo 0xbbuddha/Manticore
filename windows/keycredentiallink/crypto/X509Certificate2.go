@@ -11,6 +11,11 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys"
+	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/blob"
+	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/headers"
+	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/magic"
 )
 
 // X509Certificate represents an X.509 certificate along with its associated RSA private key and public key material.
@@ -28,9 +33,9 @@ import (
 // The X509Certificate struct is used to manage X.509 certificates, including the generation of new certificates and the export of certificates and private keys to PFX files.
 // The struct includes fields for the RSA private key, X.509 certificate, and public key material. The NewX509Certificate method is used to create a new certificate, and the ExportPFX method is used to export the certificate and private key to a PFX file.
 type X509Certificate struct {
-	key         *rsa.PrivateKey
+	privateKey  *rsa.PrivateKey
 	certificate *x509.Certificate
-	publicKey   RSAKeyMaterial
+	publicKey   *rsa.PublicKey
 }
 
 // NewX509Certificate creates a new X.509 certificate with the specified subject, key size, and validity period.
@@ -94,7 +99,7 @@ func NewX509Certificate(subject string, keySize int, notBefore, notAfter time.Ti
 	}
 
 	return &X509Certificate{
-		key:         rsaKey,
+		privateKey:  rsaKey,
 		certificate: cert,
 	}, nil
 }
@@ -136,7 +141,7 @@ func (x *X509Certificate) ExportRSAPublicKeyPEM(pathToFile string) error {
 	}
 	defer pubKeyOut.Close()
 
-	pubBytes, err := x509.MarshalPKIXPublicKey(&x.key.PublicKey)
+	pubBytes, err := x509.MarshalPKIXPublicKey(&x.privateKey.PublicKey)
 	if err != nil {
 		return err
 	}
@@ -146,6 +151,43 @@ func (x *X509Certificate) ExportRSAPublicKeyPEM(pathToFile string) error {
 	}
 
 	return nil
+}
+
+// ExportRSAPublicKeyDER exports the public key to a DER file.
+//
+// Parameters:
+// - pathToFile: A string representing the path to the file where the public key will be exported.
+//
+// Returns:
+// - An error if the export fails, otherwise nil.
+func (x *X509Certificate) ExportRSAPublicKeyDER() ([]byte, error) {
+	return nil, fmt.Errorf("ExportRSAPublicKeyDER not implemented")
+}
+
+// ExportRSAPublicKeyBCrypt exports the public key to a BCrypt structure.
+//
+// Parameters:
+// - None
+//
+// Returns:
+// - A pointer to a BCRYPT_RSA_PUBLIC_KEY object representing the public key.
+// - An error if the export fails, otherwise nil.
+func (x *X509Certificate) ExportRSAPublicKeyBCrypt() (*keys.BCRYPT_RSA_PUBLIC_KEY, error) {
+	exponentBigInt := big.NewInt(int64(x.publicKey.E))
+	exponentBytes := exponentBigInt.Bytes()
+
+	return &keys.BCRYPT_RSA_PUBLIC_KEY{
+		Magic: magic.BCRYPT_KEY_BLOB{Magic: magic.BCRYPT_RSAPUBLIC_MAGIC},
+		Header: headers.BCRYPT_RSA_KEY_BLOB{
+			BitLength:   uint32(x.publicKey.Size() * 8),
+			CbPublicExp: uint32(len(exponentBytes)),
+			CbModulus:   uint32(len(x.publicKey.N.Bytes())),
+		},
+		Content: blob.BCRYPT_RSA_PUBLIC_BLOB{
+			PublicExponent: exponentBytes,
+			Modulus:        x.publicKey.N.Bytes(),
+		},
+	}, nil
 }
 
 // ExportRSAPrivateKeyPEM exports the private key to a PEM file.
@@ -171,7 +213,7 @@ func (x *X509Certificate) ExportRSAPrivateKeyPEM(pathToFile string) error {
 	}
 	defer keyOut.Close()
 
-	privBytes := x509.MarshalPKCS1PrivateKey(x.key)
+	privBytes := x509.MarshalPKCS1PrivateKey(x.privateKey)
 	if err := pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privBytes}); err != nil {
 		return err
 	}
@@ -179,34 +221,34 @@ func (x *X509Certificate) ExportRSAPrivateKeyPEM(pathToFile string) error {
 	return nil
 }
 
-// ExportRSAPublicKeyDER exports the public key to a DER file.
+// ExportRSAPrivateKeyBCrypt exports the private key to a BCrypt file.
 //
 // Parameters:
-// - pathToFile: A string representing the path to the file where the public key will be exported.
+// - pathToFile: A string representing the path to the file where the private key will be exported.
 //
 // Returns:
 // - An error if the export fails, otherwise nil.
-func (x *X509Certificate) ExportRSAPublicKeyDER() ([]byte, error) {
-	return nil, fmt.Errorf("ExportRSAPublicKeyDER not implemented")
-}
+// - A pointer to a BCRYPT_RSA_PRIVATE_KEY object representing the private key.
+func (x *X509Certificate) ExportRSAPrivateKeyBCrypt() (*keys.BCRYPT_RSA_PRIVATE_KEY, error) {
+	exponentBigInt := big.NewInt(int64(x.privateKey.E))
+	exponentBytes := exponentBigInt.Bytes()
 
-// ExportRSAPublicKeyBCrypt exports the public key to a BCrypt file.
-//
-// Parameters:
-// - pathToFile: A string representing the path to the file where the public key will be exported.
-//
-// Returns:
-// - An error if the export fails, otherwise nil.
-func (x *X509Certificate) ExportRSAPublicKeyBCrypt() ([]byte, error) {
-	return nil, fmt.Errorf("ExportRSAPublicKeyBCrypt not implemented")
-}
-
-// ExportRSAPublicKey returns the public key material of the certificate.
-//
-// Returns:
-// - An RSAKeyMaterial object representing the public key material of the certificate.
-func (x *X509Certificate) ExportRSAPublicKey() RSAKeyMaterial {
-	return x.publicKey
+	return &keys.BCRYPT_RSA_PRIVATE_KEY{
+		Magic: magic.BCRYPT_KEY_BLOB{Magic: magic.BCRYPT_RSAPRIVATE_MAGIC},
+		Header: headers.BCRYPT_RSA_KEY_BLOB{
+			BitLength:   uint32(x.privateKey.PublicKey.Size() * 8),
+			CbPublicExp: uint32(len(exponentBytes)),
+			CbModulus:   uint32(len(x.privateKey.PublicKey.N.Bytes())),
+			CbPrime1:    uint32(len(x.privateKey.Primes[0].Bytes())),
+			CbPrime2:    uint32(len(x.privateKey.Primes[1].Bytes())),
+		},
+		Content: blob.BCRYPT_RSA_PRIVATE_BLOB{
+			PublicExponent: exponentBytes,
+			Modulus:        x.privateKey.PublicKey.N.Bytes(),
+			Prime1:         x.privateKey.Primes[0].Bytes(),
+			Prime2:         x.privateKey.Primes[1].Bytes(),
+		},
+	}, nil
 }
 
 // GetRSAPublicKey returns the public key of the certificate.
@@ -214,7 +256,7 @@ func (x *X509Certificate) ExportRSAPublicKey() RSAKeyMaterial {
 // Returns:
 // - A pointer to an rsa.PublicKey object representing the public key of the certificate.
 func (x *X509Certificate) GetRSAPublicKey() *rsa.PublicKey {
-	return &x.key.PublicKey
+	return x.publicKey
 }
 
 // GetRSAPrivateKey returns the private key of the certificate.
@@ -222,7 +264,7 @@ func (x *X509Certificate) GetRSAPublicKey() *rsa.PublicKey {
 // Returns:
 // - A pointer to an rsa.PrivateKey object representing the private key of the certificate.
 func (x *X509Certificate) GetRSAPrivateKey() *rsa.PrivateKey {
-	return x.key
+	return x.privateKey
 }
 
 // GetCertificate returns the certificate of the certificate.
@@ -231,18 +273,4 @@ func (x *X509Certificate) GetRSAPrivateKey() *rsa.PrivateKey {
 // - A pointer to an x509.Certificate object representing the certificate of the certificate.
 func (x *X509Certificate) GetCertificate() *x509.Certificate {
 	return x.certificate
-}
-
-// GetRSAKeyMaterial returns the RSA key material of the certificate.
-//
-// Returns:
-// - An RSAKeyMaterial object representing the RSA key material of the certificate.
-func (x *X509Certificate) GetRSAKeyMaterial() RSAKeyMaterial {
-	return RSAKeyMaterial{
-		Modulus:  x.key.PublicKey.N.Bytes(),
-		Exponent: uint32(x.key.PublicKey.E),
-		KeySize:  uint32(x.key.PublicKey.Size() * 8),
-		Prime1:   []byte{},
-		Prime2:   []byte{},
-	}
 }

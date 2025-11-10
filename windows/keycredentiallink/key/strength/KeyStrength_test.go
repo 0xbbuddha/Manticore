@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/key/strength"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/key/strength"
 )
 
 func TestKeyStrengthUnmarshal(t *testing.T) {

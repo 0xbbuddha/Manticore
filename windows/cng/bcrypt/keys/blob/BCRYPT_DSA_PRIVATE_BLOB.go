@@ -1,6 +1,7 @@
 package blob
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -104,4 +105,15 @@ func (b *BCRYPT_DSA_PRIVATE_BLOB) Describe(indent int) {
 	fmt.Printf("%s │ \x1b[93mPublic\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(b.Public))
 	fmt.Printf("%s │ \x1b[93mPrivateExponent\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(b.PrivateExponent[:]))
 	fmt.Printf("%s └───\n", indentPrompt)
+}
+
+// Equal checks if two BCRYPT_DSA_PRIVATE_BLOB structures are equal.
+//
+// Parameters:
+// - other: The BCRYPT_DSA_PRIVATE_BLOB structure to compare to.
+//
+// Returns:
+// - True if the two BCRYPT_DSA_PRIVATE_BLOB structures are equal, false otherwise.
+func (b *BCRYPT_DSA_PRIVATE_BLOB) Equal(other *BCRYPT_DSA_PRIVATE_BLOB) bool {
+	return bytes.Equal(b.Modulus, other.Modulus) && bytes.Equal(b.Generator, other.Generator) && bytes.Equal(b.Public, other.Public) && bytes.Equal(b.PrivateExponent[:], other.PrivateExponent[:])
 }

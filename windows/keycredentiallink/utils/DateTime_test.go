@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TheManticoreProject/Manticore/windows/keycredential/utils"
+	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/utils"
 )
 
 // ticksFromTime computes 100ns ticks since 1601-01-01 UTC without relying on
