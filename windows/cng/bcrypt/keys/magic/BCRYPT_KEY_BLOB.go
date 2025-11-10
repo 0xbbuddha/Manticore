@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/TheManticoreProject/Manticore/utils"
 )
 
 // BCRYPT_KEY_BLOB structure is used as a header for a key BLOB in memory.
@@ -74,7 +76,9 @@ func (b *BCRYPT_KEY_BLOB) Equal(other *BCRYPT_KEY_BLOB) bool {
 // - indent: The number of spaces to indent the output.
 func (b *BCRYPT_KEY_BLOB) Describe(indent int) {
 	indentPrompt := strings.Repeat(" │ ", indent)
-	fmt.Printf("%s<\x1b[93mBCRYPT_KEY_BLOB\x1b[0m>\n", indentPrompt)
-	fmt.Printf("%s │ \x1b[93mMagic\x1b[0m: 0x%08x\n", indentPrompt, b.Magic)
+	fmt.Printf("%s<\x1b[93mBCRYPT_KEY_BLOB (magic)\x1b[0m>\n", indentPrompt)
+	buf4 := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf4[:4], b.Magic)
+	fmt.Printf("%s │ \x1b[93mMagic\x1b[0m: 0x%08x (%s)\n", indentPrompt, b.Magic, utils.ReplaceNonPrintable(string(buf4)))
 	fmt.Printf("%s └───\n", indentPrompt)
 }

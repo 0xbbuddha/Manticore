@@ -1,6 +1,7 @@
 package keys
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -35,32 +36,42 @@ type BCRYPT_RSA_PUBLIC_KEY struct {
 // It extracts the public exponent and modulus from the byte slice and stores them in the BCRYPT_RSA_PUBLIC_KEY structure.
 func (k *BCRYPT_RSA_PUBLIC_KEY) Unmarshal(value []byte) (int, error) {
 	if len(value) < 24 {
-		return 0, errors.New("buffer too small for BCRYPT_RSA_PUBLIC_KEY, header too short (at least 24 bytes are required)")
+		return 0, errors.New("buffer too small for BCRYPT_RSA_PUBLIC_KEY, header too short (at least 24 bytes are required for magic and header)")
 	}
 
 	bytesRead := 0
 
+	fmt.Printf("[debug] Before unmarshalling magic: remaining bytes: %d (0x%08x)\n", len(value)-bytesRead, len(value)-bytesRead)
+	fmt.Printf("[debug] value: %s\n\n", hex.EncodeToString(value[bytesRead:]))
+
 	// Unmarshalling magic
-	bytesReadMagic, err := k.Magic.Unmarshal(value[:4])
+	bytesReadMagic, err := k.Magic.Unmarshal(value[bytesRead:])
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to unmarshal RSA public key magic: %w", err)
 	}
 	if k.Magic.Magic != magic.BCRYPT_RSAPUBLIC_MAGIC {
-		return 0, fmt.Errorf("invalid RSA public key magic: 0x%08x", k.Magic.Magic)
+		return 0, fmt.Errorf("failed to unmarshal RSA public key magic: invalid magic: 0x%08x", k.Magic.Magic)
 	}
 	bytesRead += bytesReadMagic
+
+	fmt.Printf("[debug] Before unmarshalling header: remaining bytes: %d (0x%08x)\n", len(value)-bytesRead, len(value)-bytesRead)
+	fmt.Printf("[debug] value: %s\n\n", hex.EncodeToString(value[bytesRead:]))
 
 	// Unmarshalling header
 	bytesReadHeader, err := k.Header.Unmarshal(value[bytesRead:])
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to unmarshal RSA public key header: %w", err)
 	}
 	bytesRead += bytesReadHeader
+	k.Header.Describe(0)
+
+	fmt.Printf("[debug] Before unmarshalling content: remaining bytes: %d (0x%08x)\n", len(value)-bytesRead, len(value)-bytesRead)
+	fmt.Printf("[debug] value: %s\n\n", hex.EncodeToString(value[bytesRead:]))
 
 	// Unmarshalling content
 	bytesReadContent, err := k.Content.Unmarshal(k.Header, value[bytesRead:])
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to unmarshal RSA public key content: %w", err)
 	}
 	bytesRead += bytesReadContent
 
@@ -113,7 +124,7 @@ func (k *BCRYPT_RSA_PUBLIC_KEY) Describe(indent int) {
 	k.Magic.Describe(indent + 1)
 	k.Header.Describe(indent + 1)
 	k.Content.Describe(indent + 1)
-	fmt.Printf("%s└───\n", indentPrompt)
+	fmt.Printf("%s └───\n", indentPrompt)
 }
 
 // Equal checks if two BCRYPT_RSA_PUBLIC_KEY structures are equal.

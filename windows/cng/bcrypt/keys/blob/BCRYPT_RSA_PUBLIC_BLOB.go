@@ -3,8 +3,8 @@ package blob
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/headers"
@@ -48,13 +48,13 @@ func (b *BCRYPT_RSA_PUBLIC_BLOB) Unmarshal(keyHeader headers.BCRYPT_RSA_KEY_BLOB
 	bytesRead := 0
 
 	if int(keyHeader.CbPublicExp) > len(value)-bytesRead {
-		return 0, errors.New("buffer too small for BCRYPT_RSA_PUBLIC_BLOB, not enough bytes for unmarshalling public exponent")
+		return 0, fmt.Errorf("buffer too small for BCRYPT_RSA_PUBLIC_BLOB, not enough bytes for unmarshalling public exponent, exponent length: %d, remaining bytes: %d", keyHeader.CbPublicExp, len(value)-bytesRead)
 	}
 	b.PublicExponent = value[bytesRead : bytesRead+int(keyHeader.CbPublicExp)]
 	bytesRead += int(keyHeader.CbPublicExp)
 
 	if int(keyHeader.CbModulus) > len(value)-bytesRead {
-		return 0, errors.New("buffer too small for BCRYPT_RSA_PUBLIC_BLOB, not enough bytes for unmarshalling modulus")
+		return 0, fmt.Errorf("buffer too small for BCRYPT_RSA_PUBLIC_BLOB, not enough bytes for unmarshalling modulus, modulus length: %d, remaining bytes: %d", keyHeader.CbModulus, len(value)-bytesRead)
 	}
 	b.Modulus = value[bytesRead : bytesRead+int(keyHeader.CbModulus)]
 	bytesRead += int(keyHeader.CbModulus)
@@ -82,9 +82,10 @@ func (b *BCRYPT_RSA_PUBLIC_BLOB) Marshal() ([]byte, error) {
 // - indent: The number of spaces to indent the output.
 func (b *BCRYPT_RSA_PUBLIC_BLOB) Describe(indent int) {
 	indentPrompt := strings.Repeat(" │ ", indent)
-	fmt.Printf("%s<\x1b[93mBCRYPT_RSA_PUBLIC_BLOB\x1b[0m>\n", indentPrompt)
-	fmt.Printf("%s │ \x1b[93mPublicExponent\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(b.PublicExponent))
-	fmt.Printf("%s │ \x1b[93mModulus\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(b.Modulus))
+	fmt.Printf("%s<\x1b[93mBCRYPT_RSA_PUBLIC_BLOB (content)\x1b[0m>\n", indentPrompt)
+	bigIntExponent := big.NewInt(0).SetBytes(b.PublicExponent)
+	fmt.Printf("%s │ \x1b[93mPublicExponent\x1b[0m: 0x%x (%d)\n", indentPrompt, b.PublicExponent, bigIntExponent.Int64())
+	fmt.Printf("%s │ \x1b[93mModulus\x1b[0m: 0x%s\n", indentPrompt, hex.EncodeToString(b.Modulus))
 	fmt.Printf("%s └───\n", indentPrompt)
 }
 
