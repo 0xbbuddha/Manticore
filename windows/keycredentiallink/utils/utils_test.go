@@ -15,25 +15,25 @@ func TestConvertFromBinaryIdentifier(t *testing.T) {
 	testCases := []struct {
 		name     string
 		input    []byte
-		version  version.KeyCredentialVersion
+		version  version.KeyCredentialLinkVersion
 		expected string
 	}{
 		{
 			name:     "Version 0 hex encoding",
 			input:    []byte{0x12, 0x34, 0x56},
-			version:  version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0},
+			version:  version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_0},
 			expected: "123456",
 		},
 		{
 			name:     "Version 1 hex encoding",
 			input:    []byte{0x12, 0x34, 0x56},
-			version:  version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1},
+			version:  version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_1},
 			expected: "123456",
 		},
 		{
 			name:     "Version 2 base64 encoding",
 			input:    []byte{0x12, 0x34, 0x56},
-			version:  version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2},
+			version:  version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2},
 			expected: base64.StdEncoding.EncodeToString([]byte{0x12, 0x34, 0x56}),
 		},
 	}
@@ -57,28 +57,28 @@ func TestConvertFromBinaryTime(t *testing.T) {
 		name     string
 		input    []byte
 		source   source.KeySource
-		version  version.KeyCredentialVersion
+		version  version.KeyCredentialLinkVersion
 		expected time.Time
 	}{
 		{
 			name:     "Version 0 AD source",
 			input:    testTimeBytes,
 			source:   source.KeySource{Value: source.KeySource_AD},
-			version:  version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0},
+			version:  version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_0},
 			expected: testTimeStruct,
 		},
 		{
 			name:     "Version 1 AD source",
 			input:    testTimeBytes,
 			source:   source.KeySource{Value: source.KeySource_AD},
-			version:  version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1},
+			version:  version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_1},
 			expected: testTimeStruct,
 		},
 		{
 			name:     "Version 2 AD source",
 			input:    testTimeBytes,
 			source:   source.KeySource{Value: source.KeySource_AD},
-			version:  version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2},
+			version:  version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2},
 			expected: testTimeStruct,
 		},
 	}
@@ -102,25 +102,25 @@ func TestConvertToBinaryTime(t *testing.T) {
 		name    string
 		input   []byte
 		source  source.KeySource
-		version version.KeyCredentialVersion
+		version version.KeyCredentialLinkVersion
 	}{
 		{
 			name:    "Version 0 AD source",
 			input:   testTimeBytes,
 			source:  source.KeySource{Value: source.KeySource_AD},
-			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0},
+			version: version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_0},
 		},
 		{
 			name:    "Version 1 AD source",
 			input:   testTimeBytes,
 			source:  source.KeySource{Value: source.KeySource_AD},
-			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1},
+			version: version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_1},
 		},
 		{
 			name:    "Version 2 AD source",
 			input:   testTimeBytes,
 			source:  source.KeySource{Value: source.KeySource_AD},
-			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2},
+			version: version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2},
 		},
 	}
 
@@ -139,61 +139,61 @@ func TestBinaryTimeInvolution(t *testing.T) {
 		name    string
 		time    time.Time
 		source  source.KeySource
-		version version.KeyCredentialVersion
+		version version.KeyCredentialLinkVersion
 	}{
 		{
 			name:    "Version 0 AD source - Current time",
 			time:    time.Now().UTC(),
 			source:  source.KeySource{Value: source.KeySource_AD},
-			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0},
+			version: version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_0},
 		},
 		{
 			name:    "Version 1 AD source - Current time",
 			time:    time.Now().UTC(),
 			source:  source.KeySource{Value: source.KeySource_AD},
-			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1},
+			version: version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_1},
 		},
 		{
 			name:    "Version 2 AD source - Current time",
 			time:    time.Now().UTC(),
 			source:  source.KeySource{Value: source.KeySource_AD},
-			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2},
+			version: version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2},
 		},
 		{
 			name:    "Version 0 AD source - Past time",
 			time:    time.Date(2020, 1, 1, 12, 0, 0, 0, time.UTC),
 			source:  source.KeySource{Value: source.KeySource_AD},
-			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0},
+			version: version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_0},
 		},
 		{
 			name:    "Version 1 AD source - Past time",
 			time:    time.Date(2020, 1, 1, 12, 0, 0, 0, time.UTC),
 			source:  source.KeySource{Value: source.KeySource_AD},
-			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1},
+			version: version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_1},
 		},
 		{
 			name:    "Version 2 AD source - Past time",
 			time:    time.Date(2020, 1, 1, 12, 0, 0, 0, time.UTC),
 			source:  source.KeySource{Value: source.KeySource_AD},
-			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2},
+			version: version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2},
 		},
 		{
 			name:    "Version 0 AD source - Future time",
 			time:    time.Date(2025, 12, 31, 23, 59, 59, 0, time.UTC),
 			source:  source.KeySource{Value: source.KeySource_AD},
-			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_0},
+			version: version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_0},
 		},
 		{
 			name:    "Version 1 AD source - Future time",
 			time:    time.Date(2025, 12, 31, 23, 59, 59, 0, time.UTC),
 			source:  source.KeySource{Value: source.KeySource_AD},
-			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_1},
+			version: version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_1},
 		},
 		{
 			name:    "Version 2 AD source - Future time",
 			time:    time.Date(2025, 12, 31, 23, 59, 59, 0, time.UTC),
 			source:  source.KeySource{Value: source.KeySource_AD},
-			version: version.KeyCredentialVersion{Value: version.KeyCredentialVersion_2},
+			version: version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2},
 		},
 	}
 

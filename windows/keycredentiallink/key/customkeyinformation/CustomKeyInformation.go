@@ -40,7 +40,7 @@ type CustomKeyInformation struct {
 //
 // Parameters:
 // - data: A byte slice containing the raw custom key information to be parsed.
-// - version: The version of the key credential.
+// - kcv: The version of the key credential link.
 //
 // Returns:
 // - The number of bytes read from the data.
@@ -50,7 +50,7 @@ type CustomKeyInformation struct {
 // The function expects the byte slice to follow the CUSTOM_KEY_INFORMATION structure format.
 // It extracts the version, flags, volume type, supports notification, FEK key version, strength, reserved, and encoded extended CKI fields from the byte slice.
 // The parsed values are stored in the CustomKeyInformation structure.
-func (cki *CustomKeyInformation) Unmarshal(data []byte, kcv version.KeyCredentialVersion) (int, error) {
+func (cki *CustomKeyInformation) Unmarshal(data []byte, kcv version.KeyCredentialLinkVersion) (int, error) {
 	cki.RawBytes = data
 	cki.RawBytesSize = uint32(len(data))
 
