@@ -1,7 +1,6 @@
 package keys
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -41,9 +40,6 @@ func (k *BCRYPT_RSA_PUBLIC_KEY) Unmarshal(value []byte) (int, error) {
 
 	bytesRead := 0
 
-	fmt.Printf("[debug] Before unmarshalling magic: remaining bytes: %d (0x%08x)\n", len(value)-bytesRead, len(value)-bytesRead)
-	fmt.Printf("[debug] value: %s\n\n", hex.EncodeToString(value[bytesRead:]))
-
 	// Unmarshalling magic
 	bytesReadMagic, err := k.Magic.Unmarshal(value[bytesRead:])
 	if err != nil {
@@ -54,9 +50,6 @@ func (k *BCRYPT_RSA_PUBLIC_KEY) Unmarshal(value []byte) (int, error) {
 	}
 	bytesRead += bytesReadMagic
 
-	fmt.Printf("[debug] Before unmarshalling header: remaining bytes: %d (0x%08x)\n", len(value)-bytesRead, len(value)-bytesRead)
-	fmt.Printf("[debug] value: %s\n\n", hex.EncodeToString(value[bytesRead:]))
-
 	// Unmarshalling header
 	bytesReadHeader, err := k.Header.Unmarshal(value[bytesRead:])
 	if err != nil {
@@ -64,9 +57,6 @@ func (k *BCRYPT_RSA_PUBLIC_KEY) Unmarshal(value []byte) (int, error) {
 	}
 	bytesRead += bytesReadHeader
 	k.Header.Describe(0)
-
-	fmt.Printf("[debug] Before unmarshalling content: remaining bytes: %d (0x%08x)\n", len(value)-bytesRead, len(value)-bytesRead)
-	fmt.Printf("[debug] value: %s\n\n", hex.EncodeToString(value[bytesRead:]))
 
 	// Unmarshalling content
 	bytesReadContent, err := k.Content.Unmarshal(k.Header, value[bytesRead:])
