@@ -2,7 +2,6 @@ package headers
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -56,8 +55,6 @@ func (k *BCRYPT_RSA_KEY_BLOB) Unmarshal(value []byte) (int, error) {
 	if len(value) < 20 {
 		return 0, errors.New("buffer too small for BCRYPT_RSA_KEY_BLOB, header too short (at least 20 bytes are required)")
 	}
-
-	fmt.Printf("[debug] Before unmarshalling BitLength value: %s\n\n", hex.EncodeToString(value))
 
 	bytesRead := 0
 

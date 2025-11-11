@@ -38,7 +38,6 @@ func UnmarshalKeyMaterial(data []byte) (KeyMaterial, int, error) {
 	switch blobMagic.Magic {
 
 	case magic.BCRYPT_RSAPUBLIC_MAGIC:
-		// Debug
 		blob := keys.BCRYPT_RSA_PUBLIC_KEY{}
 		bytesRead, err := blob.Unmarshal(data)
 		if err != nil {
