@@ -56,7 +56,6 @@ func (k *BCRYPT_RSA_PUBLIC_KEY) Unmarshal(value []byte) (int, error) {
 		return 0, fmt.Errorf("failed to unmarshal RSA public key header: %w", err)
 	}
 	bytesRead += bytesReadHeader
-	k.Header.Describe(0)
 
 	// Unmarshalling content
 	bytesReadContent, err := k.Content.Unmarshal(k.Header, value[bytesRead:])
