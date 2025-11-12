@@ -1,16 +1,15 @@
 package strength_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/key/strength"
 )
 
-func TestKeyStrengthUnmarshal(t *testing.T) {
+func TestKeyStrength_Unmarshal_Valid(t *testing.T) {
 	tests := []struct {
 		input    []byte
-		expected uint32
+		expected strength.KeyStrength
 		name     string
 	}{
 		{[]byte{0x00, 0x00, 0x00, 0x00}, strength.KeyStrength_Unknown, "Unknown"},
@@ -19,7 +18,7 @@ func TestKeyStrengthUnmarshal(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("input: %v", test.input), func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			var ks strength.KeyStrength
 			bytesRead, err := ks.Unmarshal(test.input)
 			if err != nil {
@@ -28,29 +27,55 @@ func TestKeyStrengthUnmarshal(t *testing.T) {
 			if bytesRead != 4 {
 				t.Errorf("Expected to read 4 bytes, but read %d", bytesRead)
 			}
-			if ks.Value != test.expected {
-				t.Errorf("Expected value %d, but got %d", test.expected, ks.Value)
+			if uint32(ks) != uint32(test.expected) {
+				t.Errorf("Expected value %d, but got %d", uint32(test.expected), uint32(ks))
 			}
-			if ks.Name != test.name {
-				t.Errorf("Expected name %s, but got %s", test.name, ks.Name)
+			if ks.String() != test.name {
+				t.Errorf("Expected name %s, but got %s", test.name, ks.String())
 			}
 		})
 	}
 }
 
-func TestKeyStrengthMarshal(t *testing.T) {
+func TestKeyStrength_Unmarshal_UnknownValue(t *testing.T) {
+	// Value 0xFF is not defined; expect String() to fall back to "Unknown"
+	input := []byte{0xFF, 0x00, 0x00, 0x00}
+	var ks strength.KeyStrength
+	bytesRead, err := ks.Unmarshal(input)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if bytesRead != 4 {
+		t.Fatalf("Expected to read 4 bytes, but read %d", bytesRead)
+	}
+	if uint32(ks) != 0xFF {
+		t.Fatalf("Expected value 255, but got %d", uint32(ks))
+	}
+	if ks.String() != "Unknown" {
+		t.Fatalf("Expected name %q for unknown value, but got %q", "Unknown", ks.String())
+	}
+}
+
+func TestKeyStrength_Unmarshal_ErrorTooShort(t *testing.T) {
+	var ks strength.KeyStrength
+	if _, err := ks.Unmarshal([]byte{0x01, 0x00, 0x00}); err == nil {
+		t.Fatalf("expected error for too short input, got nil")
+	}
+}
+
+func TestKeyStrength_Marshal_Valid(t *testing.T) {
 	tests := []struct {
-		value    uint32
+		value    strength.KeyStrength
 		expected []byte
 	}{
-		{strength.KeyStrength_Unknown, []byte{0x00}},
-		{strength.KeyStrength_Weak, []byte{0x01}},
-		{strength.KeyStrength_Normal, []byte{0x02}},
+		{strength.KeyStrength_Unknown, []byte{0x00, 0x00, 0x00, 0x00}},
+		{strength.KeyStrength_Weak, []byte{0x01, 0x00, 0x00, 0x00}},
+		{strength.KeyStrength_Normal, []byte{0x02, 0x00, 0x00, 0x00}},
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("value: %d", test.value), func(t *testing.T) {
-			ks := strength.KeyStrength{Value: test.value}
+		t.Run(test.value.String(), func(t *testing.T) {
+			ks := test.value
 			result, err := ks.Marshal()
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
