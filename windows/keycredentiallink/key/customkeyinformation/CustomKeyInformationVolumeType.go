@@ -2,32 +2,27 @@ package customkeyinformation
 
 import (
 	"fmt"
-	"strings"
 )
 
 // CustomKeyInformationVolumeType represents the volume type.
 //
-// See: https://msdn.microsoft.com/en-us/library/mt220496.aspx
-type CustomKeyInformationVolumeType struct {
-	Value uint8
-
-	// Internal
-	RawBytes     []byte
-	RawBytesSize uint32
-}
+// Sources:
+// https://msdn.microsoft.com/en-us/library/mt220496.aspx
+// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/701a55dc-d062-4032-a2da-dbdfc384c8cf
+type CustomKeyInformationVolumeType uint8
 
 const (
 	// Volume not specified.
-	CustomKeyInformationVolumeType_None uint8 = 0x00
+	CustomKeyInformationVolumeType_None CustomKeyInformationVolumeType = 0x00
 
 	// Operating system volume (OSV).
-	CustomKeyInformationVolumeType_OperatingSystem uint8 = 0x01
+	CustomKeyInformationVolumeType_OSV CustomKeyInformationVolumeType = 0x01
 
 	// Fixed data volume (FDV).
-	CustomKeyInformationVolumeType_Fixed uint8 = 0x02
+	CustomKeyInformationVolumeType_FDV CustomKeyInformationVolumeType = 0x02
 
 	// Removable data volume (RDV).
-	CustomKeyInformationVolumeType_Removable uint8 = 0x03
+	CustomKeyInformationVolumeType_RDV CustomKeyInformationVolumeType = 0x03
 )
 
 // Unmarshal parses the provided byte slice into the CustomKeyInformationVolumeType structure.
@@ -42,15 +37,12 @@ const (
 // Note:
 // The function expects the byte slice to contain a single byte representing the volume type.
 // It extracts the volume type value from the byte slice and assigns it to the CustomKeyInformationVolumeType structure.
-func (vt *CustomKeyInformationVolumeType) Unmarshal(data []byte) (int, error) {
+func (vt CustomKeyInformationVolumeType) Unmarshal(data []byte) (int, error) {
 	if len(data) < 1 {
 		return 0, fmt.Errorf("invalid data length: %d", len(data))
 	}
 
-	vt.Value = data[0]
-
-	vt.RawBytes = data
-	vt.RawBytesSize = uint32(len(data))
+	vt = CustomKeyInformationVolumeType(data[0])
 
 	return 1, nil
 }
@@ -60,42 +52,25 @@ func (vt *CustomKeyInformationVolumeType) Unmarshal(data []byte) (int, error) {
 // Returns:
 // - A byte slice representing the raw bytes of the CustomKeyInformationVolumeType structure.
 // - An error if the conversion fails.
-func (vt *CustomKeyInformationVolumeType) Marshal() ([]byte, error) {
-	vt.RawBytes = []byte{vt.Value}
-	vt.RawBytesSize = 1
-
-	return vt.RawBytes, nil
+func (vt CustomKeyInformationVolumeType) Marshal() ([]byte, error) {
+	return []byte{uint8(vt)}, nil
 }
 
 // String returns a string representation of the CustomKeyInformationVolumeType.
 //
 // Returns:
 // - A string representing the CustomKeyInformationVolumeType.
-func (vt *CustomKeyInformationVolumeType) String() string {
-	switch vt.Value {
-	case CustomKeyInformationVolumeType_OperatingSystem:
-		return "Operating System"
-	case CustomKeyInformationVolumeType_Fixed:
-		return "Fixed"
-	case CustomKeyInformationVolumeType_Removable:
-		return "Removable"
-	default:
+func (vt CustomKeyInformationVolumeType) String() string {
+	switch vt {
+	case CustomKeyInformationVolumeType_None:
 		return "None"
+	case CustomKeyInformationVolumeType_OSV:
+		return "Operating System Volume (OSV)"
+	case CustomKeyInformationVolumeType_FDV:
+		return "Fixed Data Volume (FDV)"
+	case CustomKeyInformationVolumeType_RDV:
+		return "Removable Data Volume (RDV)"
 	}
-}
 
-// Describe prints a detailed description of the CustomKeyInformationVolumeType instance.
-//
-// Parameters:
-// - indent: An integer representing the indentation level for the printed output.
-//
-// Note:
-// This function prints the Value and Name of the CustomKeyInformationVolumeType instance.
-// The output is formatted with the specified indentation level to improve readability.
-func (vt *CustomKeyInformationVolumeType) Describe(indent int) {
-	indentPrompt := strings.Repeat(" │ ", indent)
-	fmt.Printf("%s<\x1b[93mCustomKeyInformationVolumeType\x1b[0m>\n", indentPrompt)
-	fmt.Printf("%s │ \x1b[93mValue\x1b[0m: %d\n", indentPrompt, vt.Value)
-	fmt.Printf("%s │ \x1b[93mName\x1b[0m: %s\n", indentPrompt, vt.String())
-	fmt.Printf("%s └─\n", indentPrompt)
+	return "Unknown"
 }
