@@ -50,10 +50,11 @@ func TestCUSTOMKEYINFO_FLAGS_String(t *testing.T) {
 		flag     CUSTOMKEYINFO_FLAGS
 		expected string
 	}{
-		{CUSTOMKEYINFO_FLAGS_None, "None"},
-		{CUSTOMKEYINFO_FLAGS_Attestation, "Attestation"},
-		{CUSTOMKEYINFO_FLAGS_MFANotUsed, "MFA not used"},
-		{CUSTOMKEYINFO_FLAGS(0x03), "Unknown"}, // combo not mapped explicitly
+		{CUSTOMKEYINFO_FLAGS_NONE, "None"},
+		{CUSTOMKEYINFO_FLAGS_ATTESTATION, "Attestation"},
+		{CUSTOMKEYINFO_FLAGS_MFA_NOT_USED, "MFA not used"},
+		{CUSTOMKEYINFO_FLAGS_ATTESTATION + CUSTOMKEYINFO_FLAGS_MFA_NOT_USED, "Attestation | MFA not used"}, // combo not mapped explicitly
+		{CUSTOMKEYINFO_FLAGS(0x04), "Unknown"},
 		{CUSTOMKEYINFO_FLAGS(0xFF), "Unknown"},
 	}
 	for _, tt := range tests {

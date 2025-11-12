@@ -9,14 +9,14 @@ type CUSTOMKEYINFO_FLAGS uint8
 
 const (
 	// No flags specified.
-	CUSTOMKEYINFO_FLAGS_None CUSTOMKEYINFO_FLAGS = 0
+	CUSTOMKEYINFO_FLAGS_NONE CUSTOMKEYINFO_FLAGS = 0
 
 	// Reserved for future use. (CUSTOMKEYINFO_FLAGS_ATTESTATION)
-	CUSTOMKEYINFO_FLAGS_Attestation CUSTOMKEYINFO_FLAGS = 0x01
+	CUSTOMKEYINFO_FLAGS_ATTESTATION CUSTOMKEYINFO_FLAGS = 0x01
 
 	// During creation of this key, the requesting client authenticated using
 	// only a single credential. (CUSTOMKEYINFO_FLAGS_MFA_NOT_USED)
-	CUSTOMKEYINFO_FLAGS_MFANotUsed CUSTOMKEYINFO_FLAGS = 0x02
+	CUSTOMKEYINFO_FLAGS_MFA_NOT_USED CUSTOMKEYINFO_FLAGS = 0x02
 )
 
 // Unmarshal parses the provided byte slice into the CUSTOMKEYINFO_FLAGS structure.
@@ -38,23 +38,32 @@ func (kf CUSTOMKEYINFO_FLAGS) Unmarshal(data []byte) (int, error) {
 
 	kf = CUSTOMKEYINFO_FLAGS(data[0])
 
-	if kf&CUSTOMKEYINFO_FLAGS_Attestation != CUSTOMKEYINFO_FLAGS_Attestation &&
-		kf&CUSTOMKEYINFO_FLAGS_MFANotUsed != CUSTOMKEYINFO_FLAGS_MFANotUsed &&
-		kf != CUSTOMKEYINFO_FLAGS_None {
+	if kf != CUSTOMKEYINFO_FLAGS_ATTESTATION && kf != CUSTOMKEYINFO_FLAGS_MFA_NOT_USED && kf != CUSTOMKEYINFO_FLAGS_NONE && kf != CUSTOMKEYINFO_FLAGS_ATTESTATION|CUSTOMKEYINFO_FLAGS_MFA_NOT_USED {
 		return 0, fmt.Errorf("invalid CUSTOMKEYINFO_FLAGS: %d", kf)
 	}
 
 	return 1, nil
 }
 
+// Marshal returns the raw bytes of the CUSTOMKEYINFO_FLAGS structure.
+//
+// Returns:
+// - A byte slice representing the raw bytes of the CUSTOMKEYINFO_FLAGS structure.
+// - An error if the conversion fails.
+func (kf CUSTOMKEYINFO_FLAGS) Marshal() ([]byte, error) {
+	return []byte{uint8(kf)}, nil
+}
+
 func (kf CUSTOMKEYINFO_FLAGS) String() string {
 	switch kf {
-	case CUSTOMKEYINFO_FLAGS_None:
+	case CUSTOMKEYINFO_FLAGS_NONE:
 		return "None"
-	case CUSTOMKEYINFO_FLAGS_Attestation:
+	case CUSTOMKEYINFO_FLAGS_ATTESTATION:
 		return "Attestation"
-	case CUSTOMKEYINFO_FLAGS_MFANotUsed:
+	case CUSTOMKEYINFO_FLAGS_MFA_NOT_USED:
 		return "MFA not used"
+	case CUSTOMKEYINFO_FLAGS_MFA_NOT_USED | CUSTOMKEYINFO_FLAGS_ATTESTATION:
+		return "Attestation | MFA not used"
 	}
 	return "Unknown"
 }
