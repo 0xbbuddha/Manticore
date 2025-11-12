@@ -12,10 +12,6 @@ import (
 type DNWithBinary struct {
 	DistinguishedName string
 	BinaryData        []byte
-
-	// Internal
-	RawBytes     []byte
-	RawBytesSize uint32
 }
 
 const (
@@ -24,9 +20,6 @@ const (
 )
 
 func (d *DNWithBinary) Unmarshal(rawBytes []byte) (int, error) {
-	d.RawBytes = rawBytes
-	d.RawBytesSize = uint32(len(rawBytes))
-
 	parts := bytes.Split(rawBytes, []byte(StringFormatSeparator))
 	if len(parts) != 4 {
 		return 0, errors.New("rawBytes should have exactly four parts separated by colons (:)")
@@ -43,7 +36,7 @@ func (d *DNWithBinary) Unmarshal(rawBytes []byte) (int, error) {
 	}
 
 	if (len(binaryPart) * 2) != size {
-		return 0, fmt.Errorf("invalid BinaryData length. The length specified in the header (%d) does not match the actual data length (%d)", size, len(binaryPart))
+		return 0, fmt.Errorf("invalid BinaryData length. The length specified in the header (%d) does not match the actual data length (%d)", size, len(binaryPart)*2)
 	}
 
 	d.DistinguishedName = string(parts[3])
