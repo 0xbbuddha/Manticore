@@ -122,9 +122,7 @@ func NewKeyCredentialLink(
 		Source:      &source.KeySource{},
 		CustomKeyInfo: &customkeyinformation.CustomKeyInformation{
 			Version: 1,
-			Flags: customkeyinformation.CustomKeyInformationFlags{
-				Value: 0,
-			},
+			Flags:   customkeyinformation.CUSTOMKEYINFO_FLAGS_NONE,
 		},
 		DeviceId:      deviceId,
 		LastLogonTime: lastLogonTime,
