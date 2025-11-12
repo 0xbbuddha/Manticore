@@ -31,15 +31,18 @@ const (
 // Note:
 // The function expects the byte slice to contain a single byte representing the key flags.
 // It extracts the flags value from the byte slice and assigns it to the CUSTOMKEYINFO_FLAGS structure.
-func (kf CUSTOMKEYINFO_FLAGS) Unmarshal(data []byte) (int, error) {
+func (kf *CUSTOMKEYINFO_FLAGS) Unmarshal(data []byte) (int, error) {
 	if len(data) < 1 {
 		return 0, fmt.Errorf("invalid data length: %d", len(data))
 	}
 
-	kf = CUSTOMKEYINFO_FLAGS(data[0])
+	*kf = CUSTOMKEYINFO_FLAGS(data[0])
 
-	if kf != CUSTOMKEYINFO_FLAGS_ATTESTATION && kf != CUSTOMKEYINFO_FLAGS_MFA_NOT_USED && kf != CUSTOMKEYINFO_FLAGS_NONE && kf != CUSTOMKEYINFO_FLAGS_ATTESTATION|CUSTOMKEYINFO_FLAGS_MFA_NOT_USED {
-		return 0, fmt.Errorf("invalid CUSTOMKEYINFO_FLAGS: %d", kf)
+	if *kf != CUSTOMKEYINFO_FLAGS_ATTESTATION &&
+		*kf != CUSTOMKEYINFO_FLAGS_MFA_NOT_USED &&
+		*kf != CUSTOMKEYINFO_FLAGS_NONE &&
+		*kf != CUSTOMKEYINFO_FLAGS_ATTESTATION|CUSTOMKEYINFO_FLAGS_MFA_NOT_USED {
+		return 0, fmt.Errorf("invalid CUSTOMKEYINFO_FLAGS: %d", *kf)
 	}
 
 	return 1, nil
@@ -66,4 +69,20 @@ func (kf CUSTOMKEYINFO_FLAGS) String() string {
 		return "Attestation | MFA not used"
 	}
 	return "Unknown"
+}
+
+// NewCUSTOMKEYINFO_FLAGS returns a pointer to a flags value.
+func NewCUSTOMKEYINFO_FLAGS(v CUSTOMKEYINFO_FLAGS) *CUSTOMKEYINFO_FLAGS {
+	f := v
+	return &f
+}
+
+// Set sets the provided mask on the flags.
+func (kf *CUSTOMKEYINFO_FLAGS) Set(mask CUSTOMKEYINFO_FLAGS) {
+	*kf |= mask
+}
+
+// Has returns true if the provided mask is set.
+func (kf CUSTOMKEYINFO_FLAGS) Has(mask CUSTOMKEYINFO_FLAGS) bool {
+	return kf&mask == mask
 }
