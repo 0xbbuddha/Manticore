@@ -37,15 +37,15 @@ const (
 // Note:
 // The function expects the byte slice to contain a single byte representing the volume type.
 // It extracts the volume type value from the byte slice and assigns it to the CustomKeyInformationVolumeType structure.
-func (vt CustomKeyInformationVolumeType) Unmarshal(data []byte) (int, error) {
+func (vt *CustomKeyInformationVolumeType) Unmarshal(data []byte) (int, error) {
 	if len(data) < 1 {
 		return 0, fmt.Errorf("invalid data length: %d", len(data))
 	}
 
-	vt = CustomKeyInformationVolumeType(data[0])
+	*vt = CustomKeyInformationVolumeType(data[0])
 
-	if vt != CustomKeyInformationVolumeType_None && vt != CustomKeyInformationVolumeType_OSV && vt != CustomKeyInformationVolumeType_FDV && vt != CustomKeyInformationVolumeType_RDV {
-		return 0, fmt.Errorf("invalid CustomKeyInformationVolumeType: %d", vt)
+	if *vt != CustomKeyInformationVolumeType_None && *vt != CustomKeyInformationVolumeType_OSV && *vt != CustomKeyInformationVolumeType_FDV && *vt != CustomKeyInformationVolumeType_RDV {
+		return 0, fmt.Errorf("invalid CustomKeyInformationVolumeType: %d", *vt)
 	}
 
 	return 1, nil

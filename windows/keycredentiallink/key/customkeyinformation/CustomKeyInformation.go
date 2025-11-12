@@ -24,37 +24,29 @@ type CustomKeyInformation struct {
 	Version uint8
 
 	// Flags (1 byte): An 8-bit unsigned integer that specifies zero or more bit-flag values
-	Flags CUSTOMKEYINFO_FLAGS
+	Flags *CUSTOMKEYINFO_FLAGS
 
 	// VolType (1 byte): An 8-bit unsigned integer that specifies one of the following volume types:
-	VolumeType CustomKeyInformationVolumeType
+	VolumeType *CustomKeyInformationVolumeType
 
 	// SupportsNotification (1 byte): An 8-bit unsigned integer that specifies whether the device
 	// associated with this credential supports notification.
-	SupportsNotification bool
+	SupportsNotification *SupportsNotification
 
 	// FekKeyVersion (1 byte): An 8-bit unsigned integer that specifies the version of the buffer
 	// stored in KEY_USAGE_FEK (section 2.2.20.5.3). This field MUST be set to 1.
-	FekKeyVersion uint8
+	FekKeyVersion *FekKeyVersion
 
 	// KeyStrength (1 byte): An 8-bit unsigned integer that specifies the strength of the NGC key.
-	KeyStrength strength.KeyStrength
+	KeyStrength *strength.KeyStrength
 
 	// Reserved (10 bytes): Reserved for future use.
-	Reserved [10]byte
+	Reserved *Reserved
 
 	// EncodedExtendedCKI (variable): Extended custom key information.
 	// The contents of this field are defined in section 2.2.20.4.1.
 	// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/b2c0cb9b-e49e-4907-9235-f9fd7eee8c13
-	EncodedExtendedCKI EncodedExtendedCKI
-
-	// Internal
-
-	// isLongForm: Indicates if the structure is in long form.
-	// Note: This structure has two possible representations. In the first representation,
-	// only the Version and Flags fields are present; in this case the structure has a total
-	// size of two bytes.
-	isLongForm bool
+	EncodedExtendedCKI *EncodedExtendedCKI
 }
 
 // Unmarshal parses the provided byte slice into the CustomKeyInformation structure.
@@ -72,11 +64,18 @@ type CustomKeyInformation struct {
 // It extracts the version, flags, volume type, supports notification, FEK key version, strength, reserved, and encoded extended CKI fields from the byte slice.
 // The parsed values are stored in the CustomKeyInformation structure.
 func (cki *CustomKeyInformation) Unmarshal(data []byte, kcv version.KeyCredentialLinkVersion) (int, error) {
-	if len(data) < 2 {
+	if len(data) < 1 {
 		return 0, fmt.Errorf("invalid data size: %d", len(data))
 	}
 
-	cki.isLongForm = false
+	cki.Flags = nil
+	cki.VolumeType = nil
+	cki.SupportsNotification = nil
+	cki.FekKeyVersion = nil
+	cki.KeyStrength = nil
+	cki.Reserved = nil
+	cki.EncodedExtendedCKI = nil
+
 	bytesRead := 0
 
 	// An 8-bit unsigned integer that must be set to 1:
@@ -87,73 +86,78 @@ func (cki *CustomKeyInformation) Unmarshal(data []byte, kcv version.KeyCredentia
 	bytesRead += 1
 
 	// An 8-bit unsigned integer that specifies zero or more bit-flag values.
-	bytesReadFlags, err := cki.Flags.Unmarshal(data[bytesRead:])
-	if err != nil {
-		return 0, err
+	if len(data[bytesRead:]) >= 1 {
+		cki.Flags = new(CUSTOMKEYINFO_FLAGS)
+		bytesReadFlags, err := cki.Flags.Unmarshal(data[bytesRead:])
+		if err != nil {
+			return 0, err
+		}
+		bytesRead += bytesReadFlags
+	} else {
+		return bytesRead, nil
 	}
-	bytesRead += bytesReadFlags
 
 	// An 8-bit unsigned integer that specifies one of the volume types.
 	if len(data[bytesRead:]) >= 1 {
-		cki.isLongForm = true
+		cki.VolumeType = new(CustomKeyInformationVolumeType)
 		bytesReadVolumeType, err := cki.VolumeType.Unmarshal(data[bytesRead:])
 		if err != nil {
 			return 0, err
 		}
 		bytesRead += bytesReadVolumeType
 	} else {
-		return 0, nil
+		return bytesRead, nil
 	}
 
 	// An 8-bit unsigned integer that specifies whether the device associated with this credential supports notification.
 	if len(data[bytesRead:]) >= 1 {
-		cki.SupportsNotification = (data[bytesRead] != 0)
-		bytesRead += 1
+		cki.SupportsNotification = new(SupportsNotification)
+		bytesReadSupportsNotification, err := cki.SupportsNotification.Unmarshal(data[bytesRead:])
+		if err != nil {
+			return 0, err
+		}
+		bytesRead += bytesReadSupportsNotification
 	} else {
-		return 0, nil
+		return bytesRead, nil
 	}
 
 	// An 8-bit unsigned integer that specifies the version of the File Encryption Key (FEK). This field must be set to 1.
 	if len(data[bytesRead:]) >= 1 {
-		cki.FekKeyVersion = data[bytesRead]
-		bytesRead += 1
+		cki.FekKeyVersion = new(FekKeyVersion)
+		bytesReadFekKeyVersion, err := cki.FekKeyVersion.Unmarshal(data[bytesRead:])
+		if err != nil {
+			return 0, err
+		}
+		bytesRead += bytesReadFekKeyVersion
 	} else {
-		return 0, nil
+		return bytesRead, nil
 	}
 
 	// An 32-bit unsigned integer that specifies the strength of the NGC key.
 	if len(data[bytesRead:]) >= 4 {
-		bytesReadStrength, err := cki.KeyStrength.Unmarshal(data[bytesRead:])
+		cki.KeyStrength = new(strength.KeyStrength)
+		bytesReadKeyStrength, err := cki.KeyStrength.Unmarshal(data[bytesRead:])
 		if err != nil {
 			return 0, err
 		}
-		bytesRead += bytesReadStrength
+		bytesRead += bytesReadKeyStrength
 	} else {
-		return 0, nil
-	}
-
-	// 10 bytes reserved for future use.
-	// Note: With FIDO, Azure incorrectly puts here 9 bytes instead of 10.
-	if len(data[bytesRead:]) >= 10 {
-		bytesReadReserved := 10
-		copy(cki.Reserved[:], data[bytesRead:bytesRead+bytesReadReserved])
-		bytesRead += bytesReadReserved
-	} else {
-		return 0, nil
+		return bytesRead, nil
 	}
 
 	// Extended custom key information.
 	if len(data[bytesRead:]) >= 2 {
+		cki.EncodedExtendedCKI = new(EncodedExtendedCKI)
 		bytesReadEncodedExtendedCKI, err := cki.EncodedExtendedCKI.Unmarshal(data[bytesRead:])
 		if err != nil {
 			return 0, err
 		}
 		bytesRead += bytesReadEncodedExtendedCKI
 	} else {
-		return 0, nil
+		return bytesRead, nil
 	}
 
-	return 0, nil
+	return bytesRead, nil
 }
 
 // Marshal returns the raw bytes of the CustomKeyInformation structure.
@@ -168,48 +172,82 @@ func (cki *CustomKeyInformation) Marshal() ([]byte, error) {
 	data = append(data, byte(cki.Version))
 
 	// Flags: An 8-bit unsigned integer that specifies zero or more bit-flag values.
-	flagsBytes, err := cki.Flags.Marshal()
-	if err != nil {
-		return nil, err
+	if cki.Flags != nil {
+		flagsBytes, err := cki.Flags.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		data = append(data, flagsBytes...)
+	} else {
+		return data, nil
 	}
-	data = append(data, flagsBytes...)
 
-	if cki.isLongForm {
-		// VolumeType: An 8-bit unsigned integer that specifies one of the following volume types.
+	// VolumeType: An 8-bit unsigned integer that specifies one of the following volume types.
+	if cki.VolumeType != nil {
 		volumeTypeBytes, err := cki.VolumeType.Marshal()
 		if err != nil {
 			return nil, err
 		}
 		data = append(data, volumeTypeBytes...)
+	} else {
+		return data, nil
+	}
 
-		// SupportsNotification: An 8-bit unsigned integer that specifies whether the device
-		// associated with this credential supports notification.
-		if cki.SupportsNotification {
-			data = append(data, 1)
-		} else {
-			data = append(data, 0)
+	// SupportsNotification: An 8-bit unsigned integer that specifies whether the device
+	// associated with this credential supports notification.
+	if cki.SupportsNotification != nil {
+		supportsNotificationBytes, err := cki.SupportsNotification.Marshal()
+		if err != nil {
+			return nil, err
 		}
+		data = append(data, supportsNotificationBytes...)
+	} else {
+		return data, nil
+	}
 
-		// FekKeyVersion: An 8-bit unsigned integer that specifies the version of the buffer
-		// stored in KEY_USAGE_FEK (section 2.2.20.5.3). This field MUST be set to 1.
-		data = append(data, byte(cki.FekKeyVersion))
+	// FekKeyVersion: An 8-bit unsigned integer that specifies the version of the buffer
+	// stored in KEY_USAGE_FEK (section 2.2.20.5.3). This field MUST be set to 1.
+	if cki.FekKeyVersion != nil {
+		fekKeyVersionBytes, err := cki.FekKeyVersion.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		data = append(data, fekKeyVersionBytes...)
+	} else {
+		return data, nil
+	}
 
-		// KeyStrength: An 8-bit unsigned integer that specifies the strength of the NGC key.
+	// KeyStrength: An 8-bit unsigned integer that specifies the strength of the NGC key.
+	if cki.KeyStrength != nil {
 		strengthBytes, err := cki.KeyStrength.Marshal()
 		if err != nil {
 			return nil, err
 		}
 		data = append(data, strengthBytes...)
+	} else {
+		return data, nil
+	}
 
-		// Reserved: 10 bytes reserved for future use.
-		data = append(data, cki.Reserved[:]...)
+	// Reserved: 10 bytes reserved for future use.
+	if cki.Reserved != nil {
+		reservedBytes, err := cki.Reserved.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		data = append(data, reservedBytes...)
+	} else {
+		return data, nil
+	}
 
-		// EncodedExtendedCKI: Extended custom key information.
+	// EncodedExtendedCKI: Extended custom key information.
+	if cki.EncodedExtendedCKI != nil {
 		encodedExtendedCKIBytes, err := cki.EncodedExtendedCKI.Marshal()
 		if err != nil {
 			return nil, err
 		}
 		data = append(data, encodedExtendedCKIBytes...)
+	} else {
+		return data, nil
 	}
 
 	return data, nil
@@ -226,15 +264,49 @@ func (cki *CustomKeyInformation) Marshal() ([]byte, error) {
 func (cki *CustomKeyInformation) Describe(indent int) {
 	indentPrompt := strings.Repeat(" │ ", indent)
 	fmt.Printf("%s<\x1b[93mCustomKeyInformation\x1b[0m>\n", indentPrompt)
+
 	fmt.Printf("%s │ \x1b[93mVersion\x1b[0m: %d\n", indentPrompt, cki.Version)
-	fmt.Printf("%s │ \x1b[93mFlags\x1b[0m: [%s] (0x%02x)\n", indentPrompt, cki.Flags.String(), cki.Flags)
-	if cki.isLongForm {
+
+	if cki.Flags != nil {
+		fmt.Printf("%s │ \x1b[93mFlags\x1b[0m: [%s] (0x%02x)\n", indentPrompt, cki.Flags.String(), cki.Flags)
+	} else {
+		// fmt.Printf("%s │ \x1b[93mFlags\x1b[0m: None\n", indentPrompt)
+	}
+
+	if cki.VolumeType != nil {
 		fmt.Printf("%s │ \x1b[93mVolumeType\x1b[0m: %s (0x%02x)\n", indentPrompt, cki.VolumeType.String(), cki.VolumeType)
-		fmt.Printf("%s │ \x1b[93mSupportsNotification\x1b[0m: %t\n", indentPrompt, cki.SupportsNotification)
+	} else {
+		// fmt.Printf("%s │ \x1b[93mVolumeType\x1b[0m: None\n", indentPrompt)
+	}
+
+	if cki.SupportsNotification != nil {
+		fmt.Printf("%s │ \x1b[93mSupportsNotification\x1b[0m: %s\n", indentPrompt, cki.SupportsNotification.String())
+	} else {
+		// fmt.Printf("%s │ \x1b[93mSupportsNotification\x1b[0m: None\n", indentPrompt)
+	}
+
+	if cki.FekKeyVersion != nil {
 		fmt.Printf("%s │ \x1b[93mFekKeyVersion\x1b[0m: %d\n", indentPrompt, cki.FekKeyVersion)
+	} else {
+		// fmt.Printf("%s │ \x1b[93mFekKeyVersion\x1b[0m: None\n", indentPrompt)
+	}
+
+	if cki.KeyStrength != nil {
 		fmt.Printf("%s │ \x1b[93mStrength\x1b[0m: %s (0x%02x)\n", indentPrompt, cki.KeyStrength.String(), cki.KeyStrength)
+	} else {
+		// fmt.Printf("%s │ \x1b[93mStrength\x1b[0m: None\n", indentPrompt)
+	}
+
+	if cki.Reserved != nil {
 		fmt.Printf("%s │ \x1b[93mReserved\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(cki.Reserved[:]))
+	} else {
+		// fmt.Printf("%s │ \x1b[93mReserved\x1b[0m: None\n", indentPrompt)
+	}
+
+	if cki.EncodedExtendedCKI != nil {
 		cki.EncodedExtendedCKI.Describe(indent + 1)
+	} else {
+		// fmt.Printf("%s │ \x1b[93mEncodedExtendedCKI\x1b[0m: None\n", indentPrompt)
 	}
 
 	fmt.Printf("%s └───\n", indentPrompt)
