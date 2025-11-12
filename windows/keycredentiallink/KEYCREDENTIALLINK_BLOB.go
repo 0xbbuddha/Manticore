@@ -2,6 +2,7 @@ package keycredentiallink
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/version"
@@ -126,4 +127,33 @@ func (k *KEYCREDENTIALLINK_BLOB) Describe(indent int) {
 	fmt.Printf("%s │  └───\n", indentPrompt)
 	indent -= 1
 	fmt.Printf("%s └───\n", indentPrompt)
+}
+
+// SortEntriesByType sorts the KEYCREDENTIALLINK_BLOB entries in ascending order by their Identifier.Value.
+//
+// Parameters:
+// - None
+//
+// Returns:
+// - None
+//
+// Note:
+// The function sorts the entries by their Identifier.Value in ascending order.
+func (k *KEYCREDENTIALLINK_BLOB) SortEntriesByType() {
+	if len(k.Entries) <= 1 {
+		return
+	}
+
+	sort.Slice(k.Entries, func(i, j int) bool {
+		return k.Entries[i].Identifier < k.Entries[j].Identifier
+	})
+}
+
+func (b *KEYCREDENTIALLINK_BLOB) RemoveEntryByType(entryType KEYCREDENTIALLINK_ENTRY_IDENTIFIER) {
+	for i, entry := range b.Entries {
+		if entry.Identifier == entryType {
+			b.Entries = append(b.Entries[:i], b.Entries[i+1:]...)
+			break
+		}
+	}
 }

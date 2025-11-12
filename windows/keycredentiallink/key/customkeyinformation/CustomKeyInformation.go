@@ -268,7 +268,7 @@ func (cki *CustomKeyInformation) Describe(indent int) {
 	fmt.Printf("%s │ \x1b[93mVersion\x1b[0m: %d\n", indentPrompt, cki.Version)
 
 	if cki.Flags != nil {
-		fmt.Printf("%s │ \x1b[93mFlags\x1b[0m: [%s] (0x%02x)\n", indentPrompt, cki.Flags.String(), cki.Flags)
+		fmt.Printf("%s │ \x1b[93mFlags\x1b[0m: [%s] (0x%02x)\n", indentPrompt, cki.Flags.String(), uint8(*cki.Flags))
 	} else {
 		// fmt.Printf("%s │ \x1b[93mFlags\x1b[0m: None\n", indentPrompt)
 	}

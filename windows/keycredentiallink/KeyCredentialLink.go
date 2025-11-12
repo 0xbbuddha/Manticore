@@ -9,7 +9,6 @@ import (
 	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/utils"
 	"github.com/TheManticoreProject/Manticore/windows/keycredentiallink/version"
 
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -199,7 +198,7 @@ func (kc *KeyCredentialLink) Unmarshal(data []byte) (int, error) {
 
 	for _, entry := range blob.Entries {
 		// Process the entry data based on its type.
-		switch entry.Identifier.Value {
+		switch entry.Identifier {
 
 		case KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyID:
 			kc.Identifier = utils.ConvertFromBinaryIdentifier(entry.Value, kc.Version)
@@ -212,9 +211,6 @@ func (kc *KeyCredentialLink) Unmarshal(data []byte) (int, error) {
 			if err != nil {
 				return bytesRead, fmt.Errorf("failed to unmarshal KeyCredentialLink key material: %w", err)
 			}
-			// if bytesRead != len(entry.Value) {
-			// 	return bytesRead, fmt.Errorf("failed to unmarshal KeyCredentialLink key material: bytes read: %d, expected: %d", bytesRead, len(entry.Value))
-			// }
 
 		case KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyUsage:
 			if len(entry.Value) == 1 {
@@ -278,6 +274,10 @@ func (kc *KeyCredentialLink) CheckIntegrity() bool {
 
 	for i := range hash {
 		if hash[i] != kc.KeyHash[i] {
+
+			fmt.Printf("computedhash : %s\n", hex.EncodeToString(hash))
+			fmt.Printf("kc.KeyHash   : %s\n", hex.EncodeToString(kc.KeyHash))
+
 			return false
 		}
 	}
@@ -291,37 +291,29 @@ func (kc *KeyCredentialLink) CheckIntegrity() bool {
 // - A byte slice containing the key hash.
 func (kc *KeyCredentialLink) ComputeKeyHash() []byte {
 	// Src: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/a99409ea-4f72-b7ef-8596013a36c7
-	data := []byte{}
-
-	rawBytes, err := kc.Marshal()
+	blob, err := kc.ToKeyCredentialLinkBlob()
 	if err != nil {
 		return nil
 	}
-
-	remainder := rawBytes[4:]
-
-	// Read all entries corresponding to the KEYCREDENTIALLINK_ENTRY structure:
-	for len(remainder) > 3 {
-		// A 16-bit unsigned integer that specifies the length of the Value field.
-		length := binary.LittleEndian.Uint16(remainder[:2])
-		entryType := KEYCREDENTIALLINK_ENTRY_IDENTIFIER{}
-		_, err := entryType.Unmarshal(remainder)
-		if err != nil {
-			return nil
-		}
-
-		remainder = remainder[3:]
-		remainder = remainder[length:]
-
-		switch entryType.Value {
-		case KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyHash:
-			data = append(data, remainder...)
-		}
+	// Build the hash input from entries AFTER KeyHash:
+	// KeyMaterial, KeyUsage, KeySource, DeviceId, CustomKeyInformation, LastLogonTime, CreationTime.
+	binaryProperties := make([]byte, 0)
+	for _, entry := range blob.Entries {
+		if entry.Identifier == KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyMaterial ||
+			entry.Identifier == KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyUsage ||
+			entry.Identifier == KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeySource ||
+			entry.Identifier == KEYCREDENTIALLINK_ENTRY_IDENTIFIER_DeviceId ||
+			entry.Identifier == KEYCREDENTIALLINK_ENTRY_IDENTIFIER_CustomKeyInformation ||
+			entry.Identifier == KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyApproximateLastLogonTimeStamp ||
+			entry.Identifier == KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyCreationTime {
+			entryBytes, err := entry.Marshal()
+			if err != nil {
+				return nil
+			}
+			binaryProperties = append(binaryProperties, entryBytes...)
+		} // else: Skip Version/KeyID/KeyHash
 	}
-
-	hash := utils.ComputeHash(data)
-
-	return hash
+	return utils.ComputeHash(binaryProperties)
 }
 
 // Marshal returns the raw bytes of the KeyCredentialLink structure.
@@ -330,6 +322,24 @@ func (kc *KeyCredentialLink) ComputeKeyHash() []byte {
 // - A byte slice representing the raw bytes of the KeyCredentialLink structure.
 // - An error if the conversion fails.
 func (kc *KeyCredentialLink) Marshal() ([]byte, error) {
+	blob, err := kc.ToKeyCredentialLinkBlob()
+	if err != nil {
+		return nil, err
+	}
+	return blob.Marshal()
+}
+
+// ToKeyCredentialLinkBlob converts the KeyCredentialLink structure to a KEYCREDENTIALLINK_BLOB structure.
+//
+// Returns:
+// - A pointer to a KEYCREDENTIALLINK_BLOB structure.
+// - An error if the conversion fails.
+//
+// Note:
+// The function converts the KeyCredentialLink structure to a KEYCREDENTIALLINK_BLOB structure.
+// The function sorts the entries by their Identifier fields in increasing order.
+// The function returns the KEYCREDENTIALLINK_BLOB structure.
+func (kc *KeyCredentialLink) ToKeyCredentialLinkBlob() (*KEYCREDENTIALLINK_BLOB, error) {
 	blob := KEYCREDENTIALLINK_BLOB{}
 	blob.Version = kc.Version
 	blob.Entries = make([]KEYCREDENTIALLINK_ENTRY, 0)
@@ -345,11 +355,9 @@ func (kc *KeyCredentialLink) Marshal() ([]byte, error) {
 	blob.Entries = append(
 		blob.Entries,
 		KEYCREDENTIALLINK_ENTRY{
-			Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER{
-				Value: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyID,
-			},
-			Value:  identifierBytes,
-			Length: uint16(len(identifierBytes)),
+			Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyID,
+			Value:      identifierBytes,
+			Length:     uint16(len(identifierBytes)),
 		},
 	)
 
@@ -358,11 +366,9 @@ func (kc *KeyCredentialLink) Marshal() ([]byte, error) {
 		blob.Entries = append(
 			blob.Entries,
 			KEYCREDENTIALLINK_ENTRY{
-				Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER{
-					Value: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyHash,
-				},
-				Value:  kc.KeyHash,
-				Length: uint16(len(kc.KeyHash)),
+				Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyHash,
+				Value:      kc.KeyHash,
+				Length:     uint16(len(kc.KeyHash)),
 			},
 		)
 	}
@@ -375,11 +381,9 @@ func (kc *KeyCredentialLink) Marshal() ([]byte, error) {
 	blob.Entries = append(
 		blob.Entries,
 		KEYCREDENTIALLINK_ENTRY{
-			Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER{
-				Value: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyMaterial,
-			},
-			Value:  keyMaterialBytes,
-			Length: uint16(len(keyMaterialBytes)),
+			Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyMaterial,
+			Value:      keyMaterialBytes,
+			Length:     uint16(len(keyMaterialBytes)),
 		},
 	)
 
@@ -391,11 +395,9 @@ func (kc *KeyCredentialLink) Marshal() ([]byte, error) {
 	blob.Entries = append(
 		blob.Entries,
 		KEYCREDENTIALLINK_ENTRY{
-			Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER{
-				Value: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyUsage,
-			},
-			Value:  usageBytes,
-			Length: uint16(len(usageBytes)),
+			Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyUsage,
+			Value:      usageBytes,
+			Length:     uint16(len(usageBytes)),
 		},
 	)
 
@@ -405,11 +407,9 @@ func (kc *KeyCredentialLink) Marshal() ([]byte, error) {
 		blob.Entries = append(
 			blob.Entries,
 			KEYCREDENTIALLINK_ENTRY{
-				Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER{
-					Value: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyUsage,
-				},
-				Value:  legacyUsageBytes,
-				Length: uint16(len(legacyUsageBytes)),
+				Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyUsage,
+				Value:      legacyUsageBytes,
+				Length:     uint16(len(legacyUsageBytes)),
 			},
 		)
 	}
@@ -423,11 +423,9 @@ func (kc *KeyCredentialLink) Marshal() ([]byte, error) {
 		blob.Entries = append(
 			blob.Entries,
 			KEYCREDENTIALLINK_ENTRY{
-				Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER{
-					Value: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeySource,
-				},
-				Value:  sourceBytes,
-				Length: uint16(len(sourceBytes)),
+				Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeySource,
+				Value:      sourceBytes,
+				Length:     uint16(len(sourceBytes)),
 			},
 		)
 	}
@@ -438,11 +436,9 @@ func (kc *KeyCredentialLink) Marshal() ([]byte, error) {
 		blob.Entries = append(
 			blob.Entries,
 			KEYCREDENTIALLINK_ENTRY{
-				Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER{
-					Value: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_DeviceId,
-				},
-				Value:  deviceIdBytes,
-				Length: uint16(len(deviceIdBytes)),
+				Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_DeviceId,
+				Value:      deviceIdBytes,
+				Length:     uint16(len(deviceIdBytes)),
 			},
 		)
 	}
@@ -456,11 +452,9 @@ func (kc *KeyCredentialLink) Marshal() ([]byte, error) {
 		blob.Entries = append(
 			blob.Entries,
 			KEYCREDENTIALLINK_ENTRY{
-				Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER{
-					Value: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_CustomKeyInformation,
-				},
-				Value:  customKeyInfoBytes,
-				Length: uint16(len(customKeyInfoBytes)),
+				Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_CustomKeyInformation,
+				Value:      customKeyInfoBytes,
+				Length:     uint16(len(customKeyInfoBytes)),
 			},
 		)
 	}
@@ -474,11 +468,9 @@ func (kc *KeyCredentialLink) Marshal() ([]byte, error) {
 		blob.Entries = append(
 			blob.Entries,
 			KEYCREDENTIALLINK_ENTRY{
-				Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER{
-					Value: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyApproximateLastLogonTimeStamp,
-				},
-				Value:  lastLogonTimeBytes,
-				Length: uint16(len(lastLogonTimeBytes)),
+				Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyApproximateLastLogonTimeStamp,
+				Value:      lastLogonTimeBytes,
+				Length:     uint16(len(lastLogonTimeBytes)),
 			},
 		)
 	}
@@ -492,16 +484,14 @@ func (kc *KeyCredentialLink) Marshal() ([]byte, error) {
 		blob.Entries = append(
 			blob.Entries,
 			KEYCREDENTIALLINK_ENTRY{
-				Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER{
-					Value: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyCreationTime,
-				},
-				Value:  creationTimeBytes,
-				Length: uint16(len(creationTimeBytes)),
+				Identifier: KEYCREDENTIALLINK_ENTRY_IDENTIFIER_KeyCreationTime,
+				Value:      creationTimeBytes,
+				Length:     uint16(len(creationTimeBytes)),
 			},
 		)
 	}
 
-	return blob.Marshal()
+	return &blob, nil
 }
 
 // Describe prints a detailed description of the KeyCredentialLink structure.
@@ -532,4 +522,56 @@ func (kc *KeyCredentialLink) Describe(indent int) {
 	fmt.Printf("%s │ \x1b[93mLastLogonTime (UTC)\x1b[0m: %s\n", indentPrompt, kc.LastLogonTime.String())
 	fmt.Printf("%s │ \x1b[93mCreationTime (UTC)\x1b[0m: %s\n", indentPrompt, kc.CreationTime.String())
 	fmt.Printf("%s └───\n", indentPrompt)
+}
+
+// ComposeKeyCredentialLinkForComputer builds a DN-Binary for msDS-KeyCredentialLink
+// following the algorithm described in:
+// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-drsr/f81a5aa6-6cc1-4320-9eb4-1443ad8f4b7c
+//
+// Parameters:
+// - obj: Distinguished Name of the directory object (computer)
+// - keyValue: the key material bytes (CNG key blob) to embed
+//
+// Returns:
+// - ldap.DNWithBinary containing DN and composed KEYCREDENTIALLINK_BLOB
+// - error if composition fails
+func ComposeKeyCredentialLinkForComputer(obj string, keyValue []byte) (*ldap.DNWithBinary, error) {
+	kcv := version.KeyCredentialLinkVersion{Value: version.KeyCredentialLinkVersion_2}
+
+	// Compute KeyID from keyValue as SHA256(keyValue) represented per version
+	keyID := utils.ComputeKeyIdentifier(keyValue, kcv)
+
+	// Parse provided keyValue into a KeyMaterial
+	keyMaterial, _, err := bcrypt.UnmarshalKeyMaterial(keyValue)
+	if err != nil {
+		return nil, fmt.Errorf("invalid key material: %w", err)
+	}
+
+	now := utils.NewDateTimeFromTicks(0)
+
+	// Construct KCL with required fields; constructor also sets Usage=NGC and Source=AD
+	kc := NewKeyCredentialLink(
+		kcv,
+		keyID,
+		keyMaterial,
+		nil,  // DeviceId (optional)
+		&now, // LastLogonTime
+		&now, // CreationTime
+	)
+
+	// Ensure KeyHash present (constructor computes it)
+	if len(kc.KeyHash) == 0 {
+		kc.KeyHash = kc.ComputeKeyHash()
+	}
+
+	// Marshal to blob bytes and wrap in DNWithBinary
+	raw, err := kc.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	return &ldap.DNWithBinary{
+		DistinguishedName: obj,
+		BinaryData:        raw,
+	}, nil
 }
