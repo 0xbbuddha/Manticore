@@ -44,6 +44,10 @@ func (vt CustomKeyInformationVolumeType) Unmarshal(data []byte) (int, error) {
 
 	vt = CustomKeyInformationVolumeType(data[0])
 
+	if vt != CustomKeyInformationVolumeType_None && vt != CustomKeyInformationVolumeType_OSV && vt != CustomKeyInformationVolumeType_FDV && vt != CustomKeyInformationVolumeType_RDV {
+		return 0, fmt.Errorf("invalid CustomKeyInformationVolumeType: %d", vt)
+	}
+
 	return 1, nil
 }
 
