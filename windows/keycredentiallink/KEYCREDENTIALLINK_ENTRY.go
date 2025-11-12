@@ -97,7 +97,7 @@ func (e *KEYCREDENTIALLINK_ENTRY) Describe(indent int) {
 	indentPrompt := strings.Repeat(" │ ", indent)
 	fmt.Printf("%s<\x1b[93mKEYCREDENTIALLINK_ENTRY\x1b[0m>\n", indentPrompt)
 	fmt.Printf("%s │ \x1b[93mLength\x1b[0m: 0x%04x (%d)\n", indentPrompt, e.Length, e.Length)
-	fmt.Printf("%s │ \x1b[93mIdentifier\x1b[0m: 0x%02x (%s)\n", indentPrompt, e.Identifier.Value, e.Identifier.String())
+	fmt.Printf("%s │ \x1b[93mIdentifier\x1b[0m: 0x%02x (%s)\n", indentPrompt, uint8(e.Identifier), e.Identifier.String())
 	fmt.Printf("%s │ \x1b[93mValue\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(e.Value))
 	fmt.Printf("%s └───\n", indentPrompt)
 }
