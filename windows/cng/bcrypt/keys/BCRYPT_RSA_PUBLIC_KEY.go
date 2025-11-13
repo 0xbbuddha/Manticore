@@ -150,21 +150,13 @@ func (key *BCRYPT_RSA_PUBLIC_KEY) ExportPEM() ([]byte, error) {
 	// Build rsa.PublicKey manually from modulus and public exponent
 
 	publicExponent := new(big.Int).SetBytes(key.Content.PublicExponent)
-	pubKey := struct {
-		N []byte
-		E int
-	}{
-		N: key.Content.Modulus,
-		E: int(publicExponent.Int64()),
-	}
-
 	// ASN.1 encode the public key in PKCS#1 format
 	type rsaPublicKey struct {
 		N *big.Int
-		E int
+		E *big.Int
 	}
-	n := new(big.Int).SetBytes(pubKey.N)
-	pk := rsaPublicKey{N: n, E: pubKey.E}
+	n := new(big.Int).SetBytes(key.Content.Modulus)
+	pk := rsaPublicKey{N: n, E: publicExponent}
 	asn1Bytes, err := asn1.Marshal(pk)
 	if err != nil {
 		return nil, err
