@@ -115,3 +115,14 @@ func (k *BCRYPT_RSA_PRIVATE_KEY) Describe(indent int) {
 	k.Content.Describe(indent + 1)
 	fmt.Printf("%s└───\n", indentPrompt)
 }
+
+// Fingerprint returns the fingerprint of the BCRYPT_RSA_PUBLIC_KEY structure.
+//
+// Parameters:
+// - key: The BCRYPT_RSA_PRIVATE_KEY structure to get the fingerprint of.
+//
+// Returns:
+// - A string representing the fingerprint of the BCRYPT_RSA_PRIVATE_KEY structure.
+func (key *BCRYPT_RSA_PRIVATE_KEY) Fingerprint() string {
+	return fmt.Sprintf("BCRYPT_RSA_PRIVATE_KEY:0x%x:0x%x:0x%x:0x%x", key.Content.PublicExponent, key.Content.Modulus, key.Content.Prime1, key.Content.Prime2)
+}

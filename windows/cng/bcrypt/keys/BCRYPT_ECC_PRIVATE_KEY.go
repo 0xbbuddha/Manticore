@@ -133,3 +133,14 @@ func isValidECCPrivateMagic(m uint32) bool {
 		return false
 	}
 }
+
+// Fingerprint returns the fingerprint of the BCRYPT_ECC_PRIVATE_KEY structure.
+//
+// Parameters:
+// - key: The BCRYPT_ECC_PRIVATE_KEY structure to get the fingerprint of.
+//
+// Returns:
+// - A string representing the fingerprint of the BCRYPT_ECC_PRIVATE_KEY structure.
+func (key *BCRYPT_ECC_PRIVATE_KEY) Fingerprint() string {
+	return fmt.Sprintf("BCRYPT_ECC_PRIVATE_KEY:0x%x:0x%x:0x%x", key.Content.X[:], key.Content.Y[:], key.Content.D[:])
+}
