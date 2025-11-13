@@ -14,6 +14,7 @@ type KeyMaterial interface {
 	Unmarshal(data []byte) (int, error)
 	Marshal() ([]byte, error)
 	Describe(indent int)
+	Fingerprint() string
 }
 
 // UnmarshalKeyMaterial unmarshals the key material from the provided byte slice.

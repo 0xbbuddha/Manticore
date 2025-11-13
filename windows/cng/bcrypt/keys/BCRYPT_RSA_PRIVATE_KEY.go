@@ -1,8 +1,11 @@
 package keys
 
 import (
+	"encoding/asn1"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/blob"
@@ -125,4 +128,95 @@ func (k *BCRYPT_RSA_PRIVATE_KEY) Describe(indent int) {
 // - A string representing the fingerprint of the BCRYPT_RSA_PRIVATE_KEY structure.
 func (key *BCRYPT_RSA_PRIVATE_KEY) Fingerprint() string {
 	return fmt.Sprintf("BCRYPT_RSA_PRIVATE_KEY:0x%x:0x%x:0x%x:0x%x", key.Content.PublicExponent, key.Content.Modulus, key.Content.Prime1, key.Content.Prime2)
+}
+
+// ExportPEM exports the RSA private key in PEM format (PKCS#1).
+//
+// Returns:
+// - A byte slice containing the PEM-encoded RSA private key.
+// - An error if encoding fails.
+func (key *BCRYPT_RSA_PRIVATE_KEY) ExportPEM() ([]byte, error) {
+	der, err := key.ExportDER()
+	if err != nil {
+		return nil, err
+	}
+	block := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: der,
+	}
+	return pem.EncodeToMemory(block), nil
+}
+
+// ExportDER exports the RSA private key in DER format (PKCS#1 RSAPrivateKey).
+//
+// The structure encoded is:
+//
+//	RSAPrivateKey ::= SEQUENCE {
+//	  version           Version,
+//	  modulus           INTEGER,  -- n
+//	  publicExponent    INTEGER,  -- e
+//	  privateExponent   INTEGER,  -- d
+//	  prime1            INTEGER,  -- p
+//	  prime2            INTEGER,  -- q
+//	  exponent1         INTEGER,  -- d mod (p-1)
+//	  exponent2         INTEGER,  -- d mod (q-1)
+//	  coefficient       INTEGER   -- (inverse of q) mod p
+//	}
+//
+// Returns:
+// - A byte slice containing the DER-encoded RSA private key.
+// - An error if encoding fails.
+func (key *BCRYPT_RSA_PRIVATE_KEY) ExportDER() ([]byte, error) {
+	// Convert components to big.Int
+	n := new(big.Int).SetBytes(key.Content.Modulus)
+	e := new(big.Int).SetBytes(key.Content.PublicExponent)
+	p := new(big.Int).SetBytes(key.Content.Prime1)
+	q := new(big.Int).SetBytes(key.Content.Prime2)
+	if n.Sign() == 0 || e.Sign() == 0 || p.Sign() == 0 || q.Sign() == 0 {
+		return nil, errors.New("invalid RSA private key components")
+	}
+
+	one := big.NewInt(1)
+	pMinus1 := new(big.Int).Sub(p, one)
+	qMinus1 := new(big.Int).Sub(q, one)
+	phi := new(big.Int).Mul(pMinus1, qMinus1)
+
+	// Compute private exponent d = e^{-1} mod phi(n)
+	d := new(big.Int).ModInverse(e, phi)
+	if d == nil {
+		return nil, errors.New("failed to compute private exponent: e has no inverse modulo phi(n)")
+	}
+
+	// CRT parameters
+	dp := new(big.Int).Mod(d, pMinus1)
+	dq := new(big.Int).Mod(d, qMinus1)
+	qi := new(big.Int).ModInverse(q, p) // coefficient = q^{-1} mod p
+	if qi == nil {
+		return nil, errors.New("failed to compute CRT coefficient")
+	}
+
+	// ASN.1 PKCS#1 RSAPrivateKey
+	type rsaPrivateKey struct {
+		Version int
+		N       *big.Int
+		E       int
+		D       *big.Int
+		P       *big.Int
+		Q       *big.Int
+		Dp      *big.Int
+		Dq      *big.Int
+		Qi      *big.Int
+	}
+	priv := rsaPrivateKey{
+		Version: 0,
+		N:       n,
+		E:       int(e.Int64()),
+		D:       d,
+		P:       p,
+		Q:       q,
+		Dp:      dp,
+		Dq:      dq,
+		Qi:      qi,
+	}
+	return asn1.Marshal(priv)
 }
