@@ -115,3 +115,14 @@ func (k *BCRYPT_DSA_PUBLIC_KEY) Describe(indent int) {
 	k.Content.Describe(indent + 1)
 	fmt.Printf("%s└───\n", indentPrompt)
 }
+
+// Fingerprint returns the fingerprint of the BCRYPT_DSA_PUBLIC_KEY structure.
+//
+// Parameters:
+// - key: The BCRYPT_DSA_PUBLIC_KEY structure to get the fingerprint of.
+//
+// Returns:
+// - A string representing the fingerprint of the BCRYPT_DSA_PUBLIC_KEY structure.
+func (key *BCRYPT_DSA_PUBLIC_KEY) Fingerprint() string {
+	return fmt.Sprintf("BCRYPT_DSA_PUBLIC_KEY:0x%x:0x%x:0x%x", key.Content.Modulus[:], key.Content.Generator[:], key.Content.Public[:])
+}

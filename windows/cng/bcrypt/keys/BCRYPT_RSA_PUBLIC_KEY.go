@@ -126,3 +126,14 @@ func (k *BCRYPT_RSA_PUBLIC_KEY) Describe(indent int) {
 func (k *BCRYPT_RSA_PUBLIC_KEY) Equal(other *BCRYPT_RSA_PUBLIC_KEY) bool {
 	return k.Magic.Equal(&other.Magic) && k.Header.Equal(&other.Header) && k.Content.Equal(&other.Content)
 }
+
+// Fingerprint returns the fingerprint of the BCRYPT_RSA_PUBLIC_KEY structure.
+//
+// Parameters:
+// - key: The BCRYPT_RSA_PUBLIC_KEY structure to get the fingerprint of.
+//
+// Returns:
+// - A string representing the fingerprint of the BCRYPT_RSA_PUBLIC_KEY structure.
+func (key *BCRYPT_RSA_PUBLIC_KEY) Fingerprint() string {
+	return fmt.Sprintf("BCRYPT_RSA_PUBLIC_KEY:0x%x:0x%x", key.Content.PublicExponent, key.Content.Modulus)
+}
