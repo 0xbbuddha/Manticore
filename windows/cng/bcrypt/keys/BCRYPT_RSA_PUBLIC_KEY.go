@@ -236,25 +236,19 @@ func (key *BCRYPT_RSA_PUBLIC_KEY) ExportDER() ([]byte, error) {
 		0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01,
 		0x05, 0x00,
 	}
+	bitString := asn1.BitString{
+		Bytes:     asn1Bytes,
+		BitLength: len(asn1Bytes) * 8,
+	}
+	bitStringBytes, err := asn1.Marshal(bitString)
+	if err != nil {
+		return nil, err
+	}
 	spkSeq := asn1.RawValue{
 		Class:      asn1.ClassUniversal,
 		Tag:        asn1.TagSequence,
 		IsCompound: true,
 		Bytes: append(
 			spkiAlgoID,
-			func() []byte {
-				bitString := asn1.BitString{
-					Bytes:     asn1Bytes,
-					BitLength: len(asn1Bytes) * 8,
-				}
-				bs, _ := asn1.Marshal(bitString)
-				return bs
-			}()...,
-		),
-	}
-	der, err := asn1.Marshal(spkSeq)
-	if err != nil {
-		return nil, err
-	}
-	return der, nil
+			bitStringBytes...,
 }
