@@ -1,8 +1,11 @@
 package keys
 
 import (
+	"encoding/asn1"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/TheManticoreProject/Manticore/windows/cng/bcrypt/keys/blob"
@@ -136,4 +139,109 @@ func (k *BCRYPT_RSA_PUBLIC_KEY) Equal(other *BCRYPT_RSA_PUBLIC_KEY) bool {
 // - A string representing the fingerprint of the BCRYPT_RSA_PUBLIC_KEY structure.
 func (key *BCRYPT_RSA_PUBLIC_KEY) Fingerprint() string {
 	return fmt.Sprintf("BCRYPT_RSA_PUBLIC_KEY:0x%x:0x%x", key.Content.PublicExponent, key.Content.Modulus)
+}
+
+// ExportPEM exports the RSA public key in PEM format.
+//
+// Returns:
+// - A byte slice containing the PEM-encoded RSA public key.
+// - An error if encoding fails.
+func (key *BCRYPT_RSA_PUBLIC_KEY) ExportPEM() ([]byte, error) {
+	// Build rsa.PublicKey manually from modulus and public exponent
+
+	publicExponent := new(big.Int).SetBytes(key.Content.PublicExponent)
+	// ASN.1 encode the public key in PKCS#1 format
+	type rsaPublicKey struct {
+		N *big.Int
+		E *big.Int
+	}
+	n := new(big.Int).SetBytes(key.Content.Modulus)
+	pk := rsaPublicKey{N: n, E: publicExponent}
+	asn1Bytes, err := asn1.Marshal(pk)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build the ASN.1 SubjectPublicKeyInfo
+	// See RFC 5280, section 4.1, 4.1.2.7, and RFC 3447.
+	var spkiAlgoID = []byte{
+		0x30, 0x0d, // SEQUENCE, 13 bytes
+		0x06, 0x09, // OID (1.2.840.113549.1.1.1, rsaEncryption)
+		0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01,
+		0x05, 0x00, // NULL
+	}
+	// SubjectPublicKeyInfo ::= SEQUENCE {
+	//    algorithm          AlgorithmIdentifier,
+	//    subjectPublicKey   BIT STRING
+	// }
+	spkSeq := asn1.RawValue{
+		Class:      asn1.ClassUniversal,
+		Tag:        asn1.TagSequence,
+		IsCompound: true,
+		Bytes: append(
+			spkiAlgoID,
+			// Now BIT STRING
+			func() []byte {
+				bitString := asn1.BitString{
+					Bytes:     asn1Bytes,
+					BitLength: len(asn1Bytes) * 8,
+				}
+				bs, _ := asn1.Marshal(bitString)
+				return bs
+			}()...,
+		),
+	}
+	der, err := asn1.Marshal(spkSeq)
+	if err != nil {
+		return nil, err
+	}
+
+	block := &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: der,
+	}
+	return pem.EncodeToMemory(block), nil
+}
+
+// ExportDER exports the RSA public key in DER format (SubjectPublicKeyInfo/PKIX).
+//
+// Returns:
+// - A byte slice containing the DER-encoded RSA public key.
+// - An error if encoding fails.
+func (key *BCRYPT_RSA_PUBLIC_KEY) ExportDER() ([]byte, error) {
+	// Same logic as ExportPEM, but return the DER bytes for SubjectPublicKeyInfo.
+
+	publicExponent := new(big.Int).SetBytes(key.Content.PublicExponent)
+	n := new(big.Int).SetBytes(key.Content.Modulus)
+	type rsaPublicKey struct {
+		N *big.Int
+		E *big.Int
+	}
+	pk := rsaPublicKey{N: n, E: publicExponent}
+	asn1Bytes, err := asn1.Marshal(pk)
+	if err != nil {
+		return nil, err
+	}
+
+	var spkiAlgoID = []byte{
+		0x30, 0x0d, // SEQUENCE, 13 bytes
+		0x06, 0x09,
+		0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01,
+		0x05, 0x00,
+	}
+	bitString := asn1.BitString{
+		Bytes:     asn1Bytes,
+		BitLength: len(asn1Bytes) * 8,
+	}
+	bitStringBytes, err := asn1.Marshal(bitString)
+	if err != nil {
+		return nil, err
+	}
+	spkSeq := asn1.RawValue{
+		Class:      asn1.ClassUniversal,
+		Tag:        asn1.TagSequence,
+		IsCompound: true,
+		Bytes: append(
+			spkiAlgoID,
+			bitStringBytes...,
 }
