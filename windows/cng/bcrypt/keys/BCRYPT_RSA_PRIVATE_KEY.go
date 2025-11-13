@@ -199,7 +199,7 @@ func (key *BCRYPT_RSA_PRIVATE_KEY) ExportDER() ([]byte, error) {
 	type rsaPrivateKey struct {
 		Version int
 		N       *big.Int
-		E       int
+		E       *big.Int
 		D       *big.Int
 		P       *big.Int
 		Q       *big.Int
@@ -210,7 +210,7 @@ func (key *BCRYPT_RSA_PRIVATE_KEY) ExportDER() ([]byte, error) {
 	priv := rsaPrivateKey{
 		Version: 0,
 		N:       n,
-		E:       int(e.Int64()),
+		E:       e,
 		D:       d,
 		P:       p,
 		Q:       q,
