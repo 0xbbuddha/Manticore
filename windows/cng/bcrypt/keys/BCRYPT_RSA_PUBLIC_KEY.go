@@ -212,19 +212,12 @@ func (key *BCRYPT_RSA_PUBLIC_KEY) ExportDER() ([]byte, error) {
 	// Same logic as ExportPEM, but return the DER bytes for SubjectPublicKeyInfo.
 
 	publicExponent := new(big.Int).SetBytes(key.Content.PublicExponent)
-	pubKey := struct {
-		N []byte
-		E int
-	}{
-		N: key.Content.Modulus,
-		E: int(publicExponent.Int64()),
-	}
+	n := new(big.Int).SetBytes(key.Content.Modulus)
 	type rsaPublicKey struct {
 		N *big.Int
-		E int
+		E *big.Int
 	}
-	n := new(big.Int).SetBytes(pubKey.N)
-	pk := rsaPublicKey{N: n, E: pubKey.E}
+	pk := rsaPublicKey{N: n, E: publicExponent}
 	asn1Bytes, err := asn1.Marshal(pk)
 	if err != nil {
 		return nil, err
