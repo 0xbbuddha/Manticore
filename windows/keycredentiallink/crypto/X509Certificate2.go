@@ -100,6 +100,7 @@ func NewX509Certificate(subject string, keySize int, notBefore, notAfter time.Ti
 
 	return &X509Certificate{
 		privateKey:  rsaKey,
+		publicKey:   &rsaKey.PublicKey,
 		certificate: cert,
 	}, nil
 }
@@ -141,7 +142,12 @@ func (x *X509Certificate) ExportRSAPublicKeyPEM(pathToFile string) error {
 	}
 	defer pubKeyOut.Close()
 
-	pubBytes, err := x509.MarshalPKIXPublicKey(&x.privateKey.PublicKey)
+	privateKey, err := x.GetRSAPrivateKey()
+	if err != nil {
+		return fmt.Errorf("error getting RSA private key from crypto.X509Certificate: %s", err)
+	}
+
+	pubBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
 		return err
 	}
@@ -173,19 +179,24 @@ func (x *X509Certificate) ExportRSAPublicKeyDER() ([]byte, error) {
 // - A pointer to a BCRYPT_RSA_PUBLIC_KEY object representing the public key.
 // - An error if the export fails, otherwise nil.
 func (x *X509Certificate) ExportRSAPublicKeyBCrypt() (*keys.BCRYPT_RSA_PUBLIC_KEY, error) {
-	exponentBigInt := big.NewInt(int64(x.publicKey.E))
+	publicKey, err := x.GetRSAPublicKey()
+	if err != nil {
+		return nil, fmt.Errorf("error getting RSA public key from crypto.X509Certificate: %s", err)
+	}
+
+	exponentBigInt := big.NewInt(int64(publicKey.E))
 	exponentBytes := exponentBigInt.Bytes()
 
 	return &keys.BCRYPT_RSA_PUBLIC_KEY{
 		Magic: magic.BCRYPT_KEY_BLOB{Magic: magic.BCRYPT_RSAPUBLIC_MAGIC},
 		Header: headers.BCRYPT_RSA_KEY_BLOB{
-			BitLength:   uint32(x.publicKey.Size() * 8),
+			BitLength:   uint32(publicKey.Size() * 8),
 			CbPublicExp: uint32(len(exponentBytes)),
-			CbModulus:   uint32(len(x.publicKey.N.Bytes())),
+			CbModulus:   uint32(len(publicKey.N.Bytes())),
 		},
 		Content: blob.BCRYPT_RSA_PUBLIC_BLOB{
 			PublicExponent: exponentBytes,
-			Modulus:        x.publicKey.N.Bytes(),
+			Modulus:        publicKey.N.Bytes(),
 		},
 	}, nil
 }
@@ -213,7 +224,12 @@ func (x *X509Certificate) ExportRSAPrivateKeyPEM(pathToFile string) error {
 	}
 	defer keyOut.Close()
 
-	privBytes := x509.MarshalPKCS1PrivateKey(x.privateKey)
+	privateKey, err := x.GetRSAPrivateKey()
+	if err != nil {
+		return fmt.Errorf("error getting RSA private key from crypto.X509Certificate: %s", err)
+	}
+
+	privBytes := x509.MarshalPKCS1PrivateKey(privateKey)
 	if err := pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privBytes}); err != nil {
 		return err
 	}
@@ -230,23 +246,28 @@ func (x *X509Certificate) ExportRSAPrivateKeyPEM(pathToFile string) error {
 // - An error if the export fails, otherwise nil.
 // - A pointer to a BCRYPT_RSA_PRIVATE_KEY object representing the private key.
 func (x *X509Certificate) ExportRSAPrivateKeyBCrypt() (*keys.BCRYPT_RSA_PRIVATE_KEY, error) {
-	exponentBigInt := big.NewInt(int64(x.privateKey.E))
+	privateKey, err := x.GetRSAPrivateKey()
+	if err != nil {
+		return nil, fmt.Errorf("error getting RSA private key from crypto.X509Certificate: %s", err)
+	}
+
+	exponentBigInt := big.NewInt(int64(privateKey.E))
 	exponentBytes := exponentBigInt.Bytes()
 
 	return &keys.BCRYPT_RSA_PRIVATE_KEY{
 		Magic: magic.BCRYPT_KEY_BLOB{Magic: magic.BCRYPT_RSAPRIVATE_MAGIC},
 		Header: headers.BCRYPT_RSA_KEY_BLOB{
-			BitLength:   uint32(x.privateKey.PublicKey.Size() * 8),
+			BitLength:   uint32(privateKey.PublicKey.Size() * 8),
 			CbPublicExp: uint32(len(exponentBytes)),
-			CbModulus:   uint32(len(x.privateKey.PublicKey.N.Bytes())),
-			CbPrime1:    uint32(len(x.privateKey.Primes[0].Bytes())),
-			CbPrime2:    uint32(len(x.privateKey.Primes[1].Bytes())),
+			CbModulus:   uint32(len(privateKey.PublicKey.N.Bytes())),
+			CbPrime1:    uint32(len(privateKey.Primes[0].Bytes())),
+			CbPrime2:    uint32(len(privateKey.Primes[1].Bytes())),
 		},
 		Content: blob.BCRYPT_RSA_PRIVATE_BLOB{
 			PublicExponent: exponentBytes,
-			Modulus:        x.privateKey.PublicKey.N.Bytes(),
-			Prime1:         x.privateKey.Primes[0].Bytes(),
-			Prime2:         x.privateKey.Primes[1].Bytes(),
+			Modulus:        privateKey.PublicKey.N.Bytes(),
+			Prime1:         privateKey.Primes[0].Bytes(),
+			Prime2:         privateKey.Primes[1].Bytes(),
 		},
 	}, nil
 }
