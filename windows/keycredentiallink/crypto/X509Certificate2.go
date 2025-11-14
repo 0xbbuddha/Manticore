@@ -255,22 +255,34 @@ func (x *X509Certificate) ExportRSAPrivateKeyBCrypt() (*keys.BCRYPT_RSA_PRIVATE_
 //
 // Returns:
 // - A pointer to an rsa.PublicKey object representing the public key of the certificate.
-func (x *X509Certificate) GetRSAPublicKey() *rsa.PublicKey {
-	return x.publicKey
+// - An error if the public key retrieval fails, otherwise nil.
+func (x *X509Certificate) GetRSAPublicKey() (*rsa.PublicKey, error) {
+	if x.publicKey == nil {
+		return nil, fmt.Errorf("error getting RSA public key from crypto.X509Certificate, publicKey is nil")
+	}
+	return x.publicKey, nil
 }
 
 // GetRSAPrivateKey returns the private key of the certificate.
 //
 // Returns:
 // - A pointer to an rsa.PrivateKey object representing the private key of the certificate.
-func (x *X509Certificate) GetRSAPrivateKey() *rsa.PrivateKey {
-	return x.privateKey
+// - An error if the private key retrieval fails, otherwise nil.
+func (x *X509Certificate) GetRSAPrivateKey() (*rsa.PrivateKey, error) {
+	if x.privateKey == nil {
+		return nil, fmt.Errorf("error getting RSA private key from crypto.X509Certificate, privateKey is nil")
+	}
+	return x.privateKey, nil
 }
 
 // GetCertificate returns the certificate of the certificate.
 //
 // Returns:
 // - A pointer to an x509.Certificate object representing the certificate of the certificate.
-func (x *X509Certificate) GetCertificate() *x509.Certificate {
-	return x.certificate
+// - An error if the certificate retrieval fails, otherwise nil.
+func (x *X509Certificate) GetCertificate() (*x509.Certificate, error) {
+	if x.certificate == nil {
+		return nil, fmt.Errorf("error getting certificate from crypto.X509Certificate, certificate is nil")
+	}
+	return x.certificate, nil
 }
