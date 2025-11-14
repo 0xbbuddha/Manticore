@@ -142,12 +142,12 @@ func (x *X509Certificate) ExportRSAPublicKeyPEM(pathToFile string) error {
 	}
 	defer pubKeyOut.Close()
 
-	privateKey, err := x.GetRSAPrivateKey()
+	publicKey, err := x.GetRSAPublicKey()
 	if err != nil {
-		return fmt.Errorf("error getting RSA private key from crypto.X509Certificate: %s", err)
+		return fmt.Errorf("error getting RSA public key from crypto.X509Certificate: %s", err)
 	}
 
-	pubBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+	pubBytes, err := x509.MarshalPKIXPublicKey(publicKey)
 	if err != nil {
 		return err
 	}
