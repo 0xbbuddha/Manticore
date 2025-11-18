@@ -2,8 +2,10 @@ package llmnr
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"net"
+	"strings"
 )
 
 // Resource Record Types
@@ -306,4 +308,33 @@ func IPv6ToRData(ip string) []byte {
 	}
 
 	return data
+}
+
+// Describe prints a detailed description of the ResourceRecord.
+//
+// Parameters:
+// - indent: An integer value specifying the indentation level for the output.
+func (rr *ResourceRecord) Describe(indent int) {
+	indentPrompt := strings.Repeat(" │ ", indent)
+	fmt.Printf("%s<ResourceRecord>\n", indentPrompt)
+	fmt.Printf("%s │ \x1b[93mName\x1b[0m: %s\n", indentPrompt, rr.Name)
+	fmt.Printf("%s │ \x1b[93mType\x1b[0m: %s (0x%04x)\n", indentPrompt, TypeToString(rr.Type), rr.Type)
+	fmt.Printf("%s │ \x1b[93mClass\x1b[0m: %s (0x%04x)\n", indentPrompt, ClassToString(rr.Class), rr.Class)
+	fmt.Printf("%s │ \x1b[93mTTL\x1b[0m: %d\n", indentPrompt, rr.TTL)
+	fmt.Printf("%s │ \x1b[93mRDLength\x1b[0m: %d\n", indentPrompt, rr.RDLength)
+	if len(rr.RData) > 0 {
+		// Try to present human-friendly data for common record types
+		switch rr.Type {
+		case TypeA, TypeAAAA:
+			ip := net.IP(rr.RData)
+			if (rr.Type == TypeA && len(rr.RData) == net.IPv4len) || (rr.Type == TypeAAAA && len(rr.RData) == net.IPv6len) {
+				fmt.Printf("%s │ \x1b[93mRData\x1b[0m: %s\n", indentPrompt, ip.String())
+				break
+			}
+			fallthrough
+		default:
+			fmt.Printf("%s │ \x1b[93mRData\x1b[0m: %s\n", indentPrompt, hex.EncodeToString(rr.RData))
+		}
+	}
+	fmt.Printf("%s └───\n", indentPrompt)
 }

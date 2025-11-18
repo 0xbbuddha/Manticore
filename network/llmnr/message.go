@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/rand"
+	"strings"
 )
 
 // Header represents the LLMNR message header.
@@ -460,4 +461,62 @@ func (m *Message) SetQuery() {
 //   - Nothing. This function modifies the message in place.
 func (m *Message) SetResponse() {
 	m.Flags |= FlagQR
+}
+
+// Describe prints a detailed description of the Message structure.
+//
+// Parameters:
+// - indent: An integer value specifying the indentation level for the output.
+func (m *Message) Describe(indent int) {
+	indentPrompt := strings.Repeat(" │ ", indent)
+
+	fmt.Printf("%s<LLMNR Message>\n", indentPrompt)
+	fmt.Printf("%s │ \x1b[93mID\x1b[0m: 0x%04x (%d)\n", indentPrompt, m.ID, m.ID)
+
+	flags := []string{}
+	if (m.Flags & FlagQR) != 0 {
+		flags = append(flags, "QR")
+	}
+	if (m.Flags & FlagOP) != 0 {
+		flags = append(flags, "OP")
+	}
+	if (m.Flags & FlagC) != 0 {
+		flags = append(flags, "C")
+	}
+	if (m.Flags & FlagTC) != 0 {
+		flags = append(flags, "TC")
+	}
+	if (m.Flags & FlagT) != 0 {
+		flags = append(flags, "T")
+	}
+	fmt.Printf("%s │ \x1b[93mFlags\x1b[0m: 0x%04x (%s)\n", indentPrompt, m.Flags, strings.Join(flags, "|"))
+	fmt.Printf("%s │ \x1b[93mQDCount\x1b[0m: %d\n", indentPrompt, m.QDCount)
+	fmt.Printf("%s │ \x1b[93mANCount\x1b[0m: %d\n", indentPrompt, m.ANCount)
+	fmt.Printf("%s │ \x1b[93mNSCount\x1b[0m: %d\n", indentPrompt, m.NSCount)
+	fmt.Printf("%s │ \x1b[93mARCount\x1b[0m: %d\n", indentPrompt, m.ARCount)
+	if len(m.Questions) > 0 {
+		fmt.Printf("%s │ \x1b[93mQuestions\x1b[0m (%d):\n", indentPrompt, len(m.Questions))
+		for _, q := range m.Questions {
+			q.Describe(indent + 1)
+		}
+	}
+	if len(m.Answers) > 0 {
+		fmt.Printf("%s │ \x1b[93mAnswers\x1b[0m (%d):\n", indentPrompt, len(m.Answers))
+		for _, a := range m.Answers {
+			a.Describe(indent + 1)
+		}
+	}
+	if len(m.Authority) > 0 {
+		fmt.Printf("%s │ \x1b[93mAuthority\x1b[0m (%d):\n", indentPrompt, len(m.Authority))
+		for _, a := range m.Authority {
+			a.Describe(indent + 1)
+		}
+	}
+	if len(m.Additional) > 0 {
+		fmt.Printf("%s │ \x1b[93mAdditional\x1b[0m (%d):\n", indentPrompt, len(m.Additional))
+		for _, a := range m.Additional {
+			a.Describe(indent + 1)
+		}
+	}
+	fmt.Printf("%s └───\n", indentPrompt)
 }

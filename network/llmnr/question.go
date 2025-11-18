@@ -3,6 +3,7 @@ package llmnr
 import (
 	"encoding/binary"
 	"fmt"
+	"strings"
 )
 
 // Question represents a question in an LLMNR message.
@@ -111,4 +112,17 @@ func DecodeQuestion(data []byte, offset int) (Question, int, error) {
 	offset += 2
 
 	return q, offset, nil
+}
+
+// Describe prints a detailed description of the Question.
+//
+// Parameters:
+// - indent: An integer value specifying the indentation level for the output.
+func (q *Question) Describe(indent int) {
+	indentPrompt := strings.Repeat(" │ ", indent)
+	fmt.Printf("%s<Question>\n", indentPrompt)
+	fmt.Printf("%s │ \x1b[93mName\x1b[0m: %s\n", indentPrompt, q.Name)
+	fmt.Printf("%s │ \x1b[93mType\x1b[0m: %s (0x%04x)\n", indentPrompt, TypeToString(q.Type), q.Type)
+	fmt.Printf("%s │ \x1b[93mClass\x1b[0m: %s (0x%04x)\n", indentPrompt, ClassToString(q.Class), q.Class)
+	fmt.Printf("%s └───\n", indentPrompt)
 }
