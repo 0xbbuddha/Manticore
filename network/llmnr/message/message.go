@@ -493,20 +493,32 @@ func (m *Message) Describe(indent int) {
 	for _, q := range m.Questions {
 		q.Describe(indent + 1)
 	}
+	if len(m.Questions) > 0 {
+		fmt.Printf("%s │  └───\n", indentPrompt)
+	}
 
 	fmt.Printf("%s │ \x1b[93mAnswers\x1b[0m (%d):\n", indentPrompt, len(m.Answers))
 	for _, a := range m.Answers {
 		a.Describe(indent + 1)
+	}
+	if len(m.Answers) > 0 {
+		fmt.Printf("%s │  └───\n", indentPrompt)
 	}
 
 	fmt.Printf("%s │ \x1b[93mAuthority\x1b[0m (%d):\n", indentPrompt, len(m.Authority))
 	for _, a := range m.Authority {
 		a.Describe(indent + 1)
 	}
+	if len(m.Authority) > 0 {
+		fmt.Printf("%s │  └───\n", indentPrompt)
+	}
 
 	fmt.Printf("%s │ \x1b[93mAdditional\x1b[0m (%d):\n", indentPrompt, len(m.Additional))
 	for _, a := range m.Additional {
 		a.Describe(indent + 1)
+	}
+	if len(m.Additional) > 0 {
+		fmt.Printf("%s │  └───\n", indentPrompt)
 	}
 
 	fmt.Printf("%s └───\n", indentPrompt)
