@@ -1,13 +1,14 @@
-package llmnr
+package server
 
 import (
 	"fmt"
 	"net"
 
 	"github.com/TheManticoreProject/Manticore/logger"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/message"
 )
 
-// HandlerDescribePacket logs detailed information about an LLMNR packet received by the server.
+// HandlerDescribePacket logs detailed information about an LLMNR packet received by the
 //
 // Parameters:
 // - server: A pointer to the Server that received the packet.
@@ -41,7 +42,7 @@ import (
 // The function uses a logger to output the information in a structured format, with indentation to
 // represent the hierarchy of the packet's contents. The logger is locked during the function execution
 // to ensure thread-safe logging.
-func HandlerDescribePacket(server *Server, remoteAddr net.Addr, writer ResponseWriter, message *Message) bool {
+func HandlerDescribePacket(server *Server, remoteAddr net.Addr, writer ResponseWriter, message *message.Message) bool {
 	logger.Lock()
 	defer logger.Unlock()
 
@@ -53,8 +54,8 @@ func HandlerDescribePacket(server *Server, remoteAddr net.Addr, writer ResponseW
 		formatString := fmt.Sprintf(" │  ├─ Question [%%0%dd/%%0%dd]", stringLen, stringLen)
 		for i, q := range message.Questions {
 			logger.InfoMicroseconds(fmt.Sprintf(formatString, i+1, len(message.Questions)))
-			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Class : 0x%04x (%s)", q.Class, ClassToString(q.Class)))
-			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Type  : 0x%04x (%s)", q.Type, TypeToString(q.Type)))
+			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Class : 0x%04x (%s)", q.Class, q.Class.String()))
+			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Type  : 0x%04x (%s)", q.Type, q.Type.String()))
 			logger.InfoMicroseconds(fmt.Sprintf(" │  │  └─ Name  : \"%s\"", q.Name))
 		}
 		logger.InfoMicroseconds(" │  └─ ")
@@ -66,8 +67,8 @@ func HandlerDescribePacket(server *Server, remoteAddr net.Addr, writer ResponseW
 		formatString := fmt.Sprintf(" │  ├─ Answer [%%0%dd/%%0%dd]", stringLen, stringLen)
 		for i, r := range message.Answers {
 			logger.InfoMicroseconds(fmt.Sprintf(formatString, i+1, len(message.Answers)))
-			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Class    : 0x%04x (%s)", r.Class, ClassToString(r.Class)))
-			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Type     : 0x%04x (%s)", r.Type, TypeToString(r.Type)))
+			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Class    : 0x%04x (%s)", r.Class, r.Class.String()))
+			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Type     : 0x%04x (%s)", r.Type, r.Type.String()))
 			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Name     : \"%s\"", r.Name))
 			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ TTL      : %d", r.TTL))
 			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ RDLENGTH : %d", r.RDLength))
@@ -82,8 +83,8 @@ func HandlerDescribePacket(server *Server, remoteAddr net.Addr, writer ResponseW
 		formatString := fmt.Sprintf(" │  ├─ Authority [%%0%dd/%%0%dd]", stringLen, stringLen)
 		for i, r := range message.Authority {
 			logger.InfoMicroseconds(fmt.Sprintf(formatString, i+1, len(message.Authority)))
-			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Class    : 0x%04x (%s)", r.Class, ClassToString(r.Class)))
-			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Type     : 0x%04x (%s)", r.Type, TypeToString(r.Type)))
+			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Class    : 0x%04x (%s)", r.Class, r.Class.String()))
+			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Type     : 0x%04x (%s)", r.Type, r.Type.String()))
 			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Name     : \"%s\"", r.Name))
 			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ TTL      : %d", r.TTL))
 			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ RDLENGTH : %d", r.RDLength))
@@ -98,8 +99,8 @@ func HandlerDescribePacket(server *Server, remoteAddr net.Addr, writer ResponseW
 		formatString := fmt.Sprintf(" │  ├─ Additional [%%0%dd/%%0%dd]", stringLen, stringLen)
 		for i, r := range message.Additional {
 			logger.InfoMicroseconds(fmt.Sprintf(formatString, i+1, len(message.Additional)))
-			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Class    : 0x%04x (%s)", r.Class, ClassToString(r.Class)))
-			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Type     : 0x%04x (%s)", r.Type, TypeToString(r.Type)))
+			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Class    : 0x%04x (%s)", r.Class, r.Class.String()))
+			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Type     : 0x%04x (%s)", r.Type, r.Type.String()))
 			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ Name     : \"%s\"", r.Name))
 			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ TTL      : %d", r.TTL))
 			logger.InfoMicroseconds(fmt.Sprintf(" │  │  ├─ RDLENGTH : %d", r.RDLength))
@@ -116,7 +117,15 @@ func HandlerDescribePacket(server *Server, remoteAddr net.Addr, writer ResponseW
 }
 
 // HandlerDescribePacketJson logs the details of the LLMNR message in JSON format.
-func HandlerDescribePacketJson(server *Server, remoteAddr net.Addr, writer ResponseWriter, message *Message) bool {
+//
+// Parameters:
+// - server: A pointer to the Server that received the packet.
+// - remoteAddr: The address of the remote client that sent the packet.
+// - writer: A ResponseWriter to send responses back to the client.
+// - message: The LLMNR message received from the client.
+//
+// The function logs the details of the LLMNR message in JSON format.
+func HandlerDescribePacketJson(server *Server, remoteAddr net.Addr, writer ResponseWriter, message *message.Message) bool {
 
 	return false
 }

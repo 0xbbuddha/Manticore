@@ -1,22 +1,24 @@
-package llmnr_test
+package question_test
 
 import (
 	"bytes"
 	"testing"
 
-	"github.com/TheManticoreProject/Manticore/network/llmnr"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/class"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/llmnr_type"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/question"
 )
 
 func TestEncodeQuestions(t *testing.T) {
 	tests := []struct {
-		question llmnr.Question
+		question question.Question
 		expected []byte
 	}{
 		{
-			question: llmnr.Question{
+			question: question.Question{
 				Name:  "example.com",
-				Type:  llmnr.TypeA,
-				Class: llmnr.ClassIN,
+				Type:  llmnr_type.TypeA,
+				Class: class.ClassIN,
 			},
 			expected: []byte{
 				7, 'e', 'x', 'a', 'm', 'p', 'l', 'e', 3, 'c', 'o', 'm', 0, 0, 1, 0, 1,
@@ -27,7 +29,7 @@ func TestEncodeQuestions(t *testing.T) {
 	for _, test := range tests {
 		t.Run("EncodeQuestions", func(t *testing.T) {
 			var buf []byte
-			encoded, err := llmnr.EncodeQuestion(test.question)
+			encoded, err := test.question.Marshal()
 			if err != nil {
 				t.Fatalf("failed to encode question: %v", err)
 			}
@@ -42,30 +44,33 @@ func TestEncodeQuestions(t *testing.T) {
 func TestDecodeQuestions(t *testing.T) {
 	tests := []struct {
 		data     []byte
-		expected llmnr.Question
+		expected question.Question
 	}{
 		{
 			data: []byte{
 				7, 'e', 'x', 'a', 'm', 'p', 'l', 'e', 3, 'c', 'o', 'm', 0, 0, 1, 0, 1,
 			},
-			expected: llmnr.Question{
+			expected: question.Question{
 				Name:  "example.com",
-				Type:  llmnr.TypeA,
-				Class: llmnr.ClassIN,
+				Type:  llmnr_type.TypeA,
+				Class: class.ClassIN,
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run("DecodeQuestions", func(t *testing.T) {
-			var offset int
-			var question llmnr.Question
-			question, _, err := llmnr.DecodeQuestion(test.data, offset)
+			q := question.Question{}
+			bytesRead, err := q.Unmarshal(test.data)
 			if err != nil {
 				t.Fatalf("failed to decode question: %v", err)
 			}
-			if question != test.expected {
-				t.Errorf("DecodeQuestions = %v; want %v", question, test.expected)
+			if bytesRead != len(test.data) {
+				t.Errorf("bytes read = %d; want %d", bytesRead, len(test.data))
+			}
+
+			if q != test.expected {
+				t.Errorf("DecodeQuestions = %v; want %v", q, test.expected)
 			}
 		})
 	}

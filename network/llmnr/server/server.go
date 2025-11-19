@@ -1,7 +1,9 @@
-package llmnr
+package server
 
 import (
 	"github.com/TheManticoreProject/Manticore/logger"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/constants"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/message"
 
 	"fmt"
 	"net"
@@ -51,7 +53,7 @@ type Server struct {
 // NewIPv4Server creates a new LLMNR server for IPv4.
 //
 // This function initializes a new Server instance configured to use the "udp4" network type for IPv4 communication.
-// It does not accept any handlers and initializes the server with an empty list of handlers. The server's internal state,
+// It does not accept any handlers and initializes the server with an empty list of  The server's internal state,
 // including the handlers, closed channel, and debug flag, is initialized.
 //
 // Returns:
@@ -77,7 +79,7 @@ func NewIPv4Server() (*Server, error) {
 // NewIPv6Server creates a new LLMNR server for IPv6.
 //
 // This function initializes a new Server instance configured to use the "udp6" network type for IPv6 communication.
-// It does not accept any handlers and initializes the server with an empty list of handlers. The server's internal state,
+// It does not accept any handlers and initializes the server with an empty list of  The server's internal state,
 // including the handlers, closed channel, and debug flag, is initialized.
 //
 // Returns:
@@ -100,7 +102,7 @@ func NewIPv6Server() (*Server, error) {
 	return NewIPv6ServerWithHandlers([]Handler{})
 }
 
-// NewIPv4ServerWithHandlers creates a new LLMNR server for IPv4 with the specified handlers.
+// NewIPv4ServerWithHandlers creates a new LLMNR server for IPv4 with the specified
 //
 // This function initializes a new Server instance configured to use the "udp4" network type for IPv4 communication.
 // It accepts a list of handlers that will be used to process incoming LLMNR requests. The server's internal state,
@@ -135,14 +137,14 @@ func NewIPv4ServerWithHandlers(handlers []Handler) (*Server, error) {
 	}
 
 	server.Address = &net.UDPAddr{
-		IP:   net.ParseIP(IPv4MulticastAddr),
-		Port: LLMNRPort,
+		IP:   net.ParseIP(constants.IPv4MulticastAddr),
+		Port: constants.ListenPort,
 	}
 
 	return server, nil
 }
 
-// NewIPv6ServerWithHandlers creates a new LLMNR server for IPv6 with the specified handlers.
+// NewIPv6ServerWithHandlers creates a new LLMNR server for IPv6 with the specified
 //
 // This function initializes a new Server instance configured to use the "udp6" network type for IPv6 communication.
 // It accepts a list of handlers that will be used to process incoming LLMNR requests. The server's internal state,
@@ -177,16 +179,16 @@ func NewIPv6ServerWithHandlers(handlers []Handler) (*Server, error) {
 	}
 
 	server.Address = &net.UDPAddr{
-		IP:   net.ParseIP(IPv6MulticastAddr),
-		Port: LLMNRPort,
+		IP:   net.ParseIP(constants.IPv6MulticastAddr),
+		Port: constants.ListenPort,
 	}
 
 	return server, nil
 }
 
-// NewServer creates a new LLMNR server with the specified network and handlers.
+// NewServer creates a new LLMNR server with the specified network and
 //
-// This function initializes a new Server instance with the provided network type and a list of handlers.
+// This function initializes a new Server instance with the provided network type and a list of
 // The server is configured to use the specified network (e.g., "udp4" for IPv4, "udp6" for IPv6) and
 // initializes its internal state, including the handlers, closed channel, and debug flag.
 //
@@ -408,7 +410,7 @@ func (s *Server) Close() error {
 //	    log.Fatalf("Failed to close server: %v", err)
 //	}
 func (s *Server) Serve() error {
-	buffer := make([]byte, MaxPacketSize)
+	buffer := make([]byte, constants.MaxPacketSize)
 	for {
 		select {
 		case <-s.Closed:
@@ -425,7 +427,8 @@ func (s *Server) Serve() error {
 				logger.Debug(fmt.Sprintf("Received packet from %s\n", remoteAddr.String()))
 			}
 
-			msg, err := DecodeMessage(buffer[:n])
+			msg := message.Message{}
+			_, err = msg.Unmarshal(buffer[:n])
 			if err != nil {
 				if s.Debug {
 					logger.Debug(fmt.Sprintf("Error decoding message: %s\n", err.Error()))
@@ -450,12 +453,12 @@ func (s *Server) Serve() error {
 			writer := NewResponseWriter(s, remoteAddr)
 
 			// Handle the query in a separate goroutine
-			go s.processHandlers(s, remoteAddr, writer, msg)
+			go s.processHandlers(s, remoteAddr, writer, &msg)
 		}
 	}
 }
 
-// processHandlers processes the incoming LLMNR message by invoking all registered handlers.
+// processHandlers processes the incoming LLMNR message by invoking all registered
 //
 // Parameters:
 // - w: The ResponseWriter used to send responses back to the client.
@@ -474,7 +477,7 @@ func (s *Server) Serve() error {
 // server.processHandlers(responseWriter, message)
 //
 // This function is typically called internally by the Server when a new LLMNR query is received.
-func (s *Server) processHandlers(server *Server, remoteAddr net.Addr, writer ResponseWriter, message *Message) {
+func (s *Server) processHandlers(server *Server, remoteAddr net.Addr, writer ResponseWriter, message *message.Message) {
 	for _, handler := range s.Handlers {
 		continueProcessing := handler.Run(server, remoteAddr, writer, message)
 		if !continueProcessing {

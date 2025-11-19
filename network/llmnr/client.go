@@ -6,6 +6,11 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/TheManticoreProject/Manticore/network/llmnr/class"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/constants"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/llmnr_type"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/message"
 )
 
 // Client represents an LLMNR client that can send queries and receive responses.
@@ -96,22 +101,22 @@ func (c *Client) Close() error {
 }
 
 // Query sends an LLMNR query and waits for a response
-func (c *Client) Query(ctx context.Context, name string, qtype uint16) (*Message, error) {
-	msg := NewMessage()
+func (c *Client) Query(ctx context.Context, name string, qtype llmnr_type.Type) (*message.Message, error) {
+	msg := message.NewMessage()
 	msg.SetQuery()
-	if err := msg.AddQuestion(name, qtype, ClassIN); err != nil {
+	if err := msg.AddQuestion(name, llmnr_type.Type(qtype), class.ClassIN); err != nil {
 		return nil, fmt.Errorf("failed to add question: %w", err)
 	}
 
 	// Create response channel
-	responseChan := make(chan *Message, 1)
-	c.Queries.Store(msg.ID, responseChan)
-	defer c.Queries.Delete(msg.ID)
+	responseChan := make(chan *message.Message, 1)
+	c.Queries.Store(msg.Header.Identifier, responseChan)
+	defer c.Queries.Delete(msg.Header.Identifier)
 
 	// Send query
 	addr := &net.UDPAddr{
-		IP:   net.ParseIP(IPv4MulticastAddr),
-		Port: LLMNRPort,
+		IP:   net.ParseIP(constants.IPv4MulticastAddr),
+		Port: constants.ListenPort,
 	}
 
 	encoded, err := msg.Encode()
@@ -135,7 +140,7 @@ func (c *Client) Query(ctx context.Context, name string, qtype uint16) (*Message
 }
 
 func (c *Client) readLoop() {
-	buffer := make([]byte, MaxPacketSize)
+	buffer := make([]byte, constants.MaxPacketSize)
 	for {
 		select {
 		case <-c.Closed:
@@ -146,7 +151,8 @@ func (c *Client) readLoop() {
 				continue
 			}
 
-			msg, err := DecodeMessage(buffer[:n])
+			msg := message.Message{}
+			_, err = msg.Unmarshal(buffer[:n])
 			if err != nil {
 				continue
 			}
@@ -156,10 +162,10 @@ func (c *Client) readLoop() {
 			}
 
 			// Find the matching query
-			if ch, ok := c.Queries.Load(msg.ID); ok {
-				responseChan := ch.(chan *Message)
+			if ch, ok := c.Queries.Load(msg.Header.Identifier); ok {
+				responseChan := ch.(chan *message.Message)
 				select {
-				case responseChan <- msg:
+				case responseChan <- &msg:
 				default:
 				}
 			}
