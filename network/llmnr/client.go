@@ -119,7 +119,7 @@ func (c *Client) Query(ctx context.Context, name string, qtype llmnr_type.Type) 
 		Port: constants.ListenPort,
 	}
 
-	encoded, err := msg.Encode()
+	encoded, err := msg.Marshal()
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode message: %w", err)
 	}

@@ -273,14 +273,14 @@ func (m *Message) Validate() error {
 	return nil
 }
 
-// Encode serializes the Message struct into a byte slice according to the LLMNR wire format.
+// Marshal serializes the Message struct into a byte slice according to the LLMNR wire format.
 // It encodes the header, questions, and answers sections of the message.
 //
 // Returns:
 // - A byte slice containing the encoded message.
 // - An error if encoding fails at any point, such as if there is an error encoding the questions or answers.
-func (m *Message) Encode() ([]byte, error) {
-	packet := make([]byte, 0, constants.MaxPacketSize)
+func (m *Message) Marshal() ([]byte, error) {
+	marshalledData := make([]byte, 0, constants.MaxPacketSize)
 
 	bufferUint16 := make([]byte, 2)
 
@@ -288,32 +288,32 @@ func (m *Message) Encode() ([]byte, error) {
 	// ID - A 16-bit identifier assigned by the program that generates any kind of query. This identifier is copied
 	// to the corresponding reply and can be used by the requester to match up replies to outstanding queries.
 	binary.BigEndian.PutUint16(bufferUint16, m.Header.Identifier)
-	packet = append(packet, bufferUint16...)
+	marshalledData = append(marshalledData, bufferUint16...)
 
 	// Flags - A 16-bit field containing various flags that control the message flow and interpretation. These flags
 	// include the Query/Response flag (QR), Operation code (OP), Conflict flag (C), Truncation flag (TC), and Tentative flag (T).
 	binary.BigEndian.PutUint16(bufferUint16, uint16(m.Header.Flags))
-	packet = append(packet, bufferUint16...)
+	marshalledData = append(marshalledData, bufferUint16...)
 
 	// QDCOUNT - An unsigned 16-bit integer specifying the number of entries in the question section.
 	m.Header.QDCount = uint16(len(m.Questions))
 	binary.BigEndian.PutUint16(bufferUint16, m.Header.QDCount)
-	packet = append(packet, bufferUint16...)
+	marshalledData = append(marshalledData, bufferUint16...)
 
 	// ANCOUNT - An unsigned 16-bit integer specifying the number of resource records in the answer section.
 	m.Header.ANCount = uint16(len(m.Answers))
 	binary.BigEndian.PutUint16(bufferUint16, m.Header.ANCount)
-	packet = append(packet, bufferUint16...)
+	marshalledData = append(marshalledData, bufferUint16...)
 
 	// NSCOUNT - An unsigned 16-bit integer specifying the number of name server resource records in the authority records section.
 	m.Header.NSCount = uint16(len(m.Authority))
 	binary.BigEndian.PutUint16(bufferUint16, m.Header.NSCount)
-	packet = append(packet, bufferUint16...)
+	marshalledData = append(marshalledData, bufferUint16...)
 
 	// ARCOUNT - An unsigned 16-bit integer specifying the number of resource records in the additional records section.
 	m.Header.ARCount = uint16(len(m.Additional))
 	binary.BigEndian.PutUint16(bufferUint16, m.Header.ARCount)
-	packet = append(packet, bufferUint16...)
+	marshalledData = append(marshalledData, bufferUint16...)
 
 	// Encode questions
 	for _, q := range m.Questions {
@@ -321,7 +321,7 @@ func (m *Message) Encode() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("encoding question: %w", err)
 		}
-		packet = append(packet, questionBuf...)
+		marshalledData = append(marshalledData, questionBuf...)
 	}
 
 	// Encode answers
@@ -330,10 +330,28 @@ func (m *Message) Encode() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("encoding answer: %w", err)
 		}
-		packet = append(packet, answerBuf...)
+		marshalledData = append(marshalledData, answerBuf...)
 	}
 
-	return packet, nil
+	// Encode authority
+	for _, a := range m.Authority {
+		authorityBuf, err := a.Marshal()
+		if err != nil {
+			return nil, fmt.Errorf("encoding authority: %w", err)
+		}
+		marshalledData = append(marshalledData, authorityBuf...)
+	}
+
+	// Encode additional
+	for _, a := range m.Additional {
+		additionalBuf, err := a.Marshal()
+		if err != nil {
+			return nil, fmt.Errorf("encoding additional: %w", err)
+		}
+		marshalledData = append(marshalledData, additionalBuf...)
+	}
+
+	return marshalledData, nil
 }
 
 // Unmarshal decodes a byte slice into the Message receiver. It expects the byte slice to be in the wire format
@@ -378,6 +396,26 @@ func (m *Message) Unmarshal(data []byte) (int, error) {
 			return 0, fmt.Errorf("error unmarshalling answer: %w", err)
 		}
 		m.Answers = append(m.Answers, rr)
+	}
+
+	// Decode authority
+	for i := uint16(0); i < m.Header.NSCount; i++ {
+		rr := resourcerecord.ResourceRecord{}
+		bytesRead, err = rr.Unmarshal(data[bytesRead:])
+		if err != nil {
+			return 0, fmt.Errorf("error unmarshalling authority: %w", err)
+		}
+		m.Authority = append(m.Authority, rr)
+	}
+
+	// Decode additional
+	for i := uint16(0); i < m.Header.ARCount; i++ {
+		rr := resourcerecord.ResourceRecord{}
+		bytesRead, err = rr.Unmarshal(data[bytesRead:])
+		if err != nil {
+			return 0, fmt.Errorf("error unmarshalling additional: %w", err)
+		}
+		m.Additional = append(m.Additional, rr)
 	}
 
 	return bytesRead, nil

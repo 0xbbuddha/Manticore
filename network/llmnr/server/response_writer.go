@@ -53,7 +53,7 @@ func (w *responseWriter) WriteMessage(msg *message.Message) error {
 
 	msg.SetResponse()
 
-	encoded, err := msg.Encode()
+	encoded, err := msg.Marshal()
 	if err != nil {
 		return fmt.Errorf("failed to encode message: %w", err)
 	}
