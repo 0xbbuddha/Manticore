@@ -11,7 +11,7 @@ import (
 	"github.com/TheManticoreProject/Manticore/network/llmnr/message"
 	"github.com/TheManticoreProject/Manticore/network/llmnr/message/header"
 	"github.com/TheManticoreProject/Manticore/network/llmnr/question"
-	"github.com/TheManticoreProject/Manticore/network/llmnr/ressource_record"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/resourcerecord"
 )
 
 func TestNewMessage(t *testing.T) {
@@ -160,7 +160,7 @@ func TestAddAnswer(t *testing.T) {
 	msg := message.NewMessage()
 
 	// Test adding valid answer
-	rr := ressource_record.ResourceRecord{
+	rr := resourcerecord.ResourceRecord{
 		Name:     "host.local",
 		Type:     llmnr_type.TypeA,
 		Class:    class.ClassIN,
@@ -197,7 +197,7 @@ func TestValidate(t *testing.T) {
 		t.Fatalf("AddQuestion() unexpected error: %v", err)
 	}
 
-	rr := ressource_record.ResourceRecord{
+	rr := resourcerecord.ResourceRecord{
 		Name:     "host.local",
 		Type:     llmnr_type.TypeA,
 		Class:    class.ClassIN,

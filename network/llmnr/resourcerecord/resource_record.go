@@ -1,4 +1,4 @@
-package ressource_record
+package resourcerecord
 
 import (
 	"encoding/binary"

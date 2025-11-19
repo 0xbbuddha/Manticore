@@ -1,10 +1,10 @@
-package ressource_record_test
+package resourcerecord_test
 
 import (
 	"github.com/TheManticoreProject/Manticore/network/llmnr/class"
 	"github.com/TheManticoreProject/Manticore/network/llmnr/domain_name"
 	"github.com/TheManticoreProject/Manticore/network/llmnr/llmnr_type"
-	"github.com/TheManticoreProject/Manticore/network/llmnr/ressource_record"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/resourcerecord"
 
 	"bytes"
 	"testing"
@@ -22,7 +22,7 @@ func TestIPToRData(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.ip, func(t *testing.T) {
-			result := ressource_record.IPToRData(test.ip)
+			result := resourcerecord.IPToRData(test.ip)
 			if result == nil && test.expected == nil {
 				return
 			} else if !bytes.Equal(result, test.expected) {
@@ -48,7 +48,7 @@ func TestIPv4ToRData(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.ip, func(t *testing.T) {
-			result := ressource_record.IPv4ToRData(test.ip)
+			result := resourcerecord.IPv4ToRData(test.ip)
 			if result == nil && test.expected == nil {
 				return
 			} else if !bytes.Equal(result, test.expected) {
@@ -76,7 +76,7 @@ func TestIPv6ToRData(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.ip, func(t *testing.T) {
-			result := ressource_record.IPv6ToRData(test.ip)
+			result := resourcerecord.IPv6ToRData(test.ip)
 			if result == nil && test.expected == nil {
 				return
 			} else if !bytes.Equal(result, test.expected) {
@@ -131,7 +131,7 @@ func TestMarshalUnmarshalResourceRecord(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			rr := ressource_record.ResourceRecord{}
+			rr := resourcerecord.ResourceRecord{}
 			rr.Name.Unmarshal([]byte{
 				byte(len(tt.args.name)), // hack: single label only
 			})
@@ -146,7 +146,7 @@ func TestMarshalUnmarshalResourceRecord(t *testing.T) {
 				t.Fatalf("Marshal failed: %v", err)
 			}
 
-			var rr2 ressource_record.ResourceRecord
+			var rr2 resourcerecord.ResourceRecord
 			n, err := rr2.Unmarshal(data)
 			if err != nil {
 				t.Fatalf("Unmarshal failed: %v", err)

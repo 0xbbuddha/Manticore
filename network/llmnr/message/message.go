@@ -13,7 +13,7 @@ import (
 	"github.com/TheManticoreProject/Manticore/network/llmnr/llmnr_type"
 	"github.com/TheManticoreProject/Manticore/network/llmnr/message/header"
 	"github.com/TheManticoreProject/Manticore/network/llmnr/question"
-	"github.com/TheManticoreProject/Manticore/network/llmnr/ressource_record"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/resourcerecord"
 )
 
 // Message represents an LLMNR message.
@@ -37,13 +37,13 @@ type Message struct {
 	Questions []question.Question `json:"questions"`
 
 	// A slice of ResourceRecord structs representing the answers in the message.
-	Answers []ressource_record.ResourceRecord `json:"answers"`
+	Answers []resourcerecord.ResourceRecord `json:"answers"`
 
 	// A slice of ResourceRecord structs representing the authority records in the message.
-	Authority []ressource_record.ResourceRecord `json:"authority"`
+	Authority []resourcerecord.ResourceRecord `json:"authority"`
 
 	// A slice of ResourceRecord structs representing the additional records in the message.
-	Additional []ressource_record.ResourceRecord `json:"additional"`
+	Additional []resourcerecord.ResourceRecord `json:"additional"`
 }
 
 // NewMessage creates a new LLMNR message with a randomly generated transaction ID and initializes
@@ -63,9 +63,9 @@ func NewMessage() *Message {
 			ARCount:    0,
 		},
 		Questions:  make([]question.Question, 0),
-		Answers:    make([]ressource_record.ResourceRecord, 0),
-		Authority:  make([]ressource_record.ResourceRecord, 0),
-		Additional: make([]ressource_record.ResourceRecord, 0),
+		Answers:    make([]resourcerecord.ResourceRecord, 0),
+		Authority:  make([]resourcerecord.ResourceRecord, 0),
+		Additional: make([]resourcerecord.ResourceRecord, 0),
 	}
 }
 
@@ -84,7 +84,7 @@ func CreateResponseFromMessage(msg *Message) *Message {
 
 	response.Questions = []question.Question{}
 
-	response.Answers = []ressource_record.ResourceRecord{}
+	response.Answers = []resourcerecord.ResourceRecord{}
 
 	return response
 }
@@ -125,7 +125,7 @@ func (m *Message) AddQuestion(name string, qtype llmnr_type.Type, qclass class.C
 // Returns:
 // - An error if the domain name of the resource record is invalid.
 // - nil if the resource record is successfully added.
-func (m *Message) AddAnswer(rr ressource_record.ResourceRecord) error {
+func (m *Message) AddAnswer(rr resourcerecord.ResourceRecord) error {
 	if err := rr.Name.Validate(); err != nil {
 		return err
 	}
@@ -149,13 +149,13 @@ func (m *Message) AddAnswer(rr ressource_record.ResourceRecord) error {
 // - An error if the domain name of the resource record is invalid.
 // - nil if the resource record is successfully added.
 func (m *Message) AddAnswerClassINTypeA(name, ip string) error {
-	rdata := ressource_record.IPv4ToRData(ip)
+	rdata := resourcerecord.IPv4ToRData(ip)
 
 	if rdata == nil {
 		return fmt.Errorf("invalid IPv4 address")
 	}
 
-	rr := ressource_record.ResourceRecord{
+	rr := resourcerecord.ResourceRecord{
 		Name:  domain_name.DomainName(name),
 		Type:  llmnr_type.TypeA,
 		Class: class.ClassIN,
@@ -198,13 +198,13 @@ func (m *Message) AddAnswerClassINTypeA(name, ip string) error {
 // - An error if the domain name of the resource record is invalid.
 // - nil if the resource record is successfully added.
 func (m *Message) AddAnswerClassINTypeAAAA(name, ip string) error {
-	rdata := ressource_record.IPv6ToRData(ip)
+	rdata := resourcerecord.IPv6ToRData(ip)
 
 	if rdata == nil {
 		return fmt.Errorf("invalid IPv6 address")
 	}
 
-	rr := ressource_record.ResourceRecord{
+	rr := resourcerecord.ResourceRecord{
 		Name:  domain_name.DomainName(name),
 		Type:  llmnr_type.TypeAAAA,
 		Class: class.ClassIN,
@@ -372,7 +372,7 @@ func (m *Message) Unmarshal(data []byte) (int, error) {
 
 	// Decode answers
 	for i := uint16(0); i < m.Header.ANCount; i++ {
-		rr := ressource_record.ResourceRecord{}
+		rr := resourcerecord.ResourceRecord{}
 		bytesRead, err = rr.Unmarshal(data[bytesRead:])
 		if err != nil {
 			return 0, fmt.Errorf("error unmarshalling answer: %w", err)
