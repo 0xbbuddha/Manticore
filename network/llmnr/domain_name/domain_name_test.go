@@ -1,8 +1,11 @@
-package llmnr
+package domain_name_test
 
 import (
 	"bytes"
 	"testing"
+
+	"github.com/TheManticoreProject/Manticore/network/llmnr/domain_name"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/errors"
 )
 
 func TestValidateDomainName(t *testing.T) {
@@ -11,7 +14,7 @@ func TestValidateDomainName(t *testing.T) {
 		expected error
 	}{
 		{"example.com", nil},
-		{"a-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-long-domain-name-that-exceeds-the-maximum-allowed-length-for-a-domain-name.com", ErrNameTooLong},
+		{"a-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-very-long-domain-name-that-exceeds-the-maximum-allowed-length-for-a-domain-name.com", errors.ErrNameTooLong},
 		{"valid-domain.local", nil},
 		{"another.valid-domain.local", nil},
 		{"invalid_domain_with_underscores.com", nil}, // Assuming underscores are allowed in this context
@@ -20,7 +23,7 @@ func TestValidateDomainName(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := ValidateDomainName(test.name)
+			err := domain_name.ValidateDomainName(test.name)
 			if err != test.expected {
 				t.Errorf("ValidateDomainName = %v; want %v", err, test.expected)
 			}
@@ -38,7 +41,7 @@ func TestEncodeDomainName(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run("EncodeDomainName", func(t *testing.T) {
-			encoded, err := EncodeDomainName(test.name)
+			encoded, err := domain_name.EncodeDomainName(test.name)
 			if err != nil {
 				t.Fatalf("failed to encode domain name: %v", err)
 			}
@@ -63,7 +66,7 @@ func TestDecodeDomainName(t *testing.T) {
 	for _, test := range tests {
 		t.Run("DecodeDomainName", func(t *testing.T) {
 			var offset int
-			decoded, _, err := DecodeDomainName(test.data, offset)
+			decoded, _, err := domain_name.DecodeDomainName(test.data, offset)
 			if err != nil {
 				t.Fatalf("failed to decode domain name: %v", err)
 			}

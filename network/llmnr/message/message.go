@@ -1,45 +1,20 @@
-package llmnr
+package message
 
 import (
 	"encoding/binary"
 	"fmt"
 	"math/rand"
 	"strings"
-)
 
-// Header represents the LLMNR message header.
-//
-// The header contains essential information about the LLMNR message, including the message ID, flags, and counts of
-// various sections such as questions, answers, authority records, and additional records.
-//
-// Fields:
-//   - ID: A 16-bit identifier assigned by the program that generates any kind of query. This identifier is copied
-//     to the corresponding reply and can be used by the requester to match up replies to outstanding queries.
-//   - Flags: A 16-bit field containing various flags that control the message flow and interpretation. These flags
-//     include the Query/Response flag (QR), Operation code (OP), Conflict flag (C), Truncation flag (TC), and Tentative flag (T).
-//   - QDCount: An unsigned 16-bit integer specifying the number of entries in the question section of the message.
-//   - ANCount: An unsigned 16-bit integer specifying the number of resource records in the answer section of the message.
-//   - NSCount: An unsigned 16-bit integer specifying the number of name server resource records in the authority records section of the message.
-//   - ARCount: An unsigned 16-bit integer specifying the number of resource records in the additional records section of the message.
-//
-// Usage example:
-//
-//	header := Header{
-//	    ID:      12345,
-//	    Flags:   FlagQR,
-//	    QDCount: 1,
-//	    ANCount: 0,
-//	    NSCount: 0,
-//	    ARCount: 0,
-//	}
-type Header struct {
-	ID      uint16 `json:"id"`
-	Flags   uint16 `json:"flags"`
-	QDCount uint16 `json:"qd_count"` // Question count
-	ANCount uint16 `json:"an_count"` // Answer count
-	NSCount uint16 `json:"ns_count"` // Authority count
-	ARCount uint16 `json:"ar_count"` // Additional count
-}
+	"github.com/TheManticoreProject/Manticore/network/llmnr/class"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/constants"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/domain_name"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/errors"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/llmnr_type"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/message/header"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/question"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/resourcerecord"
+)
 
 // Message represents an LLMNR message.
 //
@@ -56,11 +31,19 @@ type Header struct {
 // - Authority: A slice of ResourceRecord structs representing the authority records in the message.
 // - Additional: A slice of ResourceRecord structs representing the additional records in the message.
 type Message struct {
-	Header
-	Questions  []Question       `json:"questions"`
-	Answers    []ResourceRecord `json:"answers"`
-	Authority  []ResourceRecord `json:"authority"`
-	Additional []ResourceRecord `json:"additional"`
+	// The header of the LLMNR message, containing metadata such as the transaction ID and flags.
+	Header header.Header
+	// A slice of Question structs representing the questions in the message.
+	Questions []question.Question `json:"questions"`
+
+	// A slice of ResourceRecord structs representing the answers in the message.
+	Answers []resourcerecord.ResourceRecord `json:"answers"`
+
+	// A slice of ResourceRecord structs representing the authority records in the message.
+	Authority []resourcerecord.ResourceRecord `json:"authority"`
+
+	// A slice of ResourceRecord structs representing the additional records in the message.
+	Additional []resourcerecord.ResourceRecord `json:"additional"`
 }
 
 // NewMessage creates a new LLMNR message with a randomly generated transaction ID and initializes
@@ -71,13 +54,18 @@ type Message struct {
 // - A pointer to the newly created Message instance.
 func NewMessage() *Message {
 	return &Message{
-		Header: Header{
-			ID: uint16(rand.Uint32()), // Generate random transaction ID
+		Header: header.Header{
+			Identifier: uint16(rand.Uint32()), // Generate random transaction ID
+			Flags:      header.Flags(0),
+			QDCount:    0,
+			ANCount:    0,
+			NSCount:    0,
+			ARCount:    0,
 		},
-		Questions:  make([]Question, 0),
-		Answers:    make([]ResourceRecord, 0),
-		Authority:  make([]ResourceRecord, 0),
-		Additional: make([]ResourceRecord, 0),
+		Questions:  make([]question.Question, 0),
+		Answers:    make([]resourcerecord.ResourceRecord, 0),
+		Authority:  make([]resourcerecord.ResourceRecord, 0),
+		Additional: make([]resourcerecord.ResourceRecord, 0),
 	}
 }
 
@@ -91,12 +79,12 @@ func NewMessage() *Message {
 func CreateResponseFromMessage(msg *Message) *Message {
 	response := NewMessage()
 
-	response.Header.ID = msg.Header.ID
-	response.Header.Flags = msg.Header.Flags | FlagQR
+	response.Header.Identifier = msg.Header.Identifier
+	response.Header.Flags = msg.Header.Flags | header.FlagQR
 
-	response.Questions = []Question{}
+	response.Questions = []question.Question{}
 
-	response.Answers = []ResourceRecord{}
+	response.Answers = []resourcerecord.ResourceRecord{}
 
 	return response
 }
@@ -112,18 +100,18 @@ func CreateResponseFromMessage(msg *Message) *Message {
 // Returns:
 // - An error if the domain name is invalid.
 // - nil if the question is successfully added.
-func (m *Message) AddQuestion(name string, qtype, qclass uint16) error {
-	if err := ValidateDomainName(name); err != nil {
+func (m *Message) AddQuestion(name string, qtype llmnr_type.Type, qclass class.Class) error {
+	if err := domain_name.ValidateDomainName(name); err != nil {
 		return err
 	}
 
-	m.Questions = append(m.Questions, Question{
-		Name:  name,
+	m.Questions = append(m.Questions, question.Question{
+		Name:  domain_name.DomainName(name),
 		Type:  qtype,
 		Class: qclass,
 	})
 
-	m.QDCount = uint16(len(m.Questions))
+	m.Header.QDCount = uint16(len(m.Questions))
 
 	return nil
 }
@@ -137,14 +125,14 @@ func (m *Message) AddQuestion(name string, qtype, qclass uint16) error {
 // Returns:
 // - An error if the domain name of the resource record is invalid.
 // - nil if the resource record is successfully added.
-func (m *Message) AddAnswer(rr ResourceRecord) error {
-	if err := ValidateDomainName(rr.Name); err != nil {
+func (m *Message) AddAnswer(rr resourcerecord.ResourceRecord) error {
+	if err := rr.Name.Validate(); err != nil {
 		return err
 	}
 
 	m.Answers = append(m.Answers, rr)
 
-	m.ANCount = uint16(len(m.Answers))
+	m.Header.ANCount = uint16(len(m.Answers))
 
 	return nil
 }
@@ -161,16 +149,16 @@ func (m *Message) AddAnswer(rr ResourceRecord) error {
 // - An error if the domain name of the resource record is invalid.
 // - nil if the resource record is successfully added.
 func (m *Message) AddAnswerClassINTypeA(name, ip string) error {
-	rdata := IPv4ToRData(ip)
+	rdata := resourcerecord.IPv4ToRData(ip)
 
 	if rdata == nil {
 		return fmt.Errorf("invalid IPv4 address")
 	}
 
-	rr := ResourceRecord{
-		Name:  name,
-		Type:  TypeA,
-		Class: ClassIN,
+	rr := resourcerecord.ResourceRecord{
+		Name:  domain_name.DomainName(name),
+		Type:  llmnr_type.TypeA,
+		Class: class.ClassIN,
 		TTL:   30,
 		RData: rdata,
 	}
@@ -179,7 +167,7 @@ func (m *Message) AddAnswerClassINTypeA(name, ip string) error {
 	// Check if the name is already in Questions
 	found := false
 	for _, question := range m.Questions {
-		if question.Name == name {
+		if question.Name == domain_name.DomainName(name) {
 			found = true
 			break
 		}
@@ -187,12 +175,12 @@ func (m *Message) AddAnswerClassINTypeA(name, ip string) error {
 
 	// If the name is not found in Questions, add it
 	if !found {
-		m.Questions = append(m.Questions, Question{
-			Name:  name,
-			Type:  TypeA,
-			Class: ClassIN,
+		m.Questions = append(m.Questions, question.Question{
+			Name:  domain_name.DomainName(name),
+			Type:  llmnr_type.TypeA,
+			Class: class.ClassIN,
 		})
-		m.QDCount = uint16(len(m.Questions))
+		m.Header.QDCount = uint16(len(m.Questions))
 	}
 
 	return m.AddAnswer(rr)
@@ -210,16 +198,16 @@ func (m *Message) AddAnswerClassINTypeA(name, ip string) error {
 // - An error if the domain name of the resource record is invalid.
 // - nil if the resource record is successfully added.
 func (m *Message) AddAnswerClassINTypeAAAA(name, ip string) error {
-	rdata := IPv6ToRData(ip)
+	rdata := resourcerecord.IPv6ToRData(ip)
 
 	if rdata == nil {
 		return fmt.Errorf("invalid IPv6 address")
 	}
 
-	rr := ResourceRecord{
-		Name:  name,
-		Type:  TypeAAAA,
-		Class: ClassIN,
+	rr := resourcerecord.ResourceRecord{
+		Name:  domain_name.DomainName(name),
+		Type:  llmnr_type.TypeAAAA,
+		Class: class.ClassIN,
 		TTL:   30,
 		RData: rdata,
 	}
@@ -228,7 +216,7 @@ func (m *Message) AddAnswerClassINTypeAAAA(name, ip string) error {
 	// Check if the name is already in Questions
 	found := false
 	for _, question := range m.Questions {
-		if question.Name == name {
+		if question.Name == domain_name.DomainName(name) {
 			found = true
 			break
 		}
@@ -236,12 +224,12 @@ func (m *Message) AddAnswerClassINTypeAAAA(name, ip string) error {
 
 	// If the name is not found in Questions, add it
 	if !found {
-		m.Questions = append(m.Questions, Question{
-			Name:  name,
-			Type:  TypeAAAA,
-			Class: ClassIN,
+		m.Questions = append(m.Questions, question.Question{
+			Name:  domain_name.DomainName(name),
+			Type:  llmnr_type.TypeAAAA,
+			Class: class.ClassIN,
 		})
-		m.QDCount = uint16(len(m.Questions))
+		m.Header.QDCount = uint16(len(m.Questions))
 	}
 
 	return m.AddAnswer(rr)
@@ -256,28 +244,28 @@ func (m *Message) AddAnswerClassINTypeAAAA(name, ip string) error {
 // - nil if the message is valid.
 func (m *Message) Validate() error {
 	// Check counts match actual data
-	if len(m.Questions) != int(m.QDCount) {
-		return ErrInvalidMessage
+	if len(m.Questions) != int(m.Header.QDCount) {
+		return errors.ErrInvalidMessage
 	}
-	if len(m.Answers) != int(m.ANCount) {
-		return ErrInvalidMessage
+	if len(m.Answers) != int(m.Header.ANCount) {
+		return errors.ErrInvalidMessage
 	}
-	if len(m.Authority) != int(m.NSCount) {
-		return ErrInvalidMessage
+	if len(m.Authority) != int(m.Header.NSCount) {
+		return errors.ErrInvalidMessage
 	}
-	if len(m.Additional) != int(m.ARCount) {
-		return ErrInvalidMessage
+	if len(m.Additional) != int(m.Header.ARCount) {
+		return errors.ErrInvalidMessage
 	}
 
 	// Validate all names in the message
 	for _, q := range m.Questions {
-		if err := ValidateDomainName(q.Name); err != nil {
+		if err := q.Name.Validate(); err != nil {
 			return err
 		}
 	}
 
 	for _, rr := range m.Answers {
-		if err := ValidateDomainName(rr.Name); err != nil {
+		if err := rr.Name.Validate(); err != nil {
 			return err
 		}
 	}
@@ -285,70 +273,88 @@ func (m *Message) Validate() error {
 	return nil
 }
 
-// Encode serializes the Message struct into a byte slice according to the LLMNR wire format.
+// Marshal serializes the Message struct into a byte slice according to the LLMNR wire format.
 // It encodes the header, questions, and answers sections of the message.
 //
 // Returns:
 // - A byte slice containing the encoded message.
 // - An error if encoding fails at any point, such as if there is an error encoding the questions or answers.
-func (m *Message) Encode() ([]byte, error) {
-	packet := make([]byte, 0, MaxPacketSize)
+func (m *Message) Marshal() ([]byte, error) {
+	marshalledData := make([]byte, 0, constants.MaxPacketSize)
 
 	bufferUint16 := make([]byte, 2)
 
 	// Encode header
 	// ID - A 16-bit identifier assigned by the program that generates any kind of query. This identifier is copied
 	// to the corresponding reply and can be used by the requester to match up replies to outstanding queries.
-	binary.BigEndian.PutUint16(bufferUint16, m.ID)
-	packet = append(packet, bufferUint16...)
+	binary.BigEndian.PutUint16(bufferUint16, m.Header.Identifier)
+	marshalledData = append(marshalledData, bufferUint16...)
 
 	// Flags - A 16-bit field containing various flags that control the message flow and interpretation. These flags
 	// include the Query/Response flag (QR), Operation code (OP), Conflict flag (C), Truncation flag (TC), and Tentative flag (T).
-	binary.BigEndian.PutUint16(bufferUint16, m.Flags)
-	packet = append(packet, bufferUint16...)
+	binary.BigEndian.PutUint16(bufferUint16, uint16(m.Header.Flags))
+	marshalledData = append(marshalledData, bufferUint16...)
 
 	// QDCOUNT - An unsigned 16-bit integer specifying the number of entries in the question section.
-	m.QDCount = uint16(len(m.Questions))
-	binary.BigEndian.PutUint16(bufferUint16, m.QDCount)
-	packet = append(packet, bufferUint16...)
+	m.Header.QDCount = uint16(len(m.Questions))
+	binary.BigEndian.PutUint16(bufferUint16, m.Header.QDCount)
+	marshalledData = append(marshalledData, bufferUint16...)
 
 	// ANCOUNT - An unsigned 16-bit integer specifying the number of resource records in the answer section.
-	m.ANCount = uint16(len(m.Answers))
-	binary.BigEndian.PutUint16(bufferUint16, m.ANCount)
-	packet = append(packet, bufferUint16...)
+	m.Header.ANCount = uint16(len(m.Answers))
+	binary.BigEndian.PutUint16(bufferUint16, m.Header.ANCount)
+	marshalledData = append(marshalledData, bufferUint16...)
 
 	// NSCOUNT - An unsigned 16-bit integer specifying the number of name server resource records in the authority records section.
-	m.NSCount = uint16(len(m.Authority))
-	binary.BigEndian.PutUint16(bufferUint16, m.NSCount)
-	packet = append(packet, bufferUint16...)
+	m.Header.NSCount = uint16(len(m.Authority))
+	binary.BigEndian.PutUint16(bufferUint16, m.Header.NSCount)
+	marshalledData = append(marshalledData, bufferUint16...)
 
 	// ARCOUNT - An unsigned 16-bit integer specifying the number of resource records in the additional records section.
-	m.ARCount = uint16(len(m.Additional))
-	binary.BigEndian.PutUint16(bufferUint16, m.ARCount)
-	packet = append(packet, bufferUint16...)
+	m.Header.ARCount = uint16(len(m.Additional))
+	binary.BigEndian.PutUint16(bufferUint16, m.Header.ARCount)
+	marshalledData = append(marshalledData, bufferUint16...)
 
 	// Encode questions
 	for _, q := range m.Questions {
-		questionBuf, err := EncodeQuestion(q)
+		questionBuf, err := q.Marshal()
 		if err != nil {
 			return nil, fmt.Errorf("encoding question: %w", err)
 		}
-		packet = append(packet, questionBuf...)
+		marshalledData = append(marshalledData, questionBuf...)
 	}
 
 	// Encode answers
 	for _, a := range m.Answers {
-		answerBuf, err := EncodeResourceRecord(a)
+		answerBuf, err := a.Marshal()
 		if err != nil {
 			return nil, fmt.Errorf("encoding answer: %w", err)
 		}
-		packet = append(packet, answerBuf...)
+		marshalledData = append(marshalledData, answerBuf...)
 	}
 
-	return packet, nil
+	// Encode authority
+	for _, a := range m.Authority {
+		authorityBuf, err := a.Marshal()
+		if err != nil {
+			return nil, fmt.Errorf("encoding authority: %w", err)
+		}
+		marshalledData = append(marshalledData, authorityBuf...)
+	}
+
+	// Encode additional
+	for _, a := range m.Additional {
+		additionalBuf, err := a.Marshal()
+		if err != nil {
+			return nil, fmt.Errorf("encoding additional: %w", err)
+		}
+		marshalledData = append(marshalledData, additionalBuf...)
+	}
+
+	return marshalledData, nil
 }
 
-// DecodeMessage decodes a byte slice into a Message struct. It expects the byte slice to be in the wire format
+// Unmarshal decodes a byte slice into the Message receiver. It expects the byte slice to be in the wire format
 // as specified by the LLMNR protocol. The function first checks if the provided data is at least as long as the
 // LLMNR header. It then proceeds to decode the header fields, followed by the question and answer sections.
 //
@@ -356,53 +362,63 @@ func (m *Message) Encode() ([]byte, error) {
 // - data: A byte slice containing the LLMNR message in wire format.
 //
 // Returns:
-//   - A pointer to a Message struct containing the decoded data.
+//   - The number of bytes read from data.
 //   - An error if the decoding fails at any point, such as if the data is too short or if there is an error
 //     decoding the question or answer sections.
-func DecodeMessage(data []byte) (*Message, error) {
-	if len(data) < HeaderSize {
-		return nil, fmt.Errorf("message too short")
+func (m *Message) Unmarshal(data []byte) (int, error) {
+	if len(data) < header.HeaderSize {
+		return 0, fmt.Errorf("message too short")
 	}
 
-	msg := &Message{}
-
-	// Decode header
-	msg.ID = binary.BigEndian.Uint16(data[0:])
-
-	msg.Flags = binary.BigEndian.Uint16(data[2:])
-
-	msg.QDCount = binary.BigEndian.Uint16(data[4:])
-
-	msg.ANCount = binary.BigEndian.Uint16(data[6:])
-
-	msg.NSCount = binary.BigEndian.Uint16(data[8:])
-
-	msg.ARCount = binary.BigEndian.Uint16(data[10:])
-
-	offset := HeaderSize
+	// Unmarshal header
+	bytesRead := 0
+	bytesReadHeader, err := m.Header.Unmarshal(data[bytesRead : bytesRead+header.HeaderSize])
+	if err != nil {
+		return 0, fmt.Errorf("error unmarshalling header: %w", err)
+	}
+	bytesRead += bytesReadHeader
 
 	// Decode questions
-	var err error
-	for i := uint16(0); i < msg.QDCount; i++ {
-		var q Question
-		q, offset, err = DecodeQuestion(data, offset)
+	for i := uint16(0); i < m.Header.QDCount; i++ {
+		q := question.Question{}
+		bytesRead, err = q.Unmarshal(data[bytesRead:])
 		if err != nil {
-			return nil, fmt.Errorf("decoding question: %w", err)
+			return 0, fmt.Errorf("error unmarshalling question: %w", err)
 		}
-		msg.Questions = append(msg.Questions, q)
+		m.Questions = append(m.Questions, q)
 	}
 
 	// Decode answers
-	for i := uint16(0); i < msg.ANCount; i++ {
-		var rr ResourceRecord
-		rr, offset, err = DecodeResourceRecord(data, offset)
+	for i := uint16(0); i < m.Header.ANCount; i++ {
+		rr := resourcerecord.ResourceRecord{}
+		bytesRead, err = rr.Unmarshal(data[bytesRead:])
 		if err != nil {
-			return nil, fmt.Errorf("decoding answer: %w", err)
+			return 0, fmt.Errorf("error unmarshalling answer: %w", err)
 		}
-		msg.Answers = append(msg.Answers, rr)
+		m.Answers = append(m.Answers, rr)
 	}
 
-	return msg, nil
+	// Decode authority
+	for i := uint16(0); i < m.Header.NSCount; i++ {
+		rr := resourcerecord.ResourceRecord{}
+		bytesRead, err = rr.Unmarshal(data[bytesRead:])
+		if err != nil {
+			return 0, fmt.Errorf("error unmarshalling authority: %w", err)
+		}
+		m.Authority = append(m.Authority, rr)
+	}
+
+	// Decode additional
+	for i := uint16(0); i < m.Header.ARCount; i++ {
+		rr := resourcerecord.ResourceRecord{}
+		bytesRead, err = rr.Unmarshal(data[bytesRead:])
+		if err != nil {
+			return 0, fmt.Errorf("error unmarshalling additional: %w", err)
+		}
+		m.Additional = append(m.Additional, rr)
+	}
+
+	return bytesRead, nil
 }
 
 // IsQuery returns true if the message is a query.
@@ -414,7 +430,7 @@ func DecodeMessage(data []byte) (*Message, error) {
 // Returns:
 //   - A boolean value indicating whether the message is a query (true) or not (false).
 func (m *Message) IsQuery() bool {
-	return (m.Flags & FlagQR) == 0
+	return m.Header.Flags.IsQuery()
 }
 
 // IsResponse returns true if the message is a response.
@@ -426,7 +442,7 @@ func (m *Message) IsQuery() bool {
 // Returns:
 //   - A boolean value indicating whether the message is a response (true) or not (false).
 func (m *Message) IsResponse() bool {
-	return (m.Flags & FlagQR) != 0
+	return m.Header.Flags.IsResponse()
 }
 
 // SetQuery marks the message as a query.
@@ -443,7 +459,7 @@ func (m *Message) IsResponse() bool {
 // Returns:
 //   - Nothing. This function modifies the message in place.
 func (m *Message) SetQuery() {
-	m.Flags &^= FlagQR
+	m.Header.Flags &^= header.FlagQR
 }
 
 // SetResponse marks the message as a response.
@@ -460,7 +476,7 @@ func (m *Message) SetQuery() {
 // Returns:
 //   - Nothing. This function modifies the message in place.
 func (m *Message) SetResponse() {
-	m.Flags |= FlagQR
+	m.Header.Flags |= header.FlagQR
 }
 
 // Describe prints a detailed description of the Message structure.
@@ -470,53 +486,28 @@ func (m *Message) SetResponse() {
 func (m *Message) Describe(indent int) {
 	indentPrompt := strings.Repeat(" │ ", indent)
 
-	fmt.Printf("%s<LLMNR Message>\n", indentPrompt)
-	fmt.Printf("%s │ \x1b[93mID\x1b[0m: 0x%04x (%d)\n", indentPrompt, m.ID, m.ID)
+	fmt.Printf("%s<Message>\n", indentPrompt)
+	m.Header.Describe(indent + 1)
 
-	flags := []string{}
-	if (m.Flags & FlagQR) != 0 {
-		flags = append(flags, "QR")
+	fmt.Printf("%s │ \x1b[93mQuestions\x1b[0m (%d):\n", indentPrompt, len(m.Questions))
+	for _, q := range m.Questions {
+		q.Describe(indent + 1)
 	}
-	if (m.Flags & FlagOP) != 0 {
-		flags = append(flags, "OP")
+
+	fmt.Printf("%s │ \x1b[93mAnswers\x1b[0m (%d):\n", indentPrompt, len(m.Answers))
+	for _, a := range m.Answers {
+		a.Describe(indent + 1)
 	}
-	if (m.Flags & FlagC) != 0 {
-		flags = append(flags, "C")
+
+	fmt.Printf("%s │ \x1b[93mAuthority\x1b[0m (%d):\n", indentPrompt, len(m.Authority))
+	for _, a := range m.Authority {
+		a.Describe(indent + 1)
 	}
-	if (m.Flags & FlagTC) != 0 {
-		flags = append(flags, "TC")
+
+	fmt.Printf("%s │ \x1b[93mAdditional\x1b[0m (%d):\n", indentPrompt, len(m.Additional))
+	for _, a := range m.Additional {
+		a.Describe(indent + 1)
 	}
-	if (m.Flags & FlagT) != 0 {
-		flags = append(flags, "T")
-	}
-	fmt.Printf("%s │ \x1b[93mFlags\x1b[0m: 0x%04x (%s)\n", indentPrompt, m.Flags, strings.Join(flags, "|"))
-	fmt.Printf("%s │ \x1b[93mQDCount\x1b[0m: %d\n", indentPrompt, m.QDCount)
-	fmt.Printf("%s │ \x1b[93mANCount\x1b[0m: %d\n", indentPrompt, m.ANCount)
-	fmt.Printf("%s │ \x1b[93mNSCount\x1b[0m: %d\n", indentPrompt, m.NSCount)
-	fmt.Printf("%s │ \x1b[93mARCount\x1b[0m: %d\n", indentPrompt, m.ARCount)
-	if len(m.Questions) > 0 {
-		fmt.Printf("%s │ \x1b[93mQuestions\x1b[0m (%d):\n", indentPrompt, len(m.Questions))
-		for _, q := range m.Questions {
-			q.Describe(indent + 1)
-		}
-	}
-	if len(m.Answers) > 0 {
-		fmt.Printf("%s │ \x1b[93mAnswers\x1b[0m (%d):\n", indentPrompt, len(m.Answers))
-		for _, a := range m.Answers {
-			a.Describe(indent + 1)
-		}
-	}
-	if len(m.Authority) > 0 {
-		fmt.Printf("%s │ \x1b[93mAuthority\x1b[0m (%d):\n", indentPrompt, len(m.Authority))
-		for _, a := range m.Authority {
-			a.Describe(indent + 1)
-		}
-	}
-	if len(m.Additional) > 0 {
-		fmt.Printf("%s │ \x1b[93mAdditional\x1b[0m (%d):\n", indentPrompt, len(m.Additional))
-		for _, a := range m.Additional {
-			a.Describe(indent + 1)
-		}
-	}
+
 	fmt.Printf("%s └───\n", indentPrompt)
 }

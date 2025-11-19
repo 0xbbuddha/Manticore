@@ -1,13 +1,15 @@
-package llmnr
+package server
 
 import (
 	"fmt"
 	"net"
+
+	"github.com/TheManticoreProject/Manticore/network/llmnr/message"
 )
 
 // ResponseWriter interface is used by an LLMNR handler to construct a response
 type ResponseWriter interface {
-	WriteMessage(*Message) error
+	WriteMessage(*message.Message) error
 	GetRemoteAddr() net.Addr
 }
 
@@ -44,14 +46,14 @@ func NewResponseWriter(server *Server, remoteAddr net.Addr) ResponseWriter {
 // - An error if the message is nil, if encoding the message fails, or if sending the message fails.
 //
 // The function sets the message as a response, encodes it, and sends it to the remote address using the server's UDP connection.
-func (w *responseWriter) WriteMessage(msg *Message) error {
+func (w *responseWriter) WriteMessage(msg *message.Message) error {
 	if msg == nil {
 		return fmt.Errorf("message cannot be nil")
 	}
 
 	msg.SetResponse()
 
-	encoded, err := msg.Encode()
+	encoded, err := msg.Marshal()
 	if err != nil {
 		return fmt.Errorf("failed to encode message: %w", err)
 	}

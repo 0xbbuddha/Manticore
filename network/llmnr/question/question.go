@@ -1,9 +1,12 @@
-package llmnr
+package question
 
 import (
-	"encoding/binary"
 	"fmt"
 	"strings"
+
+	"github.com/TheManticoreProject/Manticore/network/llmnr/class"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/domain_name"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/llmnr_type"
 )
 
 // Question represents a question in an LLMNR message.
@@ -21,9 +24,9 @@ import (
 // being asked in the message. Each question is encoded and decoded using the EncodeQuestion and DecodeQuestion
 // functions, respectively.
 type Question struct {
-	Name  string `json:"name"`
-	Type  uint16 `json:"type"`
-	Class uint16 `json:"class"`
+	Name  domain_name.DomainName `json:"name"`
+	Type  llmnr_type.Type        `json:"type"`
+	Class class.Class            `json:"class"`
 }
 
 // EncodeQuestion encodes a Question struct into a byte slice.
@@ -49,69 +52,86 @@ type Question struct {
 //
 // The function returns the updated byte slice with the encoded question appended to it, or an error
 // if the domain name encoding fails.
-func EncodeQuestion(q Question) ([]byte, error) {
+func (q *Question) Marshal() ([]byte, error) {
 	buf := []byte{}
 
-	nameBuf, err := EncodeDomainName(q.Name)
+	// Marshal domain name
+	nameBuf, err := q.Name.Marshal()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error marshalling domain name: %w", err)
 	}
 	buf = append(buf, nameBuf...)
 
-	bufferUint16 := make([]byte, 2)
-	binary.BigEndian.PutUint16(bufferUint16, q.Type)
-	buf = append(buf, bufferUint16...)
+	// Marshal type
+	typeBuf, err := q.Type.Marshal()
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling type: %w", err)
+	}
+	buf = append(buf, typeBuf...)
 
-	binary.BigEndian.PutUint16(bufferUint16, q.Class)
-	buf = append(buf, bufferUint16...)
+	// Marshal class
+	classBuf, err := q.Class.Marshal()
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling class: %w", err)
+	}
+	buf = append(buf, classBuf...)
 
 	return buf, nil
 }
 
-// DecodeQuestion decodes a byte slice into a Question struct.
+// Unmarshal decodes a byte slice into the receiver Question struct.
 //
-// This function takes a byte slice and an offset, and decodes the data starting from the offset
-// into a Question struct. The domain name is decoded first, followed by the type and class fields.
-// The function ensures that the data is not truncated and returns an error if any part of the
-// decoding process fails.
+// This method takes a byte slice (starting at offset 0) and decodes its wire format
+// representation into the Question struct fields. It decodes the domain name first,
+// followed by the type and class fields. It returns the number of bytes read and an error
+// if any part of the decoding process fails.
 //
 // Parameters:
 // - data: A byte slice containing the encoded question in wire format.
-// - offset: The starting position in the byte slice from which to begin decoding.
 //
 // Returns:
-//   - A Question struct containing the decoded data.
-//   - An integer representing the new offset after decoding.
+//   - An integer representing the number of bytes read from data.
 //   - An error if the decoding fails at any point, such as if the data is truncated or if there is an error
 //     decoding the domain name.
 //
 // Usage:
 //
-//	question, newOffset, err := DecodeQuestion(data, offset)
+//	var q Question
+//	n, err := q.Unmarshal(data)
 //	if err != nil {
 //	    // handle error
 //	}
-//
-// The function returns the decoded Question struct, the new offset, and an error if any.
-func DecodeQuestion(data []byte, offset int) (Question, int, error) {
-	var q Question
-	var err error
+func (q *Question) Unmarshal(data []byte) (int, error) {
+	bytesRead := 0
 
-	q.Name, offset, err = DecodeDomainName(data, offset)
+	// Unmarshal domain name
+	bytesReadDomainName, err := q.Name.Unmarshal(data[bytesRead:])
 	if err != nil {
-		return Question{}, offset, err
+		return 0, fmt.Errorf("error unmarshalling domain name: %w", err)
 	}
+	bytesRead += bytesReadDomainName
 
-	if offset+4 > len(data) {
-		return Question{}, offset, fmt.Errorf("truncated question")
+	// Unmarshal type
+	if bytesRead+2 > len(data) {
+		return 0, fmt.Errorf("truncated question, missing type")
 	}
+	bytesReadType, err := q.Type.Unmarshal(data[bytesRead : bytesRead+2])
+	if err != nil {
+		return 0, fmt.Errorf("error unmarshalling type: %w", err)
+	}
+	bytesRead += bytesReadType
 
-	q.Type = binary.BigEndian.Uint16(data[offset:])
-	offset += 2
-	q.Class = binary.BigEndian.Uint16(data[offset:])
-	offset += 2
+	// Unmarshal class
+	if bytesRead+2 > len(data) {
+		return 0, fmt.Errorf("truncated question, missing class")
+	}
+	bytesReadClass, err := q.Class.Unmarshal(data[bytesRead : bytesRead+2])
+	if err != nil {
+		return 0, fmt.Errorf("error unmarshalling class: %w", err)
+	}
+	bytesRead += bytesReadClass
 
-	return q, offset, nil
+	return bytesRead, nil
 }
 
 // Describe prints a detailed description of the Question.
@@ -122,7 +142,7 @@ func (q *Question) Describe(indent int) {
 	indentPrompt := strings.Repeat(" │ ", indent)
 	fmt.Printf("%s<Question>\n", indentPrompt)
 	fmt.Printf("%s │ \x1b[93mName\x1b[0m: %s\n", indentPrompt, q.Name)
-	fmt.Printf("%s │ \x1b[93mType\x1b[0m: %s (0x%04x)\n", indentPrompt, TypeToString(q.Type), q.Type)
-	fmt.Printf("%s │ \x1b[93mClass\x1b[0m: %s (0x%04x)\n", indentPrompt, ClassToString(q.Class), q.Class)
+	fmt.Printf("%s │ \x1b[93mType\x1b[0m: %s (0x%04x)\n", indentPrompt, q.Type.String(), q.Type)
+	fmt.Printf("%s │ \x1b[93mClass\x1b[0m: %s (0x%04x)\n", indentPrompt, q.Class.String(), q.Class)
 	fmt.Printf("%s └───\n", indentPrompt)
 }

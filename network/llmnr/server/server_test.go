@@ -1,4 +1,4 @@
-package llmnr_test
+package server_test
 
 import (
 	"fmt"
@@ -8,11 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TheManticoreProject/Manticore/network/llmnr"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/constants"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/message"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/server"
 )
 
 func TestNewIPv4Server(t *testing.T) {
-	server, err := llmnr.NewIPv4Server()
+	server, err := server.NewIPv4Server()
 	if err != nil {
 		t.Fatalf("Failed to create new IPv4 server: %v", err)
 	}
@@ -24,7 +26,7 @@ func TestNewIPv4Server(t *testing.T) {
 		t.Errorf("Expected network to be 'udp4', got %s", server.Network)
 	}
 
-	listenAddr := fmt.Sprintf("%s:%d", llmnr.IPv4MulticastAddr, llmnr.LLMNRPort)
+	listenAddr := fmt.Sprintf("%s:%d", constants.IPv4MulticastAddr, constants.ListenPort)
 	if !strings.EqualFold(server.Address.String(), listenAddr) {
 		t.Errorf("Expected address to be %s, got %s", listenAddr, server.Address.String())
 	}
@@ -43,11 +45,15 @@ func TestNewIPv4Server(t *testing.T) {
 }
 
 func TestIPv4ServerStartAndStop(t *testing.T) {
-	emptyHandler := func(server *llmnr.Server, remoteAddr net.Addr, writer llmnr.ResponseWriter, message *llmnr.Message) bool {
+	emptyHandler := func(server *server.Server, remoteAddr net.Addr, writer server.ResponseWriter, message *message.Message) bool {
 		return true
 	}
 
-	server, err := llmnr.NewIPv4ServerWithHandlers([]llmnr.Handler{llmnr.HandlerFunc(emptyHandler)})
+	server, err := server.NewIPv4ServerWithHandlers(
+		[]server.Handler{
+			server.HandlerFunc(emptyHandler),
+		},
+	)
 	if err != nil {
 		t.Fatalf("Failed to create new IPv4 server: %v", err)
 	}
@@ -84,7 +90,7 @@ func TestIPv6NewServer(t *testing.T) {
 		// https://github.com/golang/go/issues/63529
 	}
 
-	server, err := llmnr.NewIPv6Server()
+	server, err := server.NewIPv6Server()
 	if err != nil {
 		t.Fatalf("Failed to create new IPv6 server: %v", err)
 	}
@@ -96,7 +102,7 @@ func TestIPv6NewServer(t *testing.T) {
 		t.Errorf("Expected network to be 'udp6', got %s", server.Network)
 	}
 
-	listenAddr := fmt.Sprintf("[%s]:%d", llmnr.IPv6MulticastAddr, llmnr.LLMNRPort)
+	listenAddr := fmt.Sprintf("[%s]:%d", constants.IPv6MulticastAddr, constants.ListenPort)
 	if !strings.EqualFold(server.Address.String(), listenAddr) {
 		t.Errorf("Expected address to be %s, got %s", listenAddr, server.Address.String())
 	}
@@ -121,11 +127,15 @@ func TestIPv6ServerStartAndStop(t *testing.T) {
 		// https://github.com/golang/go/issues/63529
 	}
 
-	emptyHandler := func(server *llmnr.Server, remoteAddr net.Addr, writer llmnr.ResponseWriter, message *llmnr.Message) bool {
+	emptyHandler := func(server *server.Server, remoteAddr net.Addr, writer server.ResponseWriter, message *message.Message) bool {
 		return true
 	}
 
-	server, err := llmnr.NewIPv6ServerWithHandlers([]llmnr.Handler{llmnr.HandlerFunc(emptyHandler)})
+	server, err := server.NewIPv6ServerWithHandlers(
+		[]server.Handler{
+			server.HandlerFunc(emptyHandler),
+		},
+	)
 	if err != nil {
 		t.Fatalf("Failed to create new IPv6 server: %v", err)
 	}

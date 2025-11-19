@@ -1,14 +1,18 @@
-package llmnr
+package server
 
-import "net"
+import (
+	"net"
+
+	"github.com/TheManticoreProject/Manticore/network/llmnr/message"
+)
 
 // Handler defines the interface for processing LLMNR queries
 type Handler interface {
-	Run(server *Server, remoteAddr net.Addr, writer ResponseWriter, message *Message) bool
+	Run(server *Server, remoteAddr net.Addr, writer ResponseWriter, message *message.Message) bool
 }
 
 // HandlerFunc is an adapter to allow regular functions to serve as LLMNR handlers
-type HandlerFunc func(*Server, net.Addr, ResponseWriter, *Message) bool
+type HandlerFunc func(*Server, net.Addr, ResponseWriter, *message.Message) bool
 
 // Run executes the handler function to process an LLMNR query.
 //
@@ -23,18 +27,18 @@ type HandlerFunc func(*Server, net.Addr, ResponseWriter, *Message) bool
 //
 // Example usage:
 //
-//	handlerFunc := func(w llmnr.ResponseWriter, r *llmnr.Message) {
+//	handlerFunc := func(w ResponseWriter, r *message.Message) {
 //	    // Process the LLMNR query and write a response
 //	}
-//	handler := llmnr.HandlerFunc(handlerFunc)
-//	server.RegisterHandler(handler)
+//	handler := HandlerFunc(handlerFunc)
+//	RegisterHandler(handler)
 //
 // This function is typically called internally by the Server when a new LLMNR query is received.
-func (f HandlerFunc) Run(server *Server, remoteAddr net.Addr, writer ResponseWriter, message *Message) bool {
+func (f HandlerFunc) Run(server *Server, remoteAddr net.Addr, writer ResponseWriter, message *message.Message) bool {
 	return f(server, remoteAddr, writer, message)
 }
 
-// RegisterHandler registers a new handler to the LLMNR server.
+// RegisterHandler registers a new handler to the LLMNR
 //
 // Parameters:
 // - handler: The Handler to be registered. It must implement the Handler interface.
@@ -46,7 +50,7 @@ func (f HandlerFunc) Run(server *Server, remoteAddr net.Addr, writer ResponseWri
 // Example usage:
 //
 //	handler := &MyHandler{}
-//	server.RegisterHandler(handler)
+//	RegisterHandler(handler)
 //
 // This function is typically called before starting the server to ensure that all necessary
 // handlers are in place to process incoming queries.
