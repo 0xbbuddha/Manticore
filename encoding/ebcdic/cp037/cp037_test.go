@@ -8,7 +8,7 @@ import (
 )
 
 func TestCp037ToAsciiMap(t *testing.T) {
-	result := cp037.EbcdicCp037ToAscii(ascii.ASCIICharset[:])
+	result := cp037.EbcdicCp037ToAscii(ascii.AsciiCharset[:])
 	if len(result) != len(cp037.EbcdicCp037ToAsciiMap[:]) {
 		t.Fatalf("Result length mismatch, got %d expected %d", len(result), len(cp037.EbcdicCp037ToAsciiMap[:]))
 	}
