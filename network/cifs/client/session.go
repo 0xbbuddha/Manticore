@@ -10,7 +10,7 @@ import (
 	"github.com/TheManticoreProject/Manticore/network/cifs/message/header/flags"
 	"github.com/TheManticoreProject/Manticore/network/cifs/message/header/flags2"
 	"github.com/TheManticoreProject/Manticore/network/cifs/types"
-	"github.com/TheManticoreProject/Manticore/utils/encoding/utf16"
+	"github.com/TheManticoreProject/Manticore/encoding/utf16"
 )
 
 // Session represents an established session between the client and server

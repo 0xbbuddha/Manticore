@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/TheManticoreProject/Manticore/crypto/pkcs7"
-	"github.com/TheManticoreProject/Manticore/utils/encoding/utf16"
+	"github.com/TheManticoreProject/Manticore/encoding/utf16"
 )
 
 // AES Key as per the Microsoft documentation

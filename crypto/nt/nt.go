@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/TheManticoreProject/Manticore/crypto/md4"
-	"github.com/TheManticoreProject/Manticore/utils/encoding/utf16"
+	"github.com/TheManticoreProject/Manticore/encoding/utf16"
 )
 
 // NTHash computes the NT hash of a password string

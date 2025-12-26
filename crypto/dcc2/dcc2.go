@@ -8,7 +8,7 @@ import (
 
 	"github.com/TheManticoreProject/Manticore/crypto/md4"
 	"github.com/TheManticoreProject/Manticore/crypto/nt"
-	"github.com/TheManticoreProject/Manticore/utils/encoding/utf16"
+	"github.com/TheManticoreProject/Manticore/encoding/utf16"
 	"golang.org/x/crypto/pbkdf2"
 )
 
