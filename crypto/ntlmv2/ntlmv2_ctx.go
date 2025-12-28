@@ -9,7 +9,7 @@ import (
 
 	"github.com/TheManticoreProject/Manticore/crypto/lm"
 	"github.com/TheManticoreProject/Manticore/crypto/nt"
-	"github.com/TheManticoreProject/Manticore/utils/encoding/utf16"
+	"github.com/TheManticoreProject/Manticore/encoding/utf16"
 )
 
 // NTLMv2 represents the components needed for NTLMv2 authentication

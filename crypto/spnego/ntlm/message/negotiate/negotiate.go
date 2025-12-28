@@ -10,7 +10,7 @@ import (
 	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/negotiate/flags"
 	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/types"
 	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/version"
-	"github.com/TheManticoreProject/Manticore/utils/encoding/utf16"
+	"github.com/TheManticoreProject/Manticore/encoding/utf16"
 )
 
 // NegotiateMessage is the first message in NTLM authentication

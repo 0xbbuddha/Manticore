@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/TheManticoreProject/Manticore/network/smb/smb_v10/types"
-	"github.com/TheManticoreProject/Manticore/utils/encoding/utf16"
+	"github.com/TheManticoreProject/Manticore/encoding/utf16"
 )
 
 func TestSMB_STRING_Marshal(t *testing.T) {
