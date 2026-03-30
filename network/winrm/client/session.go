@@ -12,11 +12,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TheManticoreProject/Manticore/crypto/ntlmv2"
 	ntlm_authenticate "github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/authenticate"
 	ntlm_challenge "github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/challenge"
 	ntlm_negotiate "github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/negotiate"
 	ntlm_flags "github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/negotiate/flags"
-	"github.com/TheManticoreProject/Manticore/crypto/nt"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/targetinfo"
 	"github.com/TheManticoreProject/Manticore/encoding/utf16"
 	"github.com/TheManticoreProject/Manticore/windows/credentials"
 )
@@ -459,71 +460,36 @@ func (s *Session) buildNTLMv2AuthBytes(negotiate_bytes, challenge_bytes []byte, 
 	password := s.Credentials.Password
 	domain := s.Credentials.Domain
 
-	// ResponseKeyNT = HMAC-MD5(NTHash, UTF16-LE(upper(username) + upper(domain)))
-	nt_hash := nt.NTHash(password)
-	response_key_nt_mac := hmac.New(md5.New, nt_hash[:])
-	response_key_nt_mac.Write(utf16.EncodeUTF16LE(strings.ToUpper(username) + strings.ToUpper(domain)))
-	response_key_nt := response_key_nt_mac.Sum(nil)
-
 	// Client challenge: 8 random bytes.
-	client_challenge := make([]byte, 8)
-	if _, err := rand.Read(client_challenge); err != nil {
+	var client_challenge_arr [8]byte
+	if _, err := rand.Read(client_challenge_arr[:]); err != nil {
 		return nil, nil, fmt.Errorf("failed to generate client challenge: %v", err)
+	}
+
+	ctx, err := ntlmv2.NewNTLMv2CtxWithPassword(domain, username, password, challenge_msg.ServerChallenge, client_challenge_arr)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create NTLMv2 context: %v", err)
 	}
 
 	// Use the server's MsvAvTimestamp when present (MS-NLMP 3.1.5.1.2), otherwise use
 	// the current Windows FILETIME (100-ns intervals since Jan 1, 1601).
-	timestamp := ntlmTargetInfoGetAvValue(challenge_msg.TargetInfo, 0x0007)
+	needs_mic := targetinfo.HasTimestamp(challenge_msg.TargetInfo)
+	timestamp := targetinfo.GetTimestamp(challenge_msg.TargetInfo)
 	if len(timestamp) != 8 {
 		windows_filetime := (uint64(time.Now().Unix()) + 116444736000) * 10000000
 		timestamp = make([]byte, 8)
 		binary.LittleEndian.PutUint64(timestamp, windows_filetime)
 	}
 
-	// Build the effective TargetInfo for the blob: copy the challenge TargetInfo then
-	// add MsvAvFlags=0x0002 (MIC present, MS-NLMP 2.2.2.1 bit 1).
-	// The addition is inserted before the EOL marker.
-	needs_mic := ntlmTargetInfoHasAvId(challenge_msg.TargetInfo, 0x0007)
-	effective_target_info := ntlmBuildBlobTargetInfo(challenge_msg.TargetInfo, needs_mic)
+	effective_target_info := targetinfo.BuildBlobTargetInfo(challenge_msg.TargetInfo, needs_mic)
 
-	// NTLMv2 blob (temp):
-	//   RespType(1) | HiRespType(1) | Reserved(2) | Reserved(4) | Timestamp(8) | ClientChallenge(8) | Reserved(4) | TargetInfo(var) | Reserved(4)
-	blob := make([]byte, 0, 28+len(effective_target_info))
-	blob = append(blob, 0x01, 0x01)             // RespType, HiRespType
-	blob = append(blob, 0x00, 0x00)             // Reserved1
-	blob = append(blob, 0x00, 0x00, 0x00, 0x00) // Reserved2
-	blob = append(blob, timestamp...)           // Timestamp (server's MsvAvTimestamp or current time)
-	blob = append(blob, client_challenge...)    // ClientChallenge
-	blob = append(blob, 0x00, 0x00, 0x00, 0x00) // Reserved3
-	blob = append(blob, effective_target_info...) // TargetInfo (with MsvAvFlags)
-	blob = append(blob, 0x00, 0x00, 0x00, 0x00) // Reserved4
-
-	// NTProofStr = HMAC-MD5(ResponseKeyNT, ServerChallenge || blob)
-	proof_mac := hmac.New(md5.New, response_key_nt)
-	proof_mac.Write(challenge_msg.ServerChallenge[:])
-	proof_mac.Write(blob)
-	nt_proof_str := proof_mac.Sum(nil)
-
-	// NTChallengeResponse = NTProofStr || blob
-	nt_challenge_response := append(nt_proof_str, blob...)
-
-	// LmChallengeResponse: per MS-NLMP 3.1.5.1.2, when MsvAvTimestamp is present the
-	// LmChallengeResponse MUST be set to Z(24) (24 zero bytes). Only compute the real
-	// HMAC when MsvAvTimestamp is absent (no MIC scenario).
-	var lm_challenge_response []byte
-	if needs_mic {
-		lm_challenge_response = make([]byte, 24)
-	} else {
-		lm_mac := hmac.New(md5.New, response_key_nt)
-		lm_mac.Write(challenge_msg.ServerChallenge[:])
-		lm_mac.Write(client_challenge)
-		lm_challenge_response = append(lm_mac.Sum(nil), client_challenge...)
+	nt_challenge_response, nt_proof_str, err := ctx.ComputeNTChallengeResponse(timestamp, effective_target_info)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to compute NTChallengeResponse: %v", err)
 	}
 
-	// SessionBaseKey = HMAC-MD5(ResponseKeyNT, NTProofStr)
-	session_key_mac := hmac.New(md5.New, response_key_nt)
-	session_key_mac.Write(nt_proof_str)
-	session_base_key := session_key_mac.Sum(nil)
+	lm_challenge_response := ctx.ComputeLMChallengeResponse(needs_mic)
+	session_base_key := ctx.ComputeSessionBaseKey(nt_proof_str)
 
 	// KEY_EXCH: generate a random session key, RC4-encrypt it with SessionBaseKey.
 	// ExportedSessionKey = RandomSessionKey (the decrypted form of EncryptedRandomSessionKey).
@@ -591,107 +557,3 @@ func (s *Session) buildNTLMv2AuthBytes(negotiate_bytes, challenge_bytes []byte, 
 	return auth_bytes, exported_session_key, nil
 }
 
-// ntlmTargetInfoGetAvValue returns the value bytes for the first AVPair with the given AvId,
-// or nil if not found.
-//
-// Parameters:
-//   - target_info ([]byte): The raw TargetInfo bytes from the NTLM CHALLENGE_MESSAGE.
-//   - av_id (uint16): The AvId to look up.
-//
-// Returns:
-//   - []byte: The value bytes, or nil if the AvId is not present.
-func ntlmTargetInfoGetAvValue(target_info []byte, av_id uint16) []byte {
-	i := 0
-	for i+4 <= len(target_info) {
-		current_id := uint16(target_info[i]) | uint16(target_info[i+1])<<8
-		av_len := uint16(target_info[i+2]) | uint16(target_info[i+3])<<8
-		if current_id == av_id {
-			if i+4+int(av_len) > len(target_info) {
-				return nil
-			}
-			return target_info[i+4 : i+4+int(av_len)]
-		}
-		if current_id == 0x0000 {
-			break
-		}
-		i += 4 + int(av_len)
-	}
-	return nil
-}
-
-// ntlmBuildBlobTargetInfo constructs the TargetInfo to embed in the NTLMv2 blob.
-//
-// It copies all AVPairs from the challenge TargetInfo, then inserts before the EOL:
-//   - MsvAvFlags (AvId=0x0006) = 0x00000002 when needs_mic is true, else 0x00000000.
-//
-// Parameters:
-//   - target_info ([]byte): The TargetInfo bytes from the NTLM CHALLENGE_MESSAGE.
-//   - needs_mic (bool): Whether to set the MIC-present bit in MsvAvFlags.
-//
-// Returns:
-//   - []byte: The new TargetInfo for the blob.
-func ntlmBuildBlobTargetInfo(target_info []byte, needs_mic bool) []byte {
-	result := make([]byte, 0, len(target_info)+8)
-
-	i := 0
-	for i+4 <= len(target_info) {
-		current_id := uint16(target_info[i]) | uint16(target_info[i+1])<<8
-		av_len := uint16(target_info[i+2]) | uint16(target_info[i+3])<<8
-
-		if current_id == 0x0000 {
-			// Insert MsvAvFlags before EOL.
-			av_flags := uint32(0)
-			if needs_mic {
-				av_flags = 0x00000002
-			}
-			result = append(result, 0x06, 0x00, 0x04, 0x00)
-			flag_bytes := make([]byte, 4)
-			binary.LittleEndian.PutUint32(flag_bytes, av_flags)
-			result = append(result, flag_bytes...)
-			result = append(result, target_info[i:i+4]...)
-			break
-		}
-
-		if current_id == 0x0006 {
-			// Replace existing MsvAvFlags with our value.
-			av_flags := uint32(0)
-			if needs_mic {
-				av_flags = 0x00000002
-			}
-			result = append(result, 0x06, 0x00, 0x04, 0x00)
-			flag_bytes := make([]byte, 4)
-			binary.LittleEndian.PutUint32(flag_bytes, av_flags)
-			result = append(result, flag_bytes...)
-		} else {
-			result = append(result, target_info[i:i+4+int(av_len)]...)
-		}
-
-		i += 4 + int(av_len)
-	}
-
-	return result
-}
-
-// ntlmTargetInfoHasAvId reports whether a TargetInfo AVPair list contains the given AvId.
-//
-// Parameters:
-//   - target_info ([]byte): The raw TargetInfo bytes from the NTLM CHALLENGE_MESSAGE.
-//   - av_id (uint16): The AvId to search for (e.g. 0x0007 = MsvAvTimestamp).
-//
-// Returns:
-//   - bool: True if the AvId is present, false otherwise.
-func ntlmTargetInfoHasAvId(target_info []byte, av_id uint16) bool {
-	i := 0
-	for i+4 <= len(target_info) {
-		current_id := uint16(target_info[i]) | uint16(target_info[i+1])<<8
-		av_len := uint16(target_info[i+2]) | uint16(target_info[i+3])<<8
-		if current_id == av_id {
-			return true
-		}
-		if current_id == 0x0000 {
-			break
-		}
-		i += 4 + int(av_len)
-	}
-	return false
-}
