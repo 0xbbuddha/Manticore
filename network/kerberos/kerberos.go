@@ -1,3 +1,6 @@
+// Package kerberos provides Kerberos authentication primitives for Active Directory.
+// It includes a native client (KerberosClient), ASREPRoast, and a gokrb5-backed
+// helper (KerberosInit) used for LDAP GSSAPI binds.
 package kerberos
 
 import (
@@ -8,49 +11,53 @@ import (
 	"github.com/jcmturner/gokrb5/v8/config"
 )
 
-// KerberosInit initializes the Kerberos configuration and service principal name for LDAP authentication.
+// KerberosInit initialises a gokrb5 configuration and returns the LDAP service
+// principal name for the given host and realm.
+//
+// It is used by the LDAP session layer to perform GSSAPI Kerberos binds via
+// the gokrb5 library. The native KerberosClient does not depend on this function.
 //
 // Parameters:
-// - fqdnLDAPHost: A string representing the fully qualified domain name of the LDAP server.
-// - fqndRealm: A string representing the fully qualified domain name of the realm.
+//   - fqdnLDAPHost: Fully qualified domain name (or IP) of the KDC / LDAP server.
+//   - fqndRealm:    Kerberos realm (will be uppercased automatically).
 //
-// Returns:
-// - A string representing the service principal name for LDAP authentication.
-// - A pointer to the Kerberos configuration.
+// Returns the service principal name ("ldap/<fqdnLDAPHost>") and a ready-to-use
+// *config.Config.
 func KerberosInit(fqdnLDAPHost, fqndRealm string) (string, *config.Config) {
 	servicePrincipalName := fmt.Sprintf("ldap/%s", fqdnLDAPHost)
 
+	// Realm must always be upper-cased; a mismatch causes:
+	// "CRealm in response does not match what was requested"
 	fqndRealm = strings.ToUpper(fqndRealm)
-	// This is always in uppercase, if not we get the error:
-	// error performing GSSAPI bind: [Root cause: KRBMessage_Handling_Error]
-	// | KRBMessage_Handling_Error: AS Exchange Error: AS_REP is not valid or client password/keytab incorrect
-	// |  | KRBMessage_Handling_Error: CRealm in response does not match what was requested.
-	// |  |  | Requested: lab.local;
-	// |  |  | Reply: lab.local
-	// | 2024/10/08 15:36:16 error querying AD: LDAP Result Code 1 "Operations Error": 000004DC: LdapErr: DSID-0C090A5C,
-	// | comment: In order to perform this operation a successful bind must be completed on the connection., data 0, v4563
 
 	krb5Conf := config.New()
-	// LibDefaults
+
+	// [libdefaults]
 	krb5Conf.LibDefaults.AllowWeakCrypto = false
 	krb5Conf.LibDefaults.DefaultRealm = fqndRealm
 	krb5Conf.LibDefaults.DNSLookupRealm = false
 	krb5Conf.LibDefaults.DNSLookupKDC = false
-	krb5Conf.LibDefaults.TicketLifetime = time.Duration(24) * time.Hour
-	krb5Conf.LibDefaults.RenewLifetime = time.Duration(24*7) * time.Hour
+	krb5Conf.LibDefaults.TicketLifetime = 24 * time.Hour
+	krb5Conf.LibDefaults.RenewLifetime = 24 * 7 * time.Hour
 	krb5Conf.LibDefaults.Forwardable = true
 	krb5Conf.LibDefaults.Proxiable = true
 	krb5Conf.LibDefaults.RDNS = false
-	krb5Conf.LibDefaults.UDPPreferenceLimit = 1 // Force use of tcp
-	krb5Conf.LibDefaults.DefaultTGSEnctypes = []string{"aes256-cts-hmac-sha1-96", "aes128-cts-hmac-sha1-96", "arcfour-hmac-md5"}
-	krb5Conf.LibDefaults.DefaultTktEnctypes = []string{"aes256-cts-hmac-sha1-96", "aes128-cts-hmac-sha1-96", "arcfour-hmac-md5"}
-	krb5Conf.LibDefaults.PermittedEnctypes = []string{"aes256-cts-hmac-sha1-96", "aes128-cts-hmac-sha1-96", "arcfour-hmac-md5"}
+	krb5Conf.LibDefaults.UDPPreferenceLimit = 1 // Force TCP
+	krb5Conf.LibDefaults.DefaultTGSEnctypes = []string{
+		"aes256-cts-hmac-sha1-96", "aes128-cts-hmac-sha1-96", "arcfour-hmac-md5",
+	}
+	krb5Conf.LibDefaults.DefaultTktEnctypes = []string{
+		"aes256-cts-hmac-sha1-96", "aes128-cts-hmac-sha1-96", "arcfour-hmac-md5",
+	}
+	krb5Conf.LibDefaults.PermittedEnctypes = []string{
+		"aes256-cts-hmac-sha1-96", "aes128-cts-hmac-sha1-96", "arcfour-hmac-md5",
+	}
 	krb5Conf.LibDefaults.PermittedEnctypeIDs = []int32{18, 17, 23}
 	krb5Conf.LibDefaults.DefaultTGSEnctypeIDs = []int32{18, 17, 23}
 	krb5Conf.LibDefaults.DefaultTktEnctypeIDs = []int32{18, 17, 23}
 	krb5Conf.LibDefaults.PreferredPreauthTypes = []int{18, 17, 23}
 
-	// Realms
+	// [realms]
 	krb5Conf.Realms = append(krb5Conf.Realms, config.Realm{
 		Realm:         fqndRealm,
 		AdminServer:   []string{fqdnLDAPHost},
@@ -60,7 +67,7 @@ func KerberosInit(fqdnLDAPHost, fqndRealm string) (string, *config.Config) {
 		MasterKDC:     []string{fqdnLDAPHost},
 	})
 
-	// Domain Realm
+	// [domain_realm]
 	krb5Conf.DomainRealm[strings.ToLower(fqndRealm)] = fqndRealm
 	krb5Conf.DomainRealm[fmt.Sprintf(".%s", strings.ToLower(fqndRealm))] = fqndRealm
 
