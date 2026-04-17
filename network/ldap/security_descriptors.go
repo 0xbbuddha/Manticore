@@ -84,6 +84,10 @@ func (s *Session) GetNtSecurityDescriptorOf(distinguishedName string) (string, e
 		return "", fmt.Errorf("error searching for nTSecurityDescriptor: %w", err)
 	}
 
+	if len(searchResult.Entries) == 0 {
+		return "", fmt.Errorf("no entry returned for %q; access may be denied", distinguishedName)
+	}
+
 	ntsd := searchResult.Entries[0].GetEqualFoldRawAttributeValue("nTSecurityDescriptor")
 
 	return string(ntsd), nil
