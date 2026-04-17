@@ -85,7 +85,7 @@ func TestComputeNTChallengeResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	timestamp := make([]byte, 8) // Z(8) for simplicity
+	timestamp := make([]byte, 8)                 // Z(8) for simplicity
 	targetInfo := []byte{0x00, 0x00, 0x00, 0x00} // minimal: just EOL
 
 	ntCR, ntProofStr, err := ctx.ComputeNTChallengeResponse(timestamp, targetInfo)
@@ -150,5 +150,60 @@ func TestComputeSessionBaseKey(t *testing.T) {
 	}
 	if bytes.Equal(key1, key2) {
 		t.Error("different NTProofStr should yield different SessionBaseKey")
+	}
+}
+
+// TestComputeResponse_MSNLMPSection4_2_4 is a known-answer test pinning the
+// low-level ComputeResponse primitive to the MS-NLMP §4.2.4 worked example
+// ("NTLMv2 Authentication"). Unlike the structural tests above, it compares
+// against the *published NTProofStr and LM MAC values* so that any regression
+// in the HMAC construction, blob layout, or LM response format will fail here
+// before reaching a live authentication attempt.
+//
+// Reference: MS-NLMP §4.2.4
+func TestComputeResponse_MSNLMPSection4_2_4(t *testing.T) {
+	// NTOWFv2(Password="Password", User="User", UserDomain="Domain")
+	responseKeyNT, _ := hex.DecodeString("0c868a403bfd7a93a3001ef22ef02e3f")
+	responseKeyLM := responseKeyNT
+
+	serverChallenge, _ := hex.DecodeString("0123456789abcdef")
+	clientChallenge, _ := hex.DecodeString("aaaaaaaaaaaaaaaa")
+
+	// TargetInfo from §4.2.4.1.3
+	serverName, _ := hex.DecodeString(
+		"02000c0044006f006d00610069006e00" +
+			"01000c00530065007200760065007200" +
+			"00000000",
+	)
+
+	// The spec fixes the timestamp to all zeros.
+	timestamp := make([]byte, 8)
+
+	ctx := &ntlmv2.NTLMv2Ctx{}
+	got, err := ctx.ComputeResponse(responseKeyNT, responseKeyLM, serverChallenge, clientChallenge, timestamp, serverName)
+	if err != nil {
+		t.Fatalf("ComputeResponse returned error: %v", err)
+	}
+
+	expected, _ := hex.DecodeString(
+		// NTProofStr (16 bytes)
+		"68cd0ab851e51c96aabc927bebef6a1c" +
+			// temp blob
+			"0101000000000000" + // RespType=1, HiRespType=1, Reserved=Z(6)
+			"0000000000000000" + // Timestamp (FILETIME, LE, = 0)
+			"aaaaaaaaaaaaaaaa" + // ClientChallenge
+			"00000000" + // Reserved Z(4)
+			"02000c0044006f006d00610069006e00" + // ServerName (TargetInfo)
+			"01000c00530065007200760065007200" +
+			"00000000" +
+			"00000000" + // Z(4)
+			// LmChallengeResponse = HMAC_MD5(...) || ClientChallenge
+			"86c35097ac9cec102554764a57cccc19" +
+			"aaaaaaaaaaaaaaaa",
+	)
+
+	if !bytes.Equal(got, expected) {
+		t.Fatalf("ComputeResponse mismatch vs MS-NLMP §4.2.4\n got:  %s\n want: %s",
+			hex.EncodeToString(got), hex.EncodeToString(expected))
 	}
 }
