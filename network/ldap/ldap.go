@@ -66,5 +66,9 @@ func (ldapSession *Session) GetRootDSE() (*Entry, error) {
 		return nil, fmt.Errorf("error searching LDAP: %w", err)
 	}
 
+	if len(searchResult.Entries) == 0 {
+		return nil, fmt.Errorf("rootDSE search returned no entries")
+	}
+
 	return searchResult.Entries[0], nil
 }
