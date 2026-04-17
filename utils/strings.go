@@ -98,6 +98,9 @@ func SizeInBytes(size uint64) string {
 // Returns:
 // - A boolean indicating if the input string ends with a null terminator.
 func EndsWithNullTerminator(input string) bool {
+	if len(input) < 1 {
+		return false
+	}
 	return input[len(input)-1] == 0x00
 }
 
@@ -109,6 +112,9 @@ func EndsWithNullTerminator(input string) bool {
 // Returns:
 // - A boolean indicating if the input string ends with a null terminator.
 func EndsWithNullTerminatorUTF16(input []byte) bool {
+	if len(input) < 2 {
+		return false
+	}
 	return input[len(input)-2] == 0x00 && input[len(input)-1] == 0x00
 }
 

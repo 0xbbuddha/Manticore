@@ -60,6 +60,7 @@ func TestEndsWithNullTerminator(t *testing.T) {
 	}{
 		{"hello\x00", true},
 		{"world", false},
+		{"", false},
 	}
 
 	for _, tt := range tests {
@@ -82,6 +83,8 @@ func TestEndsWithNullTerminatorUTF16(t *testing.T) {
 		{"UTF16-LE hello without null terminator", []byte("h\x00e\x00l\x00l\x00o\x00"), false},
 		{"UTF16-LE world with null terminator", []byte("\x00w\x00o\x00r\x00l\x00d\x00\x00"), true},
 		{"UTF16-LE world without null terminator", []byte("\x00w\x00o\x00r\x00l\x00d"), false},
+		{"empty input", []byte{}, false},
+		{"single byte input", []byte{0x00}, false},
 	}
 
 	for _, tt := range tests {
