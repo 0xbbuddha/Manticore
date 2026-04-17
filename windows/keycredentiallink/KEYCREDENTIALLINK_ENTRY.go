@@ -40,15 +40,24 @@ type KEYCREDENTIALLINK_ENTRY struct {
 func (e *KEYCREDENTIALLINK_ENTRY) Unmarshal(data []byte) (int, error) {
 	bytesRead := 0
 
-	e.Length = binary.LittleEndian.Uint16(data[bytesRead:2])
+	if len(data) < bytesRead+2 {
+		return bytesRead, fmt.Errorf("data too short to read KEYCREDENTIALLINK_ENTRY Length: got %d bytes, need at least 2", len(data))
+	}
+	e.Length = binary.LittleEndian.Uint16(data[bytesRead : bytesRead+2])
 	bytesRead += 2
 
+	if len(data) < bytesRead+1 {
+		return bytesRead, fmt.Errorf("data too short to read KEYCREDENTIALLINK_ENTRY Identifier: got %d bytes, need at least %d", len(data), bytesRead+1)
+	}
 	identifierBytesRead, err := e.Identifier.Unmarshal(data[bytesRead : bytesRead+1])
 	if err != nil {
 		return bytesRead, err
 	}
 	bytesRead += identifierBytesRead
 
+	if len(data) < bytesRead+int(e.Length) {
+		return bytesRead, fmt.Errorf("data too short to read KEYCREDENTIALLINK_ENTRY Value: got %d bytes, need at least %d", len(data), bytesRead+int(e.Length))
+	}
 	e.Value = data[bytesRead : bytesRead+int(e.Length)]
 	bytesRead += int(e.Length)
 
