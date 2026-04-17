@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/TheManticoreProject/Manticore/crypto/ntlmv1"
 	"github.com/TheManticoreProject/Manticore/crypto/ntlmv2"
@@ -13,6 +14,7 @@ import (
 	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/header"
 	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/negotiate/flags"
 	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/message/types"
+	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/targetinfo"
 	"github.com/TheManticoreProject/Manticore/crypto/spnego/ntlm/version"
 	"github.com/TheManticoreProject/Manticore/encoding/utf16"
 )
@@ -95,28 +97,35 @@ func CreateAuthenticateMessage(challenge *challenge.ChallengeMessage, username, 
 	var err error
 
 	if (challenge.NegotiateFlags & flags.NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY) != 0 {
-		// Use NTLMv2
+		// Use NTLMv2 (MS-NLMP 3.3.2)
 		clientChallenge := [8]byte{}
-
 		_, err = rand.Read(clientChallenge[:])
 		if err != nil {
 			return nil, err
 		}
 
-		ntlmv2, err := ntlmv2.NewNTLMv2CtxWithPassword(domain, username, password, challenge.ServerChallenge, clientChallenge)
+		ctx, err := ntlmv2.NewNTLMv2CtxWithPassword(domain, username, password, challenge.ServerChallenge, clientChallenge)
 		if err != nil {
 			return nil, err
 		}
 
-		msg.LmChallengeResponse, err = ntlmv2.LMResponse()
-		if err != nil {
-			return nil, err
+		// Prepare TargetInfo for the blob: add MsvAvFlags with MIC bit when timestamp is present
+		hasTimestamp := targetinfo.HasTimestamp(challenge.TargetInfo)
+		blobTargetInfo := targetinfo.BuildBlobTargetInfo(challenge.TargetInfo, hasTimestamp)
+
+		// Use server's MsvAvTimestamp when present; otherwise derive current Windows FILETIME
+		timestamp := targetinfo.GetTimestamp(challenge.TargetInfo)
+		if len(timestamp) != 8 {
+			windowsFiletime := (uint64(time.Now().Unix()) + 116444736000) * 10000000
+			timestamp = make([]byte, 8)
+			binary.LittleEndian.PutUint64(timestamp, windowsFiletime)
 		}
 
-		msg.NtChallengeResponse, err = ntlmv2.NTResponse()
+		msg.NtChallengeResponse, _, err = ctx.ComputeNTChallengeResponse(timestamp, blobTargetInfo)
 		if err != nil {
 			return nil, err
 		}
+		msg.LmChallengeResponse = ctx.ComputeLMChallengeResponse(hasTimestamp)
 	} else {
 		// Use NTLMv1
 		ntlmv1Ctx, err := ntlmv1.NewNTLMv1CtxWithPassword(domain, username, password, challenge.ServerChallenge)
