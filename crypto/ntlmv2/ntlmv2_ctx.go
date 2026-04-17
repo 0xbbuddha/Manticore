@@ -3,10 +3,8 @@ package ntlmv2
 import (
 	"crypto/hmac"
 	"crypto/md5"
-	"encoding/binary"
 	"errors"
 	"strings"
-	"time"
 
 	"github.com/TheManticoreProject/Manticore/crypto/lm"
 	"github.com/TheManticoreProject/Manticore/crypto/nt"
@@ -84,132 +82,132 @@ func NewNTLMv2CtxWithNTHash(domain, username string, nthash [16]byte, serverChal
 	return ntlm, nil
 }
 
-// ComputeResponse computes the NTLMv2 response for a given domain, username, password,
-// server challenge, and client challenge.
+// ComputeNTChallengeResponse builds the full NTChallengeResponse (NTProofStr || blob)
+// as specified in MS-NLMP section 3.3.2.
+//
+// The blob structure (called "temp" in the spec):
+//
+//	RespType(1) | HiRespType(1) | Z(2) | Z(4) | Timestamp(8) | ClientChallenge(8) | Z(4) | TargetInfo(var) | Z(4)
+//
+// targetInfo should already have MsvAvFlags set (use targetinfo.BuildBlobTargetInfo to prepare it).
 //
 // Parameters:
-//   - domain: The domain name
-//   - username: The username
-//   - password: The plaintext password
-//   - serverChallenge: The 8-byte server challenge
-//   - clientChallenge: The 8-byte client challenge
+//   - timestamp: 8-byte Windows FILETIME from MsvAvTimestamp or derived from current time
+//   - targetInfo: raw TargetInfo bytes prepared for the blob
 //
 // Returns:
-//   - The NTLMv2 response as a byte slice
-//   - An error if the computation fails
-func (ntlm *NTLMv2Ctx) ComputeResponse(ResponseKeyNT, ResponseKeyLM, ServerChallenge, ClientChallenge []byte, Time time.Time, ServerName []byte) ([]byte, error) {
-	// Special case for anonymous authentication
+//   - ntChallengeResponse: NTProofStr(16) || blob(variable)
+//   - ntProofStr: the 16-byte NTProofStr (needed for ComputeSessionBaseKey)
+//   - error
+func (ntlm *NTLMv2Ctx) ComputeNTChallengeResponse(timestamp []byte, targetInfo []byte) ([]byte, []byte, error) {
+	if len(timestamp) != 8 {
+		return nil, nil, errors.New("timestamp must be 8 bytes")
+	}
+
+	// Build the blob (temp)
+	blob := make([]byte, 0, 28+len(targetInfo))
+	blob = append(blob, 0x01, 0x01)               // RespType, HiRespType
+	blob = append(blob, 0x00, 0x00)               // Reserved1
+	blob = append(blob, 0x00, 0x00, 0x00, 0x00)   // Reserved2
+	blob = append(blob, timestamp...)              // Timestamp (8 bytes)
+	blob = append(blob, ntlm.ClientChallenge[:]...) // ClientChallenge (8 bytes)
+	blob = append(blob, 0x00, 0x00, 0x00, 0x00)   // Reserved3
+	blob = append(blob, targetInfo...)             // TargetInfo (variable)
+	blob = append(blob, 0x00, 0x00, 0x00, 0x00)   // Reserved4
+
+	// NTProofStr = HMAC-MD5(ResponseKeyNT, ServerChallenge || blob)
+	mac := hmac.New(md5.New, ntlm.ResponseKeyNT[:])
+	mac.Write(ntlm.ServerChallenge[:])
+	mac.Write(blob)
+	ntProofStr := mac.Sum(nil)
+
+	return append(ntProofStr, blob...), ntProofStr, nil
+}
+
+// ComputeLMChallengeResponse computes the LmChallengeResponse per MS-NLMP 3.1.5.1.2.
+//
+// When hasTimestamp is true (MsvAvTimestamp was present in the server TargetInfo),
+// the spec requires LmChallengeResponse to be Z(24). Otherwise it is:
+//
+//	HMAC-MD5(ResponseKeyLM, ServerChallenge || ClientChallenge) || ClientChallenge  (24 bytes)
+//
+// Parameters:
+//   - hasTimestamp: true when MsvAvTimestamp was present in the server's TargetInfo
+func (ntlm *NTLMv2Ctx) ComputeLMChallengeResponse(hasTimestamp bool) []byte {
+	if hasTimestamp {
+		return make([]byte, 24)
+	}
+	mac := hmac.New(md5.New, ntlm.ResponseKeyNT[:])
+	mac.Write(ntlm.ServerChallenge[:])
+	mac.Write(ntlm.ClientChallenge[:])
+	return append(mac.Sum(nil), ntlm.ClientChallenge[:]...) // 16 + 8 = 24 bytes
+}
+
+// ComputeSessionBaseKey derives the SessionBaseKey from the NTProofStr.
+//
+//	SessionBaseKey = HMAC-MD5(ResponseKeyNT, NTProofStr)
+//
+// This key is RC4-encrypted with a random session key when KEY_EXCH is negotiated.
+//
+// Parameters:
+//   - ntProofStr: the 16-byte NTProofStr returned by ComputeNTChallengeResponse
+func (ntlm *NTLMv2Ctx) ComputeSessionBaseKey(ntProofStr []byte) []byte {
+	mac := hmac.New(md5.New, ntlm.ResponseKeyNT[:])
+	mac.Write(ntProofStr)
+	return mac.Sum(nil)
+}
+
+// ComputeResponse computes the combined NTLMv2 challenge response (low-level, explicit params).
+// Prefer ComputeNTChallengeResponse and ComputeLMChallengeResponse for new code.
+//
+// Parameters:
+//   - ResponseKeyNT: the 16-byte ResponseKeyNT (NTOWFv2 result)
+//   - ResponseKeyLM: the 16-byte ResponseKeyLM (same as ResponseKeyNT for NTLMv2)
+//   - ServerChallenge: the 8-byte server challenge
+//   - ClientChallenge: the 8-byte client challenge
+//   - timestamp: the 8-byte Windows FILETIME timestamp
+//   - ServerName: the raw TargetInfo bytes for the blob
+//
+// Returns:
+//   - NTChallengeResponse || LmChallengeResponse concatenated
+func (ntlm *NTLMv2Ctx) ComputeResponse(ResponseKeyNT, ResponseKeyLM, ServerChallenge, ClientChallenge, timestamp []byte, ServerName []byte) ([]byte, error) {
 	if len(ResponseKeyNT) == 0 && len(ResponseKeyLM) == 0 {
 		return []byte{0}, nil
 	}
 
-	// Encode the timestamp as a little-endian FILETIME (100-ns intervals since 1601-01-01 UTC).
-	// Use Unix seconds + sub-second nanoseconds so that pre-1678 inputs (e.g. the zero
-	// timestamp used in spec test vectors) do not overflow int64 as UnixNano would.
-	utc := Time.UTC()
-	timestamp := utc.Unix()*10_000_000 + int64(utc.Nanosecond())/100 + 116444736000000000
-	timestampBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(timestampBytes, uint64(timestamp))
-
-	// Create temp blob
-	// Set temp to ConcatenationOf(Responserversion, HiResponserversion, Z(6), Time, ClientChallenge, Z(4), ServerName, Z(4))
+	// Build temp blob:
+	// RespType(1) | HiRespType(1) | Z(6) | Timestamp(8) | ClientChallenge(8) | Z(4) | ServerName(var) | Z(4)
 	temp := make([]byte, 0)
 	temp = append(temp, 0x01)               // Response version
 	temp = append(temp, 0x01)               // Hi Response version
 	temp = append(temp, make([]byte, 6)...) // Z(6)
-	temp = append(temp, timestampBytes...)  // Timestamp
+	temp = append(temp, timestamp...)       // Timestamp (8 bytes)
 	temp = append(temp, ClientChallenge...) // Client challenge
 	temp = append(temp, make([]byte, 4)...) // Z(4)
-	temp = append(temp, ServerName...)      // Server name
+	temp = append(temp, ServerName...)      // Server name (TargetInfo)
 	temp = append(temp, make([]byte, 4)...) // Z(4)
 
-	// Calculate NT proof string
-	// Set NTProofStr to HMAC_MD5(ResponseKeyNT, ConcatenationOf(CHALLENGE_MESSAGE.ServerChallenge, temp))
+	// NTProofStr = HMAC-MD5(ResponseKeyNT, ServerChallenge || temp)
 	ntProofStrCtx := hmac.New(md5.New, ResponseKeyNT)
 	ntProofStrCtx.Write(ServerChallenge)
 	ntProofStrCtx.Write(temp)
 	ntProofStr := ntProofStrCtx.Sum(nil)
 	NtChallengeResponse := append(ntProofStr, temp...)
 
-	// Calculate LM response
-	// Set LMResponse to ConcatenationOf(HMAC_MD5(ResponseKeyLM, ConcatenationOf(CHALLENGE_MESSAGE.ServerChallenge, ClientChallenge)), ClientChallenge)
+	// LmChallengeResponse = HMAC-MD5(ResponseKeyLM, ServerChallenge || ClientChallenge) || ClientChallenge
 	lmHmacCtx := hmac.New(md5.New, ResponseKeyLM)
 	lmHmacCtx.Write(ServerChallenge)
 	lmHmacCtx.Write(ClientChallenge)
 	lmChallengeResponse := append(lmHmacCtx.Sum(nil), ClientChallenge...)
 
-	// Combine NT proof string with temp blob for final NT response
-	challengeResponse := append(NtChallengeResponse, lmChallengeResponse...)
-
-	return challengeResponse, nil
-
+	return append(NtChallengeResponse, lmChallengeResponse...), nil
 }
 
-// LMResponse computes the LM response for the NTLMv2 authentication
-//
-// Returns:
-//   - The LM response as a byte slice
-//   - An error if the computation fails
-func (ntlm *NTLMv2Ctx) LMResponse() ([]byte, error) {
-	if len(ntlm.ServerChallenge) != 8 {
-		return nil, errors.New("server challenge must be 8 bytes")
-	}
-
-	if len(ntlm.ClientChallenge) != 8 {
-		return nil, errors.New("client challenge must be 8 bytes")
-	}
-
-	// Calculate the LM response (HMAC-MD5 of NTHash with server challenge and client challenge)
-	lm := hmac.New(md5.New, ntlm.NTHash[:])
-	lm.Write(ntlm.ServerChallenge[:])
-	lm.Write(ntlm.ClientChallenge[:])
-	lmResponse := lm.Sum(nil)
-
-	return lmResponse, nil
-}
-
-// NTResponse computes the NT response for the NTLMv2 authentication
-//
-// Returns:
-//   - The NT response as a byte slice
-//   - An error if the computation fails
-func (ntlm *NTLMv2Ctx) NTResponse() ([]byte, error) {
-	if len(ntlm.ServerChallenge) != 8 {
-		return nil, errors.New("server challenge must be 8 bytes")
-	}
-
-	if len(ntlm.ClientChallenge) != 8 {
-		return nil, errors.New("client challenge must be 8 bytes")
-	}
-
-	// Calculate the NT response (HMAC-MD5 of NTHash with server challenge and client challenge)
-	nt := hmac.New(md5.New, ntlm.NTHash[:])
-	nt.Write(ntlm.ServerChallenge[:])
-	nt.Write(ntlm.ClientChallenge[:])
-	ntResponse := nt.Sum(nil)
-
-	return ntResponse, nil
-}
-
-// NTOWFv2 computes the NTOWFv2 hash for a given password, username, and domain
+// NTOWFv2 computes the NTOWFv2 hash (ResponseKeyNT) for a given password, username, and domain.
 // Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-nlmp/5e550938-91d4-459f-b67d-75d70009e3f3
-//
-// Returns:
-//   - The NTOWFv2 hash as a byte slice
-//   - An error if the computation fails
 func NTOWFv2(Passwd, User, UserDomain string) []byte {
-	// Convert password to UTF16-LE bytes
-	passwdBytes := []byte(Passwd)
-	if !utf16.IsUTF16LE(passwdBytes) {
-		passwdBytes = utf16.EncodeUTF16LE(Passwd)
-	}
 	ntHash := nt.NTHash(Passwd)
-
-	// Convert username and domain to uppercase UTF16-LE bytes
-	upperUser := strings.ToUpper(User)
-	userDomainBytes := utf16.EncodeUTF16LE(upperUser + UserDomain)
-
-	// Calculate HMAC-MD5
+	userDomainBytes := utf16.EncodeUTF16LE(strings.ToUpper(User) + UserDomain)
 	hmacMd5 := hmac.New(md5.New, ntHash[:])
 	hmacMd5.Write(userDomainBytes)
 	return hmacMd5.Sum(nil)
