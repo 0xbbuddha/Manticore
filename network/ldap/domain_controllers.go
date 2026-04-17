@@ -20,49 +20,45 @@ func (ldapSession *Session) GetDomainDNSServers() ([]string, error) {
 	dnsServers := []string{}
 	var errList []string
 
+	probe := func(hostname string) {
+		conn, err := net.Dial("tcp", hostname+":53")
+		if err != nil {
+			errList = append(errList, fmt.Sprintf("Error connecting to %s: %s", hostname, err))
+			return
+		}
+		defer conn.Close()
+
+		// Get remote address which contains the IP of the connected DNS server.
+		// Use net.SplitHostPort so IPv6 addresses ("[::1]:53") are handled correctly.
+		host, _, splitErr := net.SplitHostPort(conn.RemoteAddr().String())
+		if splitErr != nil {
+			errList = append(errList, fmt.Sprintf("Error parsing remote address for %s: %s", hostname, splitErr))
+			return
+		}
+		dnsServers = append(dnsServers, host)
+	}
+
 	// Check in domain controllers
 	domainControllersMap, err := ldapSession.GetAllDomainControllers()
 	if err != nil {
-		return dnsServers, nil
+		return dnsServers, fmt.Errorf("failed to list domain controllers: %w", err)
 	}
 
 	for distinguishedName := range domainControllersMap {
 		for _, hostname := range domainControllersMap[distinguishedName] {
-			// Try to connect to
-			conn, err := net.Dial("tcp", hostname+":53")
-			if err == nil {
-				// Get remote address which contains the IP of the connected DNS server
-				remoteAddr := conn.RemoteAddr().String()
-				remoteIP := strings.Split(remoteAddr, ":")[0]
-
-				dnsServers = append(dnsServers, remoteIP)
-				defer conn.Close()
-			} else {
-				errList = append(errList, fmt.Sprintf("Error connecting to %s: %s", hostname, err))
-			}
+			probe(hostname)
 		}
 	}
 
 	// Check in read only domain controllers
 	readOnlyDomainControllersMap, err := ldapSession.GetAllReadOnlyDomainControllers()
 	if err != nil {
-		return dnsServers, nil
+		return dnsServers, fmt.Errorf("failed to list read-only domain controllers: %w", err)
 	}
 
 	for distinguishedName := range readOnlyDomainControllersMap {
 		for _, hostname := range readOnlyDomainControllersMap[distinguishedName] {
-			// Try to connect to
-			conn, err := net.Dial("tcp", hostname+":53")
-			if err == nil {
-				// Get remote address which contains the IP of the connected DNS server
-				remoteAddr := conn.RemoteAddr().String()
-				remoteIP := strings.Split(remoteAddr, ":")[0]
-
-				dnsServers = append(dnsServers, remoteIP)
-				defer conn.Close()
-			} else {
-				errList = append(errList, fmt.Sprintf("Error connecting to %s: %s", hostname, err))
-			}
+			probe(hostname)
 		}
 	}
 
