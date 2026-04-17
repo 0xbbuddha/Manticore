@@ -3,6 +3,7 @@ package ntlmv2
 import (
 	"crypto/hmac"
 	"crypto/md5"
+	"encoding/binary"
 	"errors"
 	"strings"
 	"time"
@@ -102,28 +103,40 @@ func (ntlm *NTLMv2Ctx) ComputeResponse(ResponseKeyNT, ResponseKeyLM, ServerChall
 		return []byte{0}, nil
 	}
 
+	// Encode the timestamp as a little-endian FILETIME (100-ns intervals since 1601-01-01 UTC).
+	// Use Unix seconds + sub-second nanoseconds so that pre-1678 inputs (e.g. the zero
+	// timestamp used in spec test vectors) do not overflow int64 as UnixNano would.
+	utc := Time.UTC()
+	timestamp := utc.Unix()*10_000_000 + int64(utc.Nanosecond())/100 + 116444736000000000
+	timestampBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(timestampBytes, uint64(timestamp))
+
 	// Create temp blob
 	// Set temp to ConcatenationOf(Responserversion, HiResponserversion, Z(6), Time, ClientChallenge, Z(4), ServerName, Z(4))
 	temp := make([]byte, 0)
 	temp = append(temp, 0x01)               // Response version
 	temp = append(temp, 0x01)               // Hi Response version
 	temp = append(temp, make([]byte, 6)...) // Z(6)
-	// temp = append(temp, Time...)            // Timestamp
+	temp = append(temp, timestampBytes...)  // Timestamp
 	temp = append(temp, ClientChallenge...) // Client challenge
 	temp = append(temp, make([]byte, 4)...) // Z(4)
 	temp = append(temp, ServerName...)      // Server name
 	temp = append(temp, make([]byte, 4)...) // Z(4)
 
 	// Calculate NT proof string
-	// Set NTProofStr to HMAC_MD5(ResponseKeyNT, ConcatenationOf(CHALLENGE_MESSAGE.ServerChallenge,temp))
-	ntProofStrCtx := hmac.New(md5.New, append(ResponseKeyNT, append(ServerChallenge, temp...)...))
+	// Set NTProofStr to HMAC_MD5(ResponseKeyNT, ConcatenationOf(CHALLENGE_MESSAGE.ServerChallenge, temp))
+	ntProofStrCtx := hmac.New(md5.New, ResponseKeyNT)
+	ntProofStrCtx.Write(ServerChallenge)
+	ntProofStrCtx.Write(temp)
 	ntProofStr := ntProofStrCtx.Sum(nil)
 	NtChallengeResponse := append(ntProofStr, temp...)
 
 	// Calculate LM response
-	// Set LMResponse to HMAC_MD5(ResponseKeyLM, ConcatenationOf(CHALLENGE_MESSAGE.ServerChallenge, CHALLENGE_MESSAGE.ClientChallenge))
-	lmHmacCtx := hmac.New(md5.New, append(ResponseKeyLM, append(ServerChallenge, ClientChallenge...)...))
-	lmChallengeResponse := lmHmacCtx.Sum(nil)
+	// Set LMResponse to ConcatenationOf(HMAC_MD5(ResponseKeyLM, ConcatenationOf(CHALLENGE_MESSAGE.ServerChallenge, ClientChallenge)), ClientChallenge)
+	lmHmacCtx := hmac.New(md5.New, ResponseKeyLM)
+	lmHmacCtx.Write(ServerChallenge)
+	lmHmacCtx.Write(ClientChallenge)
+	lmChallengeResponse := append(lmHmacCtx.Sum(nil), ClientChallenge...)
 
 	// Combine NT proof string with temp blob for final NT response
 	challengeResponse := append(NtChallengeResponse, lmChallengeResponse...)
