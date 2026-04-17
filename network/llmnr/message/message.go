@@ -381,40 +381,44 @@ func (m *Message) Unmarshal(data []byte) (int, error) {
 	// Decode questions
 	for i := uint16(0); i < m.Header.QDCount; i++ {
 		q := question.Question{}
-		bytesRead, err = q.Unmarshal(data[bytesRead:])
+		n, err := q.Unmarshal(data[bytesRead:])
 		if err != nil {
 			return 0, fmt.Errorf("error unmarshalling question: %w", err)
 		}
+		bytesRead += n
 		m.Questions = append(m.Questions, q)
 	}
 
 	// Decode answers
 	for i := uint16(0); i < m.Header.ANCount; i++ {
 		rr := resourcerecord.ResourceRecord{}
-		bytesRead, err = rr.Unmarshal(data[bytesRead:])
+		n, err := rr.Unmarshal(data[bytesRead:])
 		if err != nil {
 			return 0, fmt.Errorf("error unmarshalling answer: %w", err)
 		}
+		bytesRead += n
 		m.Answers = append(m.Answers, rr)
 	}
 
 	// Decode authority
 	for i := uint16(0); i < m.Header.NSCount; i++ {
 		rr := resourcerecord.ResourceRecord{}
-		bytesRead, err = rr.Unmarshal(data[bytesRead:])
+		n, err := rr.Unmarshal(data[bytesRead:])
 		if err != nil {
 			return 0, fmt.Errorf("error unmarshalling authority: %w", err)
 		}
+		bytesRead += n
 		m.Authority = append(m.Authority, rr)
 	}
 
 	// Decode additional
 	for i := uint16(0); i < m.Header.ARCount; i++ {
 		rr := resourcerecord.ResourceRecord{}
-		bytesRead, err = rr.Unmarshal(data[bytesRead:])
+		n, err := rr.Unmarshal(data[bytesRead:])
 		if err != nil {
 			return 0, fmt.Errorf("error unmarshalling additional: %w", err)
 		}
+		bytesRead += n
 		m.Additional = append(m.Additional, rr)
 	}
 

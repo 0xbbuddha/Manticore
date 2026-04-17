@@ -188,6 +188,65 @@ func TestAddAnswer(t *testing.T) {
 	}
 }
 
+// TestUnmarshalMultipleRecords exercises the Marshal -> Unmarshal round trip
+// with more than one question and at least one answer. The prior
+// implementation of Message.Unmarshal overwrote its cumulative offset on
+// every nested Unmarshal, so the second question's bytes were parsed from
+// the wrong position and later sections got corrupted. This test fails on
+// the broken code and passes once bytesRead accumulates correctly.
+func TestUnmarshalMultipleRecords(t *testing.T) {
+	orig := message.NewMessage()
+	orig.Header.Identifier = 0x1234
+	orig.Header.Flags = 0x0100
+
+	if err := orig.AddQuestion("host.local", llmnr_type.TypeA, class.ClassIN); err != nil {
+		t.Fatalf("AddQuestion 1 failed: %v", err)
+	}
+	if err := orig.AddQuestion("other.local", llmnr_type.TypeAAAA, class.ClassIN); err != nil {
+		t.Fatalf("AddQuestion 2 failed: %v", err)
+	}
+	if err := orig.AddAnswer(resourcerecord.ResourceRecord{
+		Name:     "host.local",
+		Type:     llmnr_type.TypeA,
+		Class:    class.ClassIN,
+		TTL:      300,
+		RDLength: 4,
+		RData:    []byte{192, 168, 1, 1},
+	}); err != nil {
+		t.Fatalf("AddAnswer failed: %v", err)
+	}
+
+	wire, err := orig.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	parsed := message.NewMessage()
+	n, err := parsed.Unmarshal(wire)
+	if err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+	if n != len(wire) {
+		t.Errorf("Unmarshal returned %d bytes read, want %d", n, len(wire))
+	}
+
+	if len(parsed.Questions) != 2 {
+		t.Fatalf("expected 2 questions, got %d", len(parsed.Questions))
+	}
+	if parsed.Questions[0].Name != "host.local" {
+		t.Errorf("question 0 name mismatch: got %q", parsed.Questions[0].Name)
+	}
+	if parsed.Questions[1].Name != "other.local" {
+		t.Errorf("question 1 name mismatch: got %q", parsed.Questions[1].Name)
+	}
+	if len(parsed.Answers) != 1 {
+		t.Fatalf("expected 1 answer, got %d", len(parsed.Answers))
+	}
+	if parsed.Answers[0].Name != "host.local" {
+		t.Errorf("answer name mismatch: got %q", parsed.Answers[0].Name)
+	}
+}
+
 func TestValidate(t *testing.T) {
 	msg := message.NewMessage()
 
