@@ -111,14 +111,18 @@ func TestFlagsString(t *testing.T) {
 		flags    header.Flags
 		expected string
 	}{
-		{0, "QR"},
-		{header.FlagQR, "OP"},
-		{header.FlagC, "QR|C"},
-		{header.FlagTC, "QR|TC"},
-		{header.FlagT, "QR|T"},
-		{header.FlagQR | header.FlagC, "OP|C"},
-		{header.FlagQR | header.FlagTC | header.FlagT, "OP|TC|T"},
-		{header.FlagQR | header.FlagOP | header.FlagC | header.FlagTC | header.FlagT, "OP|C|TC|T"},
+		// Query messages (QR bit clear) must not emit "QR".
+		{0, ""},
+		{header.FlagC, "C"},
+		{header.FlagTC, "TC"},
+		{header.FlagT, "T"},
+		// Response messages (QR bit set) emit "QR".
+		{header.FlagQR, "QR"},
+		{header.FlagQR | header.FlagC, "QR|C"},
+		{header.FlagQR | header.FlagTC | header.FlagT, "QR|TC|T"},
+		// FlagOP is not rendered as a label by String(); OPCODE is a 4-bit field,
+		// not a single-bit flag, and is deliberately not surfaced here.
+		{header.FlagQR | header.FlagOP | header.FlagC | header.FlagTC | header.FlagT, "QR|C|TC|T"},
 	}
 	for _, tt := range tests {
 		got := tt.flags.String()

@@ -64,13 +64,14 @@ func (f *Flags) Unmarshal(data []byte) (int, error) {
 }
 
 // String returns a string representation of the flags.
+//
+// The QR label is emitted only when the QR bit is set (response), matching the
+// convention used in DNS trace output. Query messages (QR=0) produce no QR
+// label. OPCODE is a separate 4-bit field and is not derived from the QR bit.
 func (f Flags) String() string {
 	flags := []string{}
-	if f.IsQuery() {
-		flags = append(flags, "QR")
-	}
 	if f.IsResponse() {
-		flags = append(flags, "OP")
+		flags = append(flags, "QR")
 	}
 	if f.IsConflict() {
 		flags = append(flags, "C")
