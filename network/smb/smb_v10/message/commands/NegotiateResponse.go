@@ -394,6 +394,9 @@ func (c *NegotiateResponse) Unmarshal(marshalledData []byte) (int, error) {
 	offset = 0
 	if c.SecurityMode.SupportsChallengeResponseAuth() {
 		// Unmarshalling data ServerGUID
+		if len(rawDataContent) < offset+16 {
+			return offset, fmt.Errorf("rawDataContent too short for ServerGUID")
+		}
 		c.ServerGUID.FromRawBytes(rawDataContent[offset : offset+16])
 		offset += 16
 
