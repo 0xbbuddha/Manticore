@@ -78,8 +78,8 @@ func (d *Data) Marshal() ([]byte, error) {
 func (d *Data) Unmarshal(data []byte) (int, error) {
 	bytesRead := 0
 
-	if len(data) == 0 {
-		return bytesRead, fmt.Errorf("data is empty")
+	if len(data) < 2 {
+		return bytesRead, fmt.Errorf("data too short to unmarshal SMB data byte count")
 	}
 
 	d.ByteCount = binary.LittleEndian.Uint16(data[:2])

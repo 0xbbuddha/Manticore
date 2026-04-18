@@ -110,3 +110,20 @@ func Test_DataUnmarshalEmptyData(t *testing.T) {
 		t.Errorf("Expected Bytes to be empty, got length: %d", len(data.Bytes))
 	}
 }
+
+// Test_DataUnmarshalOneByteDoesNotPanic verifies that a 1-byte input (too
+// short to contain the 2-byte ByteCount) returns an error rather than
+// panicking on the binary.LittleEndian.Uint16(data[:2]) read.
+func Test_DataUnmarshalOneByteDoesNotPanic(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Data.Unmarshal panicked on 1-byte input: %v", r)
+		}
+	}()
+
+	d := data.NewData()
+	_, err := d.Unmarshal([]byte{0x01})
+	if err == nil {
+		t.Fatal("Expected error when unmarshalling 1-byte data, got nil")
+	}
+}
