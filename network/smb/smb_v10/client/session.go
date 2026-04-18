@@ -147,16 +147,21 @@ func (s *Session) SessionSetup() error {
 			session_setup_cmd.VcNumber = types.USHORT(0x0000)
 			session_setup_cmd.SessionKey = s.Client.Connection.Server.SessionKey
 
+			if s.Credentials == nil {
+				return fmt.Errorf("plaintext authentication requires credentials but none were provided")
+			}
+			password := s.Credentials.Password
+
 			// Check if Unicode is supported
-			if s.Client.Connection.Server.Capabilities&0x00000004 != 0 { // CAP_UNICODE
+			if s.Client.Connection.Server.Capabilities&capabilities.CAP_UNICODE == capabilities.CAP_UNICODE {
 				// Send password in Unicode
-				session_setup_cmd.UnicodePassword = []types.UCHAR(utf16.EncodeUTF16LE("UnicodePassword"))
+				session_setup_cmd.UnicodePassword = []types.UCHAR(utf16.EncodeUTF16LE(password))
 				session_setup_cmd.UnicodePasswordLen = types.USHORT(len(session_setup_cmd.UnicodePassword))
 				session_setup_cmd.OEMPasswordLen = types.USHORT(0x0000)
 				session_setup_cmd.OEMPassword = []types.UCHAR{}
 			} else {
 				// Send password in OEM format
-				session_setup_cmd.OEMPassword = []types.UCHAR("OEMPassword")
+				session_setup_cmd.OEMPassword = []types.UCHAR(password)
 				session_setup_cmd.OEMPasswordLen = types.USHORT(len(session_setup_cmd.OEMPassword))
 				session_setup_cmd.UnicodePasswordLen = types.USHORT(0x0000)
 				session_setup_cmd.UnicodePassword = []types.UCHAR{}
