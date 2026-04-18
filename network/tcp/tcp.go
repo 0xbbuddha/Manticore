@@ -6,6 +6,12 @@ import (
 	"net"
 )
 
+// MaxDirectTCPPayloadSize caps the payload size accepted from a single Direct TCP frame.
+// The Direct TCP session service length field is 24 bits wide (up to ~16 MiB), but SMB1
+// negotiates a MaxBufferSize of at most a few tens of kilobytes in practice. 1 MiB is a
+// generous upper bound that rejects DoS-scale frames without blocking legitimate traffic.
+const MaxDirectTCPPayloadSize = 1 * 1024 * 1024
+
 // TCPTransport implements the Transport interface for Direct TCP transport
 // Source: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb/f906c680-330c-43ae-9a71-f854e24aeee6
 type TCPTransport struct {
@@ -90,6 +96,10 @@ func (t *TCPTransport) Receive() ([]byte, error) {
 
 	// Parse length from 3 bytes
 	length := (int(header[1]) << 16) | (int(header[2]) << 8) | int(header[3])
+
+	if length > MaxDirectTCPPayloadSize {
+		return nil, fmt.Errorf("Direct TCP payload length %d exceeds maximum %d", length, MaxDirectTCPPayloadSize)
+	}
 
 	buffer := make([]byte, length)
 
