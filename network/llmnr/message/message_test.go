@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/TheManticoreProject/Manticore/network/llmnr/class"
+	"github.com/TheManticoreProject/Manticore/network/llmnr/domain_name"
 	"github.com/TheManticoreProject/Manticore/network/llmnr/errors"
 	"github.com/TheManticoreProject/Manticore/network/llmnr/llmnr_type"
 	"github.com/TheManticoreProject/Manticore/network/llmnr/message"
@@ -279,5 +280,37 @@ func TestValidate(t *testing.T) {
 	err = msg.Validate()
 	if err != errors.ErrInvalidMessage {
 		t.Errorf("Validate() error = %v, want %v", err, errors.ErrInvalidMessage)
+	}
+}
+
+func TestValidateChecksAuthorityAndAdditional(t *testing.T) {
+	// Label of 64 'a' chars — exceeds MaxLabelLength (63).
+	tooLongLabel := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+	mkRR := func(name string) resourcerecord.ResourceRecord {
+		return resourcerecord.ResourceRecord{
+			Name:     domain_name.DomainName(name),
+			Type:     llmnr_type.TypeA,
+			Class:    class.ClassIN,
+			TTL:      30,
+			RDLength: 4,
+			RData:    []byte{127, 0, 0, 1},
+		}
+	}
+
+	// Invalid name in Authority section.
+	msgAuth := message.NewMessage()
+	msgAuth.Authority = append(msgAuth.Authority, mkRR(tooLongLabel))
+	msgAuth.Header.NSCount = 1
+	if err := msgAuth.Validate(); err != errors.ErrLabelTooLong {
+		t.Errorf("Validate() returned %v for invalid Authority name, want %v", err, errors.ErrLabelTooLong)
+	}
+
+	// Invalid name in Additional section.
+	msgAdd := message.NewMessage()
+	msgAdd.Additional = append(msgAdd.Additional, mkRR(tooLongLabel))
+	msgAdd.Header.ARCount = 1
+	if err := msgAdd.Validate(); err != errors.ErrLabelTooLong {
+		t.Errorf("Validate() returned %v for invalid Additional name, want %v", err, errors.ErrLabelTooLong)
 	}
 }

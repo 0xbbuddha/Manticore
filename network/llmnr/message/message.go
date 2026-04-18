@@ -270,6 +270,18 @@ func (m *Message) Validate() error {
 		}
 	}
 
+	for _, rr := range m.Authority {
+		if err := rr.Name.Validate(); err != nil {
+			return err
+		}
+	}
+
+	for _, rr := range m.Additional {
+		if err := rr.Name.Validate(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
