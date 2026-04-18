@@ -164,3 +164,31 @@ func TestIPv6ServerStartAndStop(t *testing.T) {
 		t.Error("Expected server to close within 1 second, but it did not")
 	}
 }
+
+func TestIsIPv4AndIsIPv6AreMutuallyExclusive(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test on Windows")
+	}
+
+	ipv4Server, err := server.NewIPv4Server()
+	if err != nil {
+		t.Fatalf("Failed to create IPv4 server: %v", err)
+	}
+	if !ipv4Server.IsIPv4() {
+		t.Errorf("Expected IPv4 server IsIPv4()=true, got false")
+	}
+	if ipv4Server.IsIPv6() {
+		t.Errorf("Expected IPv4 server IsIPv6()=false, got true (IPv4 address reports as IPv6)")
+	}
+
+	ipv6Server, err := server.NewIPv6Server()
+	if err != nil {
+		t.Fatalf("Failed to create IPv6 server: %v", err)
+	}
+	if !ipv6Server.IsIPv6() {
+		t.Errorf("Expected IPv6 server IsIPv6()=true, got false")
+	}
+	if ipv6Server.IsIPv4() {
+		t.Errorf("Expected IPv6 server IsIPv4()=false, got true")
+	}
+}

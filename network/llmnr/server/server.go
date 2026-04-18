@@ -253,8 +253,10 @@ func (s *Server) IsIPv4() bool {
 // Returns:
 // - A boolean value: true if the server's address is an IPv6 address, false otherwise.
 //
-// The function uses the net.IP.To16 method to determine if the IP address is an IPv6 address.
-// If the IP address is not an IPv6 address, the method will return nil, and the function will return false.
+// An address is considered IPv6 when it has a valid 16-byte representation and
+// cannot be represented as an IPv4 address (net.IP.To4 returns nil). Checking
+// only To16() would incorrectly classify IPv4 addresses as IPv6, because
+// net.IP.To16() also returns a non-nil 16-byte representation for IPv4.
 //
 // Example usage:
 // server, err := llmnr.NewIPv6Server()
@@ -269,7 +271,7 @@ func (s *Server) IsIPv4() bool {
 //	    fmt.Println("The server is not using an IPv6 address.")
 //	}
 func (s *Server) IsIPv6() bool {
-	return s.Address.IP.To16() != nil
+	return s.Address.IP.To16() != nil && s.Address.IP.To4() == nil
 }
 
 // SetDebug enables or disables debug mode for the LLMNR server.
