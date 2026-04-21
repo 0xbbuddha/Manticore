@@ -53,6 +53,9 @@ const (
 	PAEncTimestamp = 2
 	// PAETypeInfo2 is the encryption type info version 2 pre-auth type (PA-ETYPE-INFO2).
 	PAETypeInfo2 = 19
+	// PAPACRequest is the Microsoft PA-PAC-REQUEST pre-auth type (MS-KILE).
+	// Required by Windows KDCs to avoid silent dropping of AS-REQs without pre-auth.
+	PAPACRequest = 128
 )
 
 // KDC error code constants (RFC 4120 Section 7.5.9).

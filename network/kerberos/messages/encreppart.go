@@ -61,18 +61,8 @@ func (e *EncASRepPart) Unmarshal(data []byte) (int, error) {
 		return 0, fmt.Errorf("encasreppart: %w", err)
 	}
 
-	seq_bytes, err := asn1.Marshal(asn1.RawValue{
-		Class:      asn1.ClassUniversal,
-		Tag:        asn1.TagSequence,
-		IsCompound: true,
-		Bytes:      inner_bytes,
-	})
-	if err != nil {
-		return 0, err
-	}
-
 	var inner encRepPartInner
-	if _, err := asn1.Unmarshal(seq_bytes, &inner); err != nil {
+	if _, err := asn1.Unmarshal(inner_bytes, &inner); err != nil {
 		return 0, fmt.Errorf("encasreppart inner unmarshal: %w", err)
 	}
 
@@ -120,18 +110,8 @@ func (e *EncTGSRepPart) Unmarshal(data []byte) (int, error) {
 		return 0, fmt.Errorf("enctgsreppart: %w", err)
 	}
 
-	seq_bytes, err := asn1.Marshal(asn1.RawValue{
-		Class:      asn1.ClassUniversal,
-		Tag:        asn1.TagSequence,
-		IsCompound: true,
-		Bytes:      inner_bytes,
-	})
-	if err != nil {
-		return 0, err
-	}
-
 	var inner encRepPartInner
-	if _, err := asn1.Unmarshal(seq_bytes, &inner); err != nil {
+	if _, err := asn1.Unmarshal(inner_bytes, &inner); err != nil {
 		return 0, fmt.Errorf("enctgsreppart inner unmarshal: %w", err)
 	}
 

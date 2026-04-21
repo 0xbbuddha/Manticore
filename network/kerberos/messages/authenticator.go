@@ -22,7 +22,7 @@ type EncryptionKey struct {
 	KeyValue []byte `asn1:"explicit,tag:1"`
 }
 
-// authenticatorInner is the inner SEQUENCE of a Kerberos Authenticator.
+// authenticatorInner is the inner SEQUENCE of a Kerberos Authenticator for unmarshaling.
 type authenticatorInner struct {
 	// AVno is the Authenticator version number (always 5).
 	AVno int `asn1:"explicit,tag:0"`
@@ -42,6 +42,20 @@ type authenticatorInner struct {
 	SeqNumber int `asn1:"explicit,tag:7,optional"`
 	// AuthorizationData contains optional authorization data.
 	AuthorizationData []AuthorizationData `asn1:"explicit,tag:8,optional"`
+}
+
+// authenticatorMarshal is the wire representation for marshaling.
+// CRealm uses realmExplicit; CName uses PrincipalNameMarshal for GeneralString encoding.
+type authenticatorMarshal struct {
+	AVno              int                  `asn1:"explicit,tag:0"`
+	CRealm            asn1.RawValue        // pre-encoded [1] EXPLICIT { GeneralString }
+	CName             PrincipalNameMarshal `asn1:"explicit,tag:2"`
+	Cksum             Checksum             `asn1:"explicit,tag:3,optional"`
+	CUSec             int                  `asn1:"explicit,tag:4"`
+	CTime             time.Time            `asn1:"explicit,tag:5,generalized"`
+	SubKey            EncryptionKey        `asn1:"explicit,tag:6,optional"`
+	SeqNumber         int                  `asn1:"explicit,tag:7,optional"`
+	AuthorizationData []AuthorizationData  `asn1:"explicit,tag:8,optional"`
 }
 
 // Authenticator is a Kerberos Authenticator (APPLICATION[2]),
@@ -66,10 +80,10 @@ type Authenticator struct {
 
 // Marshal encodes the Authenticator as an ASN.1 APPLICATION[2] wrapped SEQUENCE.
 func (a *Authenticator) Marshal() ([]byte, error) {
-	inner := authenticatorInner{
+	inner := authenticatorMarshal{
 		AVno:      KerberosV5,
-		CRealm:    a.CRealm,
-		CName:     a.CName,
+		CRealm:    realmExplicit(1, a.CRealm),
+		CName:     MarshalPrincipalName(a.CName),
 		CUSec:     a.CUSec,
 		CTime:     a.CTime,
 		SeqNumber: a.SeqNumber,
@@ -78,11 +92,11 @@ func (a *Authenticator) Marshal() ([]byte, error) {
 		inner.SubKey = *a.SubKey
 	}
 
-	seq_contents, err := marshalSequenceContents(inner)
+	seq_bytes, err := asn1.Marshal(inner)
 	if err != nil {
 		return nil, err
 	}
-	return wrapApplication(2, seq_contents)
+	return wrapApplication(2, seq_bytes)
 }
 
 // Unmarshal decodes an Authenticator from an ASN.1 APPLICATION[2] wrapped SEQUENCE.
@@ -93,18 +107,8 @@ func (a *Authenticator) Unmarshal(data []byte) (int, error) {
 		return 0, fmt.Errorf("authenticator: %w", err)
 	}
 
-	seq_bytes, err := asn1.Marshal(asn1.RawValue{
-		Class:      asn1.ClassUniversal,
-		Tag:        asn1.TagSequence,
-		IsCompound: true,
-		Bytes:      inner_bytes,
-	})
-	if err != nil {
-		return 0, err
-	}
-
 	var inner authenticatorInner
-	if _, err := asn1.Unmarshal(seq_bytes, &inner); err != nil {
+	if _, err := asn1.Unmarshal(inner_bytes, &inner); err != nil {
 		return 0, fmt.Errorf("authenticator inner unmarshal: %w", err)
 	}
 

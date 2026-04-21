@@ -5,6 +5,43 @@ import (
 	"time"
 )
 
+// kdcReqBodyMarshal is the wire representation of KDCReqBody for marshaling.
+// It uses GeneralString (asn1.RawValue) for Realm and PrincipalNameMarshal for names,
+// because Go's asn1 ignores the "generalstring" tag and produces PrintableString.
+//
+// Realm has no struct tag: Go ignores explicit,tag:N for asn1.RawValue fields, so
+// realmExplicit() pre-builds the [2] EXPLICIT { GeneralString } wrapper instead.
+type kdcReqBodyMarshal struct {
+	KDCOptions  asn1.BitString       `asn1:"explicit,tag:0"`
+	CName       PrincipalNameMarshal `asn1:"explicit,tag:1,optional"`
+	Realm       asn1.RawValue        // pre-encoded as [2] EXPLICIT { GeneralString } by realmExplicit
+	SName       PrincipalNameMarshal `asn1:"explicit,tag:3,optional"`
+	From        time.Time            `asn1:"explicit,tag:4,optional,generalized"`
+	Till        time.Time            `asn1:"explicit,tag:5,generalized"`
+	RTime       time.Time            `asn1:"explicit,tag:6,optional,generalized"`
+	Nonce       int                  `asn1:"explicit,tag:7"`
+	EType       []int                `asn1:"explicit,tag:8"`
+	Addresses   []HostAddress        `asn1:"explicit,tag:9,optional"`
+	EncAuthData EncryptedData        `asn1:"explicit,tag:10,optional"`
+}
+
+// marshalKDCReqBody converts a KDCReqBody to its GeneralString-encoded form.
+func marshalKDCReqBody(b KDCReqBody) kdcReqBodyMarshal {
+	return kdcReqBodyMarshal{
+		KDCOptions:  b.KDCOptions,
+		CName:       MarshalPrincipalName(b.CName),
+		Realm:       realmExplicit(2, b.Realm),
+		SName:       MarshalPrincipalName(b.SName),
+		From:        b.From,
+		Till:        b.Till,
+		RTime:       b.RTime,
+		Nonce:       b.Nonce,
+		EType:       b.EType,
+		Addresses:   b.Addresses,
+		EncAuthData: b.EncAuthData,
+	}
+}
+
 // KDCReqBody is the body of a KDC request (AS-REQ or TGS-REQ),
 // as defined in RFC 4120 Section 5.4.1.
 type KDCReqBody struct {
