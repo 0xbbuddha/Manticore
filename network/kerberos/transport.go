@@ -32,7 +32,7 @@ const krbErrorTag = 0x7e
 func kdcSend(kdc_host string, kdc_port int, msg []byte) ([]byte, error) {
 	if len(msg) <= udpMaxSize {
 		resp, err := kdcSendUDP(kdc_host, kdc_port, msg)
-		if err == nil && len(resp) > 0 && (len(resp) == 0 || resp[0] != krbErrorTag) {
+		if err == nil && len(resp) > 0 && resp[0] != krbErrorTag {
 			return resp, nil
 		}
 	}
