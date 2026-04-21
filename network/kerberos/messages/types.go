@@ -70,7 +70,10 @@ func generalStringRaw(s string) asn1.RawValue {
 // pre-encode the context wrapper (a0|tag constructed) directly in the returned RawValue.
 func realmExplicit(tag int, s string) asn1.RawValue {
 	gs := generalStringRaw(s)
-	gsBytes, _ := asn1.Marshal(gs)
+	gsBytes, err := asn1.Marshal(gs)
+	if err != nil {
+		panic("messages: failed to marshal realm GeneralString: " + err.Error())
+	}
 	return asn1.RawValue{Class: asn1.ClassContextSpecific, Tag: tag, IsCompound: true, Bytes: gsBytes}
 }
 
