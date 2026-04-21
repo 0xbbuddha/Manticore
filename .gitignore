@@ -27,3 +27,6 @@ go.work.sum
 # Builds dir
 ./bin/
 ./main.go
+
+# Local files for debug 
+./.private/
