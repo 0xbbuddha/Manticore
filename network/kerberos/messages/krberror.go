@@ -78,11 +78,11 @@ func (e *KRBError) Marshal() ([]byte, error) {
 		EText:     e.EText,
 		EData:     e.EData,
 	}
-	seq_contents, err := marshalSequenceContents(inner)
+	seq_bytes, err := asn1.Marshal(inner)
 	if err != nil {
 		return nil, err
 	}
-	return wrapApplication(MsgTypeError, seq_contents)
+	return wrapApplication(MsgTypeError, seq_bytes)
 }
 
 // Unmarshal decodes a KRBError from an ASN.1 APPLICATION[30] wrapped SEQUENCE.
@@ -93,18 +93,8 @@ func (e *KRBError) Unmarshal(data []byte) (int, error) {
 		return 0, fmt.Errorf("krberror: %w", err)
 	}
 
-	seq_bytes, err := asn1.Marshal(asn1.RawValue{
-		Class:      asn1.ClassUniversal,
-		Tag:        asn1.TagSequence,
-		IsCompound: true,
-		Bytes:      inner_bytes,
-	})
-	if err != nil {
-		return 0, err
-	}
-
 	var inner krbErrorInner
-	if _, err := asn1.Unmarshal(seq_bytes, &inner); err != nil {
+	if _, err := asn1.Unmarshal(inner_bytes, &inner); err != nil {
 		return 0, fmt.Errorf("krberror inner unmarshal: %w", err)
 	}
 

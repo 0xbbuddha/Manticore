@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// tgsReqInner is the inner SEQUENCE of a TGS-REQ message.
+// tgsReqInner is the inner SEQUENCE of a TGS-REQ message for unmarshaling.
 type tgsReqInner struct {
 	// PVNO is the Kerberos protocol version (always 5).
 	PVNO int `asn1:"explicit,tag:1"`
@@ -15,6 +15,14 @@ type tgsReqInner struct {
 	PAData []PAData `asn1:"explicit,tag:3,optional"`
 	// ReqBody is the KDC request body specifying the desired service ticket.
 	ReqBody KDCReqBody `asn1:"explicit,tag:4"`
+}
+
+// tgsReqMarshal is the inner SEQUENCE for marshaling — uses GeneralString types.
+type tgsReqMarshal struct {
+	PVNO    int               `asn1:"explicit,tag:1"`
+	MsgType int               `asn1:"explicit,tag:2"`
+	PAData  []PAData          `asn1:"explicit,tag:3,optional"`
+	ReqBody kdcReqBodyMarshal `asn1:"explicit,tag:4"`
 }
 
 // TGSReq is a Kerberos TGS-REQ (Ticket Granting Service Request) message,
@@ -34,17 +42,17 @@ type TGSReq struct {
 
 // Marshal encodes the TGS-REQ as an ASN.1 APPLICATION[12] wrapped SEQUENCE.
 func (r *TGSReq) Marshal() ([]byte, error) {
-	inner := tgsReqInner{
+	inner := tgsReqMarshal{
 		PVNO:    KerberosV5,
 		MsgType: MsgTypeTGSReq,
 		PAData:  r.PAData,
-		ReqBody: r.ReqBody,
+		ReqBody: marshalKDCReqBody(r.ReqBody),
 	}
-	seq_contents, err := marshalSequenceContents(inner)
+	seq_bytes, err := asn1.Marshal(inner)
 	if err != nil {
 		return nil, err
 	}
-	return wrapApplication(MsgTypeTGSReq, seq_contents)
+	return wrapApplication(MsgTypeTGSReq, seq_bytes)
 }
 
 // Unmarshal decodes a TGS-REQ from an ASN.1 APPLICATION[12] wrapped SEQUENCE.
@@ -55,18 +63,8 @@ func (r *TGSReq) Unmarshal(data []byte) (int, error) {
 		return 0, fmt.Errorf("tgsreq: %w", err)
 	}
 
-	seq_bytes, err := asn1.Marshal(asn1.RawValue{
-		Class:      asn1.ClassUniversal,
-		Tag:        asn1.TagSequence,
-		IsCompound: true,
-		Bytes:      inner_bytes,
-	})
-	if err != nil {
-		return 0, err
-	}
-
 	var inner tgsReqInner
-	if _, err := asn1.Unmarshal(seq_bytes, &inner); err != nil {
+	if _, err := asn1.Unmarshal(inner_bytes, &inner); err != nil {
 		return 0, fmt.Errorf("tgsreq inner unmarshal: %w", err)
 	}
 

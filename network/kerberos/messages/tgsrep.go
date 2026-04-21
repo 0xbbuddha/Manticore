@@ -31,9 +31,14 @@ func (r *TGSRep) Marshal() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	var tkt_raw asn1.RawValue
-	if _, err := asn1.Unmarshal(tkt_bytes, &tkt_raw); err != nil {
-		return nil, err
+	// Pre-encode [5] EXPLICIT { APPLICATION[1] bytes }.
+	// Go ignores explicit,tag:N for asn1.RawValue with FullBytes set, so we build
+	// the [5] wrapper manually using Bytes (which Go wraps with Class/Tag/IsCompound).
+	tkt_raw := asn1.RawValue{
+		Class:      asn1.ClassContextSpecific,
+		Tag:        5,
+		IsCompound: true,
+		Bytes:      tkt_bytes,
 	}
 
 	inner := kdcRepInner{
@@ -45,11 +50,11 @@ func (r *TGSRep) Marshal() ([]byte, error) {
 		Ticket:  tkt_raw,
 		EncPart: r.EncPart,
 	}
-	seq_contents, err := marshalSequenceContents(inner)
+	seq_bytes, err := asn1.Marshal(inner)
 	if err != nil {
 		return nil, err
 	}
-	return wrapApplication(MsgTypeTGSRep, seq_contents)
+	return wrapApplication(MsgTypeTGSRep, seq_bytes)
 }
 
 // Unmarshal decodes a TGS-REP from an ASN.1 APPLICATION[13] wrapped SEQUENCE.
@@ -60,18 +65,8 @@ func (r *TGSRep) Unmarshal(data []byte) (int, error) {
 		return 0, fmt.Errorf("tgsrep: %w", err)
 	}
 
-	seq_bytes, err := asn1.Marshal(asn1.RawValue{
-		Class:      asn1.ClassUniversal,
-		Tag:        asn1.TagSequence,
-		IsCompound: true,
-		Bytes:      inner_bytes,
-	})
-	if err != nil {
-		return 0, err
-	}
-
 	var inner kdcRepInner
-	if _, err := asn1.Unmarshal(seq_bytes, &inner); err != nil {
+	if _, err := asn1.Unmarshal(inner_bytes, &inner); err != nil {
 		return 0, fmt.Errorf("tgsrep inner unmarshal: %w", err)
 	}
 
@@ -82,12 +77,10 @@ func (r *TGSRep) Unmarshal(data []byte) (int, error) {
 	r.CName = inner.CName
 	r.EncPart = inner.EncPart
 
-	// Unmarshal the ticket from the raw value
-	tkt_raw_bytes, err := asn1.Marshal(inner.Ticket)
-	if err != nil {
-		return 0, err
-	}
-	if _, err := r.Ticket.Unmarshal(tkt_raw_bytes); err != nil {
+	// inner.Ticket.Bytes is the APPLICATION[1] ticket (Go does not strip the [5] explicit
+	// wrapper when unmarshaling into asn1.RawValue — the outer tag stays in the RawValue
+	// itself, and Bytes holds the content of that outer tag = the full APPLICATION[1]).
+	if _, err := r.Ticket.Unmarshal(inner.Ticket.Bytes); err != nil {
 		return 0, fmt.Errorf("tgsrep ticket unmarshal: %w", err)
 	}
 

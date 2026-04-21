@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// asReqInner is the inner SEQUENCE of an AS-REQ message.
+// asReqInner is the inner SEQUENCE of an AS-REQ message for unmarshaling.
 // It is wrapped in an APPLICATION[10] tag by Marshal.
 type asReqInner struct {
 	// PVNO is the Kerberos protocol version number (always 5).
@@ -16,6 +16,14 @@ type asReqInner struct {
 	PAData []PAData `asn1:"explicit,tag:3,optional"`
 	// ReqBody is the KDC request body.
 	ReqBody KDCReqBody `asn1:"explicit,tag:4"`
+}
+
+// asReqMarshal is the inner SEQUENCE for marshaling — uses GeneralString types.
+type asReqMarshal struct {
+	PVNO    int              `asn1:"explicit,tag:1"`
+	MsgType int              `asn1:"explicit,tag:2"`
+	PAData  []PAData         `asn1:"explicit,tag:3,optional"`
+	ReqBody kdcReqBodyMarshal `asn1:"explicit,tag:4"`
 }
 
 // ASReq is a Kerberos AS-REQ (Authentication Service Request) message,
@@ -34,17 +42,17 @@ type ASReq struct {
 
 // Marshal encodes the AS-REQ as an ASN.1 APPLICATION[10] wrapped SEQUENCE.
 func (r *ASReq) Marshal() ([]byte, error) {
-	inner := asReqInner{
+	inner := asReqMarshal{
 		PVNO:    KerberosV5,
 		MsgType: MsgTypeASReq,
 		PAData:  r.PAData,
-		ReqBody: r.ReqBody,
+		ReqBody: marshalKDCReqBody(r.ReqBody),
 	}
-	seq_contents, err := marshalSequenceContents(inner)
+	seq_bytes, err := asn1.Marshal(inner)
 	if err != nil {
 		return nil, err
 	}
-	return wrapApplication(MsgTypeASReq, seq_contents)
+	return wrapApplication(MsgTypeASReq, seq_bytes)
 }
 
 // Unmarshal decodes an AS-REQ from an ASN.1 APPLICATION[10] wrapped SEQUENCE.
@@ -55,18 +63,8 @@ func (r *ASReq) Unmarshal(data []byte) (int, error) {
 		return 0, fmt.Errorf("asreq: %w", err)
 	}
 
-	seq_bytes, err := asn1.Marshal(asn1.RawValue{
-		Class:      asn1.ClassUniversal,
-		Tag:        asn1.TagSequence,
-		IsCompound: true,
-		Bytes:      inner_bytes,
-	})
-	if err != nil {
-		return 0, err
-	}
-
 	var inner asReqInner
-	if _, err := asn1.Unmarshal(seq_bytes, &inner); err != nil {
+	if _, err := asn1.Unmarshal(inner_bytes, &inner); err != nil {
 		return 0, fmt.Errorf("asreq inner unmarshal: %w", err)
 	}
 

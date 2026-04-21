@@ -57,27 +57,51 @@ type PAData struct {
 // as defined in RFC 4120 Section 5.4.1.
 type KDCOptions = asn1.BitString
 
-// marshalSequenceContents marshals v to ASN.1 and returns the raw SEQUENCE contents
-// (stripping the outer SEQUENCE tag and length).
-func marshalSequenceContents(v interface{}) ([]byte, error) {
-	b, err := asn1.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-	var raw asn1.RawValue
-	if _, err := asn1.Unmarshal(b, &raw); err != nil {
-		return nil, err
-	}
-	return raw.Bytes, nil
+// generalStringRaw encodes a string as an ASN.1 GeneralString (tag 27 = 0x1B).
+// Go's encoding/asn1 ignores the "generalstring" struct tag and always produces
+// PrintableString for ASCII-safe content. Kerberos requires GeneralString for
+// realm names and principal name components (RFC 4120).
+func generalStringRaw(s string) asn1.RawValue {
+	return asn1.RawValue{Class: asn1.ClassUniversal, Tag: 27, Bytes: []byte(s)}
 }
 
-// wrapApplication wraps the given inner bytes in an ASN.1 APPLICATION tag.
-func wrapApplication(tag int, inner []byte) ([]byte, error) {
+// realmExplicit encodes s as an ASN.1 [tag] EXPLICIT { GeneralString } context element.
+// Go's asn1.Marshal ignores explicit,tag:N struct tags for asn1.RawValue fields, so we
+// pre-encode the context wrapper (a0|tag constructed) directly in the returned RawValue.
+func realmExplicit(tag int, s string) asn1.RawValue {
+	gs := generalStringRaw(s)
+	gsBytes, err := asn1.Marshal(gs)
+	if err != nil {
+		panic("messages: failed to marshal realm GeneralString: " + err.Error())
+	}
+	return asn1.RawValue{Class: asn1.ClassContextSpecific, Tag: tag, IsCompound: true, Bytes: gsBytes}
+}
+
+// PrincipalNameMarshal is the wire representation of PrincipalName for marshaling.
+// It uses []asn1.RawValue (GeneralString) instead of []string, which Go's asn1
+// would incorrectly encode as PrintableString.
+type PrincipalNameMarshal struct {
+	NameType   int             `asn1:"explicit,tag:0"`
+	NameString []asn1.RawValue `asn1:"explicit,tag:1"`
+}
+
+// MarshalPrincipalName converts a PrincipalName to its GeneralString-encoded form.
+func MarshalPrincipalName(pn PrincipalName) PrincipalNameMarshal {
+	strs := make([]asn1.RawValue, len(pn.NameString))
+	for i, s := range pn.NameString {
+		strs[i] = generalStringRaw(s)
+	}
+	return PrincipalNameMarshal{NameType: pn.NameType, NameString: strs}
+}
+
+// wrapApplication wraps seqBytes (a full DER-encoded SEQUENCE) in an ASN.1 APPLICATION tag,
+// producing APPLICATION[tag] { SEQUENCE { ... } } as required by RFC 4120.
+func wrapApplication(tag int, seqBytes []byte) ([]byte, error) {
 	return asn1.Marshal(asn1.RawValue{
 		Class:      asn1.ClassApplication,
 		Tag:        tag,
 		IsCompound: true,
-		Bytes:      inner,
+		Bytes:      seqBytes,
 	})
 }
 

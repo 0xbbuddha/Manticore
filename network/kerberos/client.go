@@ -23,7 +23,7 @@ import (
 //	c := kerberos.NewClient("john", "CORP.LOCAL", "10.0.0.1")
 //	c.WithPassword("secret")
 //	if err := c.GetTGT(); err != nil { ... }
-//	ticket, sessionKey, err := c.GetTGS("cifs/dc01.corp.local")
+//	ticket, sessionKey, err := c.GetTGS("cifs/dc01.corp.local", true)
 type KerberosClient struct {
 	username string
 	realm    string
@@ -32,10 +32,11 @@ type KerberosClient struct {
 	password string
 
 	// Populated after a successful GetTGT call.
-	tgtTicket  messages.Ticket
-	sessionKey []byte
+	tgtTicket    messages.Ticket
+	tgtTicketRaw []byte // raw APPLICATION[1] bytes as received from KDC
+	sessionKey   []byte
 	sessionEType int
-	hasTGT     bool
+	hasTGT       bool
 }
 
 // NewClient creates a new KerberosClient for the given username, realm and KDC host.
@@ -65,36 +66,46 @@ func (c *KerberosClient) WithCCache(_ string) error {
 // GetTGT requests a Ticket Granting Ticket from the KDC using the password
 // configured via WithPassword.
 //
-// It performs the full AS-REQ/AS-REP exchange with PA-ENC-TIMESTAMP pre-auth:
-//  1. Probe without pre-auth to discover the KDC's preferred etype and salt.
-//  2. Derive the client key (StringToKey) from the password + salt.
-//  3. Re-send with PA-ENC-TIMESTAMP encrypted under that key.
-//  4. Decrypt the AS-REP enc-part to obtain the session key and TGT ticket.
+// Windows KDCs silently drop AS-REQs without PA-ENC-TIMESTAMP, so we skip
+// the probe and send PA-ENC-TIMESTAMP immediately with the default AD salt
+// (realm+username). If the KDC returns PREAUTH_REQUIRED with different
+// etype/salt info, we retry once with the corrected values.
 func (c *KerberosClient) GetTGT() error {
 	if c.password == "" {
 		return fmt.Errorf("kerberos: no credentials configured: call WithPassword first")
 	}
 
-	// Step 1: probe without pre-auth to get KDC_ERR_PREAUTH_REQUIRED with ETYPE-INFO2.
-	probe_resp, err := c.sendASReq(nil)
+	// Attempt with default AD salt. The KDC may respond with PREAUTH_REQUIRED
+	// if a different salt or etype is required.
+	etype := messages.ETypeAES256CTSHMACSHA196
+	salt := c.realm + c.username
+	resp, err := c.sendASReqWithPreauth(etype, salt, nil)
 	if err != nil {
 		return err
 	}
 
-	// Parse the probe response — expect a KRBError with ErrPreauthRequired.
+	// If the KDC requires a different etype/salt, it responds with PREAUTH_REQUIRED.
 	var krb_err messages.KRBError
-	if _, parse_err := krb_err.Unmarshal(probe_resp); parse_err == nil {
-		if krb_err.ErrorCode != messages.ErrPreauthRequired {
-			return fmt.Errorf("kerberos: unexpected KDC error %d: %s", krb_err.ErrorCode, krb_err.EText)
+	if _, parse_err := krb_err.Unmarshal(resp); parse_err == nil {
+		if krb_err.ErrorCode == messages.ErrPreauthRequired {
+			etype, salt, s2k_params := c.pickETypeFromError(krb_err)
+			return c.doASReqWithPreauth(etype, salt, s2k_params)
 		}
-		// Extract preferred etype and salt from ETYPE-INFO2 in EData.
-		etype, salt, s2k_params := c.pickETypeFromError(krb_err)
-		return c.doASReqWithPreauth(etype, salt, s2k_params)
+		return fmt.Errorf("kerberos: KDC error %d: %s", krb_err.ErrorCode, krb_err.EText)
 	}
 
-	// The KDC responded with an AS-REP directly (no pre-auth required — unusual but valid).
-	// Try to decrypt with default etype/salt.
-	return c.processASRep(probe_resp, messages.ETypeAES256CTSHMACSHA196, c.realm+c.username, nil)
+	return c.processASRep(resp, etype, salt, nil)
+}
+
+// pacRequestPA returns a PA-PAC-REQUEST PAData element with include-pac = TRUE.
+// Windows KDCs require at least this in every AS-REQ to produce a response.
+func pacRequestPA() messages.PAData {
+	// PA-PAC-REQUEST ::= SEQUENCE { include-pac [0] BOOLEAN }
+	// Encoded: 30 05 a0 03 01 01 ff
+	return messages.PAData{
+		PADataType:  messages.PAPACRequest,
+		PADataValue: []byte{0x30, 0x05, 0xa0, 0x03, 0x01, 0x01, 0xff},
+	}
 }
 
 // GetTGS requests a service ticket for the given Service Principal Name.
@@ -103,8 +114,11 @@ func (c *KerberosClient) GetTGT() error {
 // The SPN format is "service/host" (e.g. "cifs/dc01.corp.local") or
 // "service/host@REALM".
 //
+// includePAC controls whether the KDC should include the PAC in the service ticket.
+// Pass false for kerberoasting (produces shorter, hashcat-crackable ciphers).
+//
 // Returns the service Ticket and its associated session key bytes.
-func (c *KerberosClient) GetTGS(spn string) (messages.Ticket, []byte, error) {
+func (c *KerberosClient) GetTGS(spn string, includePAC bool) (messages.Ticket, []byte, error) {
 	if !c.hasTGT {
 		return messages.Ticket{}, nil, fmt.Errorf("kerberos: no TGT: call GetTGT first")
 	}
@@ -122,11 +136,17 @@ func (c *KerberosClient) GetTGS(spn string) (messages.Ticket, []byte, error) {
 
 	// Build TGS-REQ.
 	nonce := randomNonce()
+	// PA-PAC-REQUEST: SEQUENCE { [0] BOOLEAN } — TRUE=0xff, FALSE=0x00
+	pacBool := byte(0xff)
+	if !includePAC {
+		pacBool = 0x00
+	}
 	tgs_req := &messages.TGSReq{
 		PVNO:    messages.KerberosV5,
 		MsgType: messages.MsgTypeTGSReq,
 		PAData: []messages.PAData{
 			{PADataType: messages.PATGSReq, PADataValue: ap_req_bytes},
+			{PADataType: messages.PAPACRequest, PADataValue: []byte{0x30, 0x05, 0xa0, 0x03, 0x01, 0x01, pacBool}},
 		},
 		ReqBody: messages.KDCReqBody{
 			KDCOptions: kdcOptionsForwardable(),
@@ -146,7 +166,6 @@ func (c *KerberosClient) GetTGS(spn string) (messages.Ticket, []byte, error) {
 	if err != nil {
 		return messages.Ticket{}, nil, fmt.Errorf("kerberos: marshal TGS-REQ: %w", err)
 	}
-
 	resp, err := kdcSend(c.kdcHost, defaultKDCPort, tgs_req_bytes)
 	if err != nil {
 		return messages.Ticket{}, nil, err
@@ -300,14 +319,14 @@ func pickBestEType(info messages.ETypeInfo2, default_salt string) (int, string, 
 	return e.EType, e.Salt, e.S2KParams
 }
 
-// doASReqWithPreauth derives the client key and sends an AS-REQ with PA-ENC-TIMESTAMP.
-func (c *KerberosClient) doASReqWithPreauth(etype int, salt string, s2k_params []byte) error {
+// sendASReqWithPreauth builds and sends an AS-REQ with PA-ENC-TIMESTAMP.
+// Returns the raw KDC response bytes.
+func (c *KerberosClient) sendASReqWithPreauth(etype int, salt string, s2k_params []byte) ([]byte, error) {
 	key, err := kerbcrypto.StringToKey(etype, c.password, salt, s2k_params)
 	if err != nil {
-		return fmt.Errorf("kerberos: StringToKey: %w", err)
+		return nil, fmt.Errorf("kerberos: StringToKey: %w", err)
 	}
 
-	// Build PA-ENC-TIMESTAMP.
 	now := time.Now().UTC()
 	ts := &messages.PAEncTSEnc{
 		PATimestamp: now,
@@ -315,30 +334,34 @@ func (c *KerberosClient) doASReqWithPreauth(etype int, salt string, s2k_params [
 	}
 	ts_bytes, err := ts.Marshal()
 	if err != nil {
-		return fmt.Errorf("kerberos: marshal PA-ENC-TIMESTAMP: %w", err)
+		return nil, fmt.Errorf("kerberos: marshal PA-ENC-TIMESTAMP: %w", err)
 	}
 
 	enc_ts, err := kerbcrypto.Encrypt(etype, key, kerbcrypto.KeyUsageASReqPAEncTimestamp, ts_bytes)
 	if err != nil {
-		return fmt.Errorf("kerberos: encrypt PA-ENC-TIMESTAMP: %w", err)
+		return nil, fmt.Errorf("kerberos: encrypt PA-ENC-TIMESTAMP: %w", err)
 	}
 
 	pa_enc_ts := messages.EncryptedData{EType: etype, Cipher: enc_ts}
 	pa_enc_ts_bytes, err := asn1.Marshal(pa_enc_ts)
 	if err != nil {
-		return fmt.Errorf("kerberos: marshal EncryptedData for PA-ENC-TIMESTAMP: %w", err)
+		return nil, fmt.Errorf("kerberos: marshal EncryptedData for PA-ENC-TIMESTAMP: %w", err)
 	}
 
 	pa_data := []messages.PAData{
+		pacRequestPA(),
 		{PADataType: messages.PAEncTimestamp, PADataValue: pa_enc_ts_bytes},
 	}
+	return c.sendASReq(pa_data)
+}
 
-	resp, err := c.sendASReq(pa_data)
+// doASReqWithPreauth sends an AS-REQ with PA-ENC-TIMESTAMP and processes the AS-REP.
+func (c *KerberosClient) doASReqWithPreauth(etype int, salt string, s2k_params []byte) error {
+	resp, err := c.sendASReqWithPreauth(etype, salt, s2k_params)
 	if err != nil {
 		return err
 	}
 
-	// Check for error.
 	var krb_err messages.KRBError
 	if _, parse_err := krb_err.Unmarshal(resp); parse_err == nil {
 		return fmt.Errorf("kerberos: GetTGT failed (error %d): %s", krb_err.ErrorCode, krb_err.EText)
@@ -370,6 +393,7 @@ func (c *KerberosClient) processASRep(resp []byte, etype int, salt string, s2k_p
 	}
 
 	c.tgtTicket = as_rep.Ticket
+	c.tgtTicketRaw = as_rep.TicketRaw
 	c.sessionKey = enc_as_rep.Key.KeyValue
 	c.sessionEType = enc_as_rep.Key.KeyType
 	c.hasTGT = true
@@ -400,7 +424,6 @@ func (c *KerberosClient) buildAPReq() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("marshal Authenticator: %w", err)
 	}
-
 	enc_auth, err := kerbcrypto.Encrypt(c.sessionEType, c.sessionKey, kerbcrypto.KeyUsageTGSReqPAAPReqAuthen, auth_bytes)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt Authenticator: %w", err)
@@ -411,6 +434,7 @@ func (c *KerberosClient) buildAPReq() ([]byte, error) {
 		MsgType:   messages.MsgTypeAPReq,
 		APOptions: asn1.BitString{Bytes: []byte{0x00, 0x00, 0x00, 0x00}, BitLength: 32},
 		Ticket:    c.tgtTicket,
+		TicketRaw: c.tgtTicketRaw,
 		Authenticator: messages.EncryptedData{
 			EType:  c.sessionEType,
 			Cipher: enc_auth,

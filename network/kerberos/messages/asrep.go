@@ -17,8 +17,10 @@ type kdcRepInner struct {
 	CRealm string `asn1:"explicit,tag:3,generalstring"`
 	// CName is the client's principal name.
 	CName PrincipalName `asn1:"explicit,tag:4"`
-	// Ticket is the issued ticket (APPLICATION[1]), stored as raw bytes.
-	Ticket asn1.RawValue `asn1:"explicit,tag:5"`
+	// Ticket is pre-encoded as [5] EXPLICIT { APPLICATION[1] bytes }.
+	// Go ignores explicit,tag:N for asn1.RawValue (both Marshal and Unmarshal), so we store
+	// the [5] context wrapper ourselves. Bytes = APPLICATION[1] TLV after Unmarshal.
+	Ticket asn1.RawValue
 	// EncPart is the encrypted part of the reply containing the session key.
 	EncPart EncryptedData `asn1:"explicit,tag:6"`
 }
@@ -37,8 +39,11 @@ type ASRep struct {
 	CRealm string
 	// CName is the client's principal name as returned by the KDC.
 	CName PrincipalName
-	// Ticket is the issued Ticket Granting Ticket.
+	// Ticket is the issued Ticket Granting Ticket (parsed).
 	Ticket Ticket
+	// TicketRaw holds the raw APPLICATION[1] ticket bytes as received from the KDC.
+	// Use these verbatim in AP-REQ to avoid re-encoding differences.
+	TicketRaw []byte
 	// EncPart is the encrypted reply body, decryptable with the client's key.
 	EncPart EncryptedData
 }
@@ -49,9 +54,14 @@ func (r *ASRep) Marshal() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	var tkt_raw asn1.RawValue
-	if _, err := asn1.Unmarshal(tkt_bytes, &tkt_raw); err != nil {
-		return nil, err
+	// Pre-encode [5] EXPLICIT { APPLICATION[1] bytes }.
+	// Go ignores explicit,tag:N for asn1.RawValue with FullBytes set, so we build
+	// the [5] wrapper manually using Bytes (which Go wraps with Class/Tag/IsCompound).
+	tkt_raw := asn1.RawValue{
+		Class:      asn1.ClassContextSpecific,
+		Tag:        5,
+		IsCompound: true,
+		Bytes:      tkt_bytes,
 	}
 
 	inner := kdcRepInner{
@@ -63,11 +73,11 @@ func (r *ASRep) Marshal() ([]byte, error) {
 		Ticket:  tkt_raw,
 		EncPart: r.EncPart,
 	}
-	seq_contents, err := marshalSequenceContents(inner)
+	seq_bytes, err := asn1.Marshal(inner)
 	if err != nil {
 		return nil, err
 	}
-	return wrapApplication(MsgTypeASRep, seq_contents)
+	return wrapApplication(MsgTypeASRep, seq_bytes)
 }
 
 // Unmarshal decodes an AS-REP from an ASN.1 APPLICATION[11] wrapped SEQUENCE.
@@ -78,18 +88,8 @@ func (r *ASRep) Unmarshal(data []byte) (int, error) {
 		return 0, fmt.Errorf("asrep: %w", err)
 	}
 
-	seq_bytes, err := asn1.Marshal(asn1.RawValue{
-		Class:      asn1.ClassUniversal,
-		Tag:        asn1.TagSequence,
-		IsCompound: true,
-		Bytes:      inner_bytes,
-	})
-	if err != nil {
-		return 0, err
-	}
-
 	var inner kdcRepInner
-	if _, err := asn1.Unmarshal(seq_bytes, &inner); err != nil {
+	if _, err := asn1.Unmarshal(inner_bytes, &inner); err != nil {
 		return 0, fmt.Errorf("asrep inner unmarshal: %w", err)
 	}
 
@@ -100,12 +100,11 @@ func (r *ASRep) Unmarshal(data []byte) (int, error) {
 	r.CName = inner.CName
 	r.EncPart = inner.EncPart
 
-	// Unmarshal the ticket from the raw value
-	tkt_raw_bytes, err := asn1.Marshal(inner.Ticket)
-	if err != nil {
-		return 0, err
-	}
-	if _, err := r.Ticket.Unmarshal(tkt_raw_bytes); err != nil {
+	// inner.Ticket.Bytes holds the APPLICATION[1] ticket bytes as sent by the KDC.
+	// (Go does not strip the [5] explicit wrapper for asn1.RawValue fields — the outer
+	// context tag stays in the RawValue, and Bytes = content inside that tag = APPLICATION[1].)
+	r.TicketRaw = inner.Ticket.Bytes
+	if _, err := r.Ticket.Unmarshal(r.TicketRaw); err != nil {
 		return 0, fmt.Errorf("asrep ticket unmarshal: %w", err)
 	}
 
