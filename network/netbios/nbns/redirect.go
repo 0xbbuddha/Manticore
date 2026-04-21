@@ -2,6 +2,7 @@ package nbns
 
 import (
 	"net"
+	"sync"
 )
 
 // RedirectInfo contains information about where to redirect a client
@@ -12,6 +13,7 @@ type RedirectInfo struct {
 
 // RedirectManager handles NBNS redirection
 type RedirectManager struct {
+	mu          sync.RWMutex
 	redirectMap map[string]RedirectInfo // Maps scope to redirect info
 }
 
@@ -24,6 +26,8 @@ func NewRedirectManager() *RedirectManager {
 
 // AddRedirect adds or updates a redirect mapping
 func (r *RedirectManager) AddRedirect(scope string, serverIP net.IP, port uint16) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.redirectMap[scope] = RedirectInfo{
 		ServerIP:   serverIP,
 		ServerPort: port,
@@ -32,11 +36,15 @@ func (r *RedirectManager) AddRedirect(scope string, serverIP net.IP, port uint16
 
 // RemoveRedirect removes a redirect mapping
 func (r *RedirectManager) RemoveRedirect(scope string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	delete(r.redirectMap, scope)
 }
 
 // GetRedirect returns redirect information for a scope
 func (r *RedirectManager) GetRedirect(scope string) (RedirectInfo, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	info, exists := r.redirectMap[scope]
 	return info, exists
 }

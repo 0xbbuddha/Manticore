@@ -189,7 +189,7 @@ func (s *TCPServer) handleMessage(data []byte) ([]byte, error) {
 		Header: NBNSHeader{
 			TransactionID: packet.Header.TransactionID,
 			Flags:         FlagResponse | FlagAuthoritative,
-			Questions:     packet.Header.Questions,
+			Questions:     0,
 		},
 	}
 

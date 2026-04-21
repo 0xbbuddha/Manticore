@@ -182,6 +182,33 @@ func (n *ADDR_ENTRY) Marshal() []byte {
 	return buf
 }
 
+// Unmarshal decodes an ADDR_ENTRY from a byte slice
+func (n *ADDR_ENTRY) Unmarshal(data []byte) error {
+	if len(data) < 6 {
+		return fmt.Errorf("ADDR_ENTRY too short: need 6 bytes, got %d", len(data))
+	}
+	n.Flags = binary.BigEndian.Uint16(data[0:2])
+	n.Address = binary.BigEndian.Uint32(data[2:6])
+	return nil
+}
+
+// IP returns the address as a net.IP
+func (n *ADDR_ENTRY) IP() net.IP {
+	ip := make(net.IP, 4)
+	binary.BigEndian.PutUint32(ip, n.Address)
+	return ip
+}
+
+// ParseIPFromRData extracts an IP address from NB resource record RData.
+// RData is expected to be in ADDR_ENTRY format (2 bytes flags + 4 bytes address).
+func ParseIPFromRData(rdata []byte) (net.IP, error) {
+	var entry ADDR_ENTRY
+	if err := entry.Unmarshal(rdata); err != nil {
+		return nil, err
+	}
+	return entry.IP(), nil
+}
+
 // returns static 6 bytes number
 func (n *ADDR_ENTRY) Length() uint16 {
 	return 6

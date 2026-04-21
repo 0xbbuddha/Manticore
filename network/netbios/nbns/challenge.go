@@ -1,6 +1,7 @@
 package nbns
 
 import (
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -97,7 +98,11 @@ func (c *NameChallenger) ChallengeOwnership(name string, owner net.IP) (bool, er
 
 		// Verify owner IP in response
 		for _, rr := range response.Answers {
-			if net.IP(rr.RData).Equal(owner) {
+			ip, err := ParseIPFromRData(rr.RData)
+			if err != nil {
+				continue
+			}
+			if ip.Equal(owner) {
 				return true, nil
 			}
 		}
@@ -115,10 +120,12 @@ func (c *NameChallenger) DefendName(packet *NBNSPacket, response *NBNSPacket) {
 
 	for _, q := range packet.Questions {
 		// Check if we own this name
-		owners, nameType, err := c.nbns.QueryName(q.Name.Name)
+		owners, nameType, ttl, err := c.nbns.QueryName(q.Name.Name, q.Name.ScopeID)
 		if err != nil {
 			continue
 		}
+
+		ttlSeconds := uint32(ttl.Seconds())
 
 		// Create defense response
 		response.Header.Flags = FlagResponse | FlagAuthoritative
@@ -136,7 +143,7 @@ func (c *NameChallenger) DefendName(packet *NBNSPacket, response *NBNSPacket) {
 				Name:     q.Name,
 				Type:     q.Type,
 				Class:    q.Class,
-				TTL:      uint32(24 * time.Hour.Seconds()),
+				TTL:      ttlSeconds,
 				RDLength: uint16(owner.Length()),
 				RData:    owner.Marshal(),
 			}
@@ -147,8 +154,12 @@ func (c *NameChallenger) DefendName(packet *NBNSPacket, response *NBNSPacket) {
 	}
 }
 
-// generateTransactionID creates a random transaction ID
+// generateTransactionID creates a cryptographically random transaction ID
 func generateTransactionID() uint16 {
-	// Simple implementation - could be made more random
-	return uint16(time.Now().UnixNano() & 0xFFFF)
+	var buf [2]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		// Fallback to time-based if crypto/rand fails (should never happen)
+		return uint16(time.Now().UnixNano() & 0xFFFF)
+	}
+	return binary.BigEndian.Uint16(buf[:])
 }

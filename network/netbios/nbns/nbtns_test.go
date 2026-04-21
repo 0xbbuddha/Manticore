@@ -35,13 +35,13 @@ func TestNBNSIntegration(t *testing.T) {
 	t.Run("NameRegistration", func(t *testing.T) {
 		name := "TESTNAME"
 		ip := net.ParseIP("192.168.1.1")
-		err := nbns.RegisterName(name, Unique, ip, 24*time.Hour)
+		err := nbns.RegisterName(name, "", Unique, ip, 24*time.Hour)
 		if err != nil {
 			t.Errorf("Failed to register name: %v", err)
 		}
 
 		// Verify registration
-		owners, nameType, err := nbns.QueryName(name)
+		owners, nameType, _, err := nbns.QueryName(name, "")
 		if err != nil {
 			t.Errorf("Failed to query name: %v", err)
 		}
@@ -60,13 +60,13 @@ func TestNBNSIntegration(t *testing.T) {
 		ip2 := net.ParseIP("192.168.1.3")
 
 		// Register first name
-		err := nbns.RegisterName(name, Unique, ip1, 24*time.Hour)
+		err := nbns.RegisterName(name, "", Unique, ip1, 24*time.Hour)
 		if err != nil {
 			t.Errorf("Failed to register first name: %v", err)
 		}
 
 		// Try to register same name
-		err = nbns.RegisterName(name, Unique, ip2, 24*time.Hour)
+		err = nbns.RegisterName(name, "", Unique, ip2, 24*time.Hour)
 		if err == nil {
 			t.Error("Expected conflict error, got nil")
 		}
@@ -79,18 +79,18 @@ func TestNBNSIntegration(t *testing.T) {
 		ip2 := net.ParseIP("192.168.1.5")
 
 		// Register group members
-		err := nbns.RegisterName(name, Group, ip1, 24*time.Hour)
+		err := nbns.RegisterName(name, "", Group, ip1, 24*time.Hour)
 		if err != nil {
 			t.Errorf("Failed to register first group member: %v", err)
 		}
 
-		err = nbns.RegisterName(name, Group, ip2, 24*time.Hour)
+		err = nbns.RegisterName(name, "", Group, ip2, 24*time.Hour)
 		if err != nil {
 			t.Errorf("Failed to register second group member: %v", err)
 		}
 
 		// Verify group
-		owners, nameType, err := nbns.QueryName(name)
+		owners, nameType, _, err := nbns.QueryName(name, "")
 		if err != nil {
 			t.Errorf("Failed to query group: %v", err)
 		}

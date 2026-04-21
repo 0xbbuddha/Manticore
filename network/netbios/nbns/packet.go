@@ -100,6 +100,7 @@ func (p *NBNSPacket) Marshal() ([]byte, error) {
 		// Add name length and name
 		buf = append(buf, byte(len(encoded)))
 		buf = append(buf, []byte(encoded)...)
+		buf = append(buf, byte(0x00)) // null terminator
 
 		// Add type and class
 		buf = binary.BigEndian.AppendUint16(buf, q.Type)
@@ -202,7 +203,7 @@ func (p *NBNSPacket) Unmarshal(data []byte) (int, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode name: %v", err)
 			}
-			offset += nameLen
+			offset += nameLen + 1 // +1 for null terminator
 
 			if offset+10 > len(data) {
 				return nil, fmt.Errorf("truncated resource record")
